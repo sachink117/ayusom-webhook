@@ -80,50 +80,75 @@ app.post('/webhook', async (req, res) => {
             message: text
           });
 
+          // Contact number request — handle at any stage
+          if (
+            text.toLowerCase().includes('whatsapp') ||
+            text.toLowerCase().includes('contact') ||
+            text.toLowerCase().includes('call') ||
+            text.toLowerCase().includes('phone') ||
+            text.toLowerCase().includes('number') ||
+            text.toLowerCase().includes('direct')
+          ) {
+            await sendMessage(senderId,
+`Bilkul! Aap seedha hamare specialist se baat kar sakte hain. 🙏
+
+📱 WhatsApp: +91 85951 60713
+
+Hum personally aapki problem sunenge aur sahi guidance denge.
+(You can also reach us directly on WhatsApp anytime.)
+
+Ayusom Herbals 🌿`
+            );
+            continue;
+          }
+
           if (state === 'new') {
             userState[senderId] = 'asked_duration';
             await sendMessage(senderId,
-`🙏 Namaste! Welcome to Ayusom Herbals.
+`🙏 Namaste! Ayusom Herbals mein aapka swagat hai.
 
-We specialize in Ayurvedic treatment for chronic sinus — naturally, without dependency on sprays or steroids.
+Hum chronic sinus conditions ka Ayurvedic treatment karte hain — naturally, bina spray ya steroid dependency ke.
+(We specialize in Ayurvedic treatment for chronic sinus — without dependency on sprays or steroids.)
 
-To prepare your personalized assessment, please answer a few quick questions.
+Aapke liye personalized assessment ke liye kuch quick questions —
 
-✦ How long have you been suffering from sinus?
 ✦ Aapko sinus ki problem kitne samay se hai?
+(How long have you been suffering from sinus?)
 
-1️⃣ Less than 6 months / 6 mahine se kam
-2️⃣ 6 months – 2 years / 6 mahine se 2 saal
-3️⃣ More than 2 years / 2 saal se zyada`
+1️⃣ 6 mahine se kam (Less than 6 months)
+2️⃣ 6 mahine se 2 saal (6 months – 2 years)
+3️⃣ 2 saal se zyada (More than 2 years)
+
+Number reply karein.`
             );
 
           } else if (state === 'asked_duration') {
             if (!['1','2','3'].includes(text)) {
-              await sendMessage(senderId, `Please reply with 1, 2 or 3. / Kripya 1, 2 ya 3 reply karein. 🙏`);
+              await sendMessage(senderId, `Kripya 1, 2 ya 3 mein se reply karein. 🙏 (Please reply with 1, 2 or 3.)`);
             } else {
-              const duration = text === '1' ? 'less than 6 months' : text === '2' ? '6 months to 2 years' : 'more than 2 years';
+              const duration = text === '1' ? '6 mahine se kam' : text === '2' ? '6 mahine se 2 saal' : '2 saal se zyada';
               userProfile[senderId] = { ...profile, duration };
               userState[senderId] = 'asked_symptoms';
               await sendMessage(senderId,
-`Noted. / Samajh gaya. ✅
+`Noted. ✅
 
-✦ What are your main symptoms?
-✦ Mukhya symptoms kya hain?
+✦ Aapke mukhya symptoms kya hain?
+(What are your main symptoms?)
 
-1️⃣ Blocked nose / Naak band rehna
-2️⃣ Headache & facial pressure / Sar dard aur bhaari chehra
-3️⃣ Dependent on Otrivin / nasal spray
-4️⃣ Post nasal drip / Gale mein balgam
-5️⃣ Sleep disruption / Raat ko neend nahi
+1️⃣ Naak band rehna (Blocked nose)
+2️⃣ Sar dard aur chehra bhaari rehna (Headache & facial pressure)
+3️⃣ Otrivin / nasal spray pe depend ho gaya (Spray dependency)
+4️⃣ Gale mein balgam rehna (Post nasal drip)
+5️⃣ Raat ko neend nahi aati (Sleep disruption)
 
-Reply with number.`
+Number reply karein.`
               );
             }
 
           } else if (state === 'asked_symptoms') {
             const symptomMap = {
-              '1': 'Blocked nose',
-              '2': 'Headache & facial pressure',
+              '1': 'Naak band rehna',
+              '2': 'Sar dard aur facial pressure',
               '3': 'Otrivin/spray dependency',
               '4': 'Post nasal drip',
               '5': 'Sleep disruption'
@@ -132,39 +157,39 @@ Reply with number.`
             userProfile[senderId] = { ...profile, symptom };
             userState[senderId] = 'asked_tried';
             await sendMessage(senderId,
-`Noted. ✅
+`Samajh gaya. ✅
 
-✦ Have you tried any treatment before?
 ✦ Pehle koi treatment try ki hai?
+(Have you tried any treatment before?)
 
-1️⃣ Only nasal sprays / Sirf nasal spray
-2️⃣ Allopathy medicines / Doctor ki dawai
-3️⃣ Home remedies / Ghar ke nuskhe
-4️⃣ Nothing yet / Abhi kuch nahi kiya
-5️⃣ Other Ayurvedic treatment`
+1️⃣ Sirf nasal spray (Only nasal sprays)
+2️⃣ Doctor ki allopathy dawai (Allopathy medicines)
+3️⃣ Ghar ke nuskhe (Home remedies)
+4️⃣ Abhi kuch nahi kiya (Nothing yet)
+5️⃣ Koi aur Ayurvedic treatment (Other Ayurvedic)`
             );
 
           } else if (state === 'asked_tried') {
             const treatmentMap = {
-              '1': 'nasal sprays only',
-              '2': 'allopathy',
-              '3': 'home remedies',
-              '4': 'nothing yet',
+              '1': 'sirf nasal spray',
+              '2': 'allopathy medicines',
+              '3': 'ghar ke nuskhe',
+              '4': 'kuch nahi',
               '5': 'other Ayurvedic'
             };
             const tried = treatmentMap[text] || text;
             userProfile[senderId] = { ...profile, tried };
             userState[senderId] = 'asked_severity';
             await sendMessage(senderId,
-`Understood. / Samajh gaya. ✅
+`Samajh gaya. ✅
 
-✦ How severely does sinus affect your daily life?
 ✦ Sinus aapki daily life ko kitna affect karta hai?
+(How severely does sinus affect your daily life?)
 
-1️⃣ Mild — occasional discomfort
-2️⃣ Moderate — affects work/sleep sometimes
-3️⃣ Severe — affects daily routine regularly
-4️⃣ Very severe — difficult to function normally`
+1️⃣ Thodi problem — kabhi kabhi (Mild — occasional)
+2️⃣ Kaafi problem — kaam aur neend affect hoti hai (Moderate)
+3️⃣ Bahut zyada — daily routine affect hai (Severe)
+4️⃣ Extreme — normal kaam karna mushkil hai (Very severe)`
             );
 
           } else if (state === 'asked_severity') {
@@ -180,82 +205,87 @@ Reply with number.`
             await sendMessage(senderId,
 `📋 Assessment Complete ✅
 
-Based on your responses:
-- Duration: ${p.duration}
-- Primary symptom: ${p.symptom}
+Aapki details:
+- Problem duration: ${p.duration}
+- Main symptom: ${p.symptom}
 - Previous treatment: ${p.tried}
 - Severity: ${p.severity}
 
 ─────────────────────
-🌿 OUR CLINICAL FINDING
+🌿 HAMARE SPECIALIST KA ASSESSMENT
 ─────────────────────
-Your condition indicates *Prana Vaha Srotas* blockage with accumulated Ama (toxins) in the respiratory tract — a well-documented Ayurvedic diagnosis for chronic sinus conditions.
+Aapki condition mein *Prana Vaha Srotas* blockage hai aur respiratory tract mein Ama (toxins) accumulated hain — yeh chronic sinus ka well-documented Ayurvedic diagnosis hai.
 
-The standard allopathic approach (sprays, antihistamines) suppresses symptoms without resolving root cause. This is why most patients remain dependent for years.
+Allopathic approach (sprays, antihistamines) sirf symptoms suppress karta hai, root cause solve nahi karta. Isliye zyada log saalon tak dependent rehte hain.
 
-Ayusom's protocol addresses the root — not just the symptoms.
+Ayusom ka protocol root cause pe kaam karta hai — not just symptoms.
+
+(Your condition indicates Prana Vaha Srotas blockage with accumulated toxins in the respiratory tract — a well-documented Ayurvedic diagnosis. Standard allopathic treatment suppresses symptoms without resolving root cause. Ayusom addresses the root.)
 
 ─────────────────────
 🌿 AYUSOM 14-DAY SINUS PROGRAM
 ─────────────────────
-✅ Personalized diet plan for your sinus type
-✅ Nasya therapy (Ayurvedic nasal cleansing)
+✅ Aapke sinus type ke liye personalized diet plan
+✅ Nasya therapy — Ayurvedic nasal cleansing
 ✅ Herbal Kadha protocol
 ✅ Steam therapy routine
-✅ 14 days direct WhatsApp guidance
+✅ 14 din direct WhatsApp guidance
 
 *Verified Result:*
-Shikha Tyagi (similar profile) — Day 14: nasal passage 90% clear, Otrivin completely stopped. ✅
+Shikha Tyagi ji (similar profile) — Day 14: naak 90% clear, Otrivin completely stopped. ✅
 
 ─────────────────────
-Investment: ₹1,299
+Investment: ₹1,299 only
 ─────────────────────
 
-Would you like to begin your program?
 Kya aap apna program shuru karna chahte hain?
+(Would you like to begin your healing journey?)
 
-Reply YES to proceed. 🙏`
+Reply karein YES. 🙏`
             );
 
           } else if (state === 'pitched') {
-            if (['yes','haan','han','ha','y'].includes(text.toLowerCase())) {
+            if (['yes','haan','han','ha','y','हाँ','हां'].includes(text.toLowerCase())) {
               userState[senderId] = 'payment';
               await sendMessage(senderId,
-`🙏 Wonderful!
+`Bahut achha! 🙏
 
-Your 14-day personalized Ayurvedic Sinus Program is confirmed.
+Aapka 14-day personalized Ayurvedic Sinus Program confirm ho gaya.
+(Your 14-day personalized program is confirmed.)
 
 💳 Program Fee: ₹1,299
 
-Please share:
-1️⃣ Your WhatsApp number
-2️⃣ Your city / Aapka shahar
+Aap apna WhatsApp number aur city share karein —
+(Please share your WhatsApp number and city.)
 
-We will send payment details and your personalized plan on WhatsApp within a few minutes. 🌿`
+Hum aapko payment details aur personalized plan WhatsApp pe bhejenge kuch hi minutes mein. 🌿`
               );
             } else if (
               text.toLowerCase().includes('price') ||
               text.toLowerCase().includes('cost') ||
               text.toLowerCase().includes('kitna') ||
-              text.toLowerCase().includes('fees')
+              text.toLowerCase().includes('fees') ||
+              text.toLowerCase().includes('charge')
             ) {
               await sendMessage(senderId,
-`The complete 14-day program is ₹1,299 only.
+`Poora 14-day program sirf ₹1,299 mein.
+(Complete 14-day program is ₹1,299 only.)
 
-This includes:
-✅ Personalized plan for your specific sinus type
-✅ 14 days WhatsApp guidance
-✅ Full diet + Nasya + Kadha + Steam protocol
+Isme shamil hai:
+✅ Aapke specific sinus type ke liye personalized plan
+✅ 14 din WhatsApp guidance
+✅ Diet + Nasya + Kadha + Steam protocol
 ✅ Daily morning & evening support
 
-For lasting natural relief — this is the most effective and affordable solution available.
+Lasting natural relief ke liye — yeh sabse effective aur affordable solution hai.
+(For lasting natural relief — this is the most effective and affordable solution available.)
 
-Reply YES to begin. 🙏`
+Reply karein YES to begin. 🙏`
               );
             } else {
               await sendMessage(senderId,
-`For any questions, please feel free to ask. 🙏
-Koi bhi sawaal poochh sakte hain.
+`Koi bhi sawaal poochh sakte hain — hum yahan hain. 🙏
+(Feel free to ask any questions.)
 
 Kya aap program shuru karna chahte hain? Reply YES.`
               );
@@ -264,18 +294,25 @@ Kya aap program shuru karna chahte hain? Reply YES.`
           } else if (state === 'payment') {
             userState[senderId] = 'done';
             await sendMessage(senderId,
-`Thank you! 🙏
+`Shukriya! 🙏
 
-Our Ayurvedic specialist will contact you on WhatsApp shortly with payment details and your personalized 14-day plan.
+Hamare Ayurvedic specialist aapko WhatsApp pe jald contact karenge — payment details aur aapka personalized 14-day plan bhejenge.
 
 Aapka healing journey jald shuru hoga. 🌿
+(Our specialist will contact you on WhatsApp shortly with payment details and your personalized plan.)
+
 Ayusom Herbals`
             );
 
           } else if (state === 'done') {
             await sendMessage(senderId,
-`For further assistance, please WhatsApp us directly. Our specialist will help you. 🙏
-Ayusom Herbals`
+`Kisi bhi help ke liye seedha WhatsApp karein:
+📱 +91 85951 60713
+
+Hum aapki poori madad karenge. 🙏
+(For any assistance, WhatsApp us directly. We are here to help.)
+
+Ayusom Herbals 🌿`
             );
           }
         }
