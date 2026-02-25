@@ -1,56 +1,44 @@
 const express = require('express');
-const https = require('https');
+const fetch = require('node-fetch');
 const app = express();
 
 app.use(express.json());
 
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
+const GOOGLE_SHEET_URL = process.env.GOOGLE_SHEET_URL;
 
-function saveToSheet(data) {
-  const postData = JSON.stringify(data);
-  
-  const options = {
-    hostname: 'script.google.com',
-    path: '/macros/s/AKfycbzz8Zd4oAQHCzNaUFu0EIV_sD0BK75XO0WJDN69jD2cVyK-okSyMrl2VfCbjhH_kQsSbg/exec',
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(postData)
-    }
-  };
-
-  const req = https.request(options, res => {
-    let body = '';
-    console.log('Sheet status:', res.statusCode);
-    console.log('Redirect location:', res.headers.location);
-    res.on('data', chunk => body += chunk);
-    res.on('end', () => console.log('Sheet body:', body.substring(0, 200)));
-  });
-  req.on('error', e => console.error('Sheet error:', e));
-  req.write(postData);
-  req.end();
+async function saveToSheet(data) {
+  try {
+    const response = await fetch(GOOGLE_SHEET_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      redirect: 'follow'
+    });
+    const text = await response.text();
+    console.log('Sheet saved:', response.status, text.substring(0, 100));
+  } catch(err) {
+    console.error('Sheet error:', err.message);
+  }
 }
 
-function sendMessage(senderId, text) {
-  const data = JSON.stringify({
-    recipient: { id: senderId },
-    message: { text: text }
-  });
-  const options = {
-    hostname: 'graph.facebook.com',
-    path: '/v18.0/me/messages?access_token=' + PAGE_ACCESS_TOKEN,
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(data)
-    }
-  };
-  const req = https.request(options, res => {
-    console.log('Message sent, status:', res.statusCode);
-  });
-  req.on('error', e => console.error('Send error:', e));
-  req.write(data);
-  req.end();
+async function sendMessage(senderId, text) {
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient: { id: senderId },
+          message: { text: text }
+        })
+      }
+    );
+    console.log('Message sent, status:', response.status);
+  } catch(err) {
+    console.error('Send error:', err.message);
+  }
 }
 
 app.get('/webhook', (req, res) => {
@@ -64,30 +52,30 @@ app.get('/webhook', (req, res) => {
   return res.sendStatus(403);
 });
 
-app.post('/webhook', (req, res) => {
+app.post('/webhook', async (req, res) => {
   const body = req.body;
   if (body.entry) {
-    body.entry.forEach(entry => {
+    for (const entry of body.entry) {
       if (entry.messaging) {
-        entry.messaging.forEach(msg => {
+        for (const msg of entry.messaging) {
           if (msg.message && msg.message.text) {
             const senderId = msg.sender.id;
             const text = msg.message.text;
             console.log(`FACEBOOK LEAD - ID: ${senderId} - Message: ${text}`);
-            saveToSheet({
+            await saveToSheet({
               timestamp: new Date().toISOString(),
               platform: 'Facebook',
               senderId: senderId,
               name: 'FB_' + senderId,
               message: text
             });
-            sendMessage(senderId,
+            await sendMessage(senderId,
               `Namaste! 🙏 Ayusom Herbals mein aapka swagat hai.\n\nAapki sinus problem kitne samay se hai?\n\n1️⃣ 6 mahine se kam\n2️⃣ 6 mahine - 2 saal\n3️⃣ 2 saal se zyada\n\nBas number reply karein.`
             );
           }
-        });
+        }
       }
-    });
+    }
   }
   res.status(200).send('EVENT_RECEIVED');
 });
