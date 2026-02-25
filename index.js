@@ -28,6 +28,27 @@ async function saveToSheet(data) {
   }
 }
 
+async function updateLead(senderId, temperature, lastStage, symptom) {
+  try {
+    const response = await fetch(GOOGLE_SHEET_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        update: true,
+        senderId,
+        temperature,
+        lastStage,
+        symptom: symptom || ''
+      }),
+      redirect: 'follow'
+    });
+    const text = await response.text();
+    console.log('Lead updated:', text.substring(0, 100));
+  } catch(err) {
+    console.error('Update error:', err.message);
+  }
+}
+
 async function sendMessage(senderId, text) {
   try {
     const response = await fetch(
@@ -74,15 +95,18 @@ app.post('/webhook', async (req, res) => {
 
           console.log(`LEAD - ID: ${senderId} - State: ${state} - Message: ${text}`);
 
-          await saveToSheet({
-            timestamp: new Date().toISOString(),
-            platform: 'Facebook',
-            senderId: senderId,
-            name: 'FB_' + senderId,
-            message: text
-          });
+          // First message — save as new lead
+          if (state === 'new') {
+            await saveToSheet({
+              timestamp: new Date().toISOString(),
+              platform: 'Facebook',
+              senderId: senderId,
+              name: 'FB_' + senderId,
+              message: text
+            });
+          }
 
-          // Handle contact/whatsapp request at any stage
+          // Contact request — handle at any stage
           if (
             text.toLowerCase().includes('whatsapp') ||
             text.toLowerCase().includes('contact') ||
@@ -106,6 +130,7 @@ Ayusom Herbals 🌿`
 
           if (state === 'new') {
             userState[senderId] = 'asked_duration';
+            await updateLead(senderId, '🔴 Cold', 'started', '');
             await sendMessage(senderId,
 `🙏 Namaste! Ayusom Herbals mein aapka swagat hai.
 
@@ -131,6 +156,7 @@ Number reply karein.`
               const duration = text === '1' ? '6 mahine se kam' : text === '2' ? '6 mahine se 2 saal' : '2 saal se zyada';
               userProfile[senderId] = { ...profile, duration };
               userState[senderId] = 'asked_symptoms';
+              await updateLead(senderId, '🔴 Cold', 'asked_duration', '');
               await sendMessage(senderId,
 `Noted. ✅
 
@@ -158,6 +184,7 @@ Number reply karein.`
             const symptom = symptomMap[text] || text;
             userProfile[senderId] = { ...profile, symptom };
             userState[senderId] = 'asked_tried';
+            await updateLead(senderId, '🟡 Warm', 'asked_symptoms', symptom);
             await sendMessage(senderId,
 `Samajh gaya. ✅
 
@@ -182,6 +209,7 @@ Number reply karein.`
             const tried = treatmentMap[text] || text;
             userProfile[senderId] = { ...profile, tried };
             userState[senderId] = 'asked_severity';
+            await updateLead(senderId, '🟡 Warm', 'asked_tried', userProfile[senderId].symptom);
             await sendMessage(senderId,
 `Samajh gaya. ✅
 
@@ -201,6 +229,7 @@ Number reply karein.`
             const severity = severityMap[text] || 'Moderate';
             userProfile[senderId] = { ...profile, severity };
             userState[senderId] = 'pitched';
+            await updateLead(senderId, '🟡 Warm', 'pitched', userProfile[senderId].symptom);
 
             const p = userProfile[senderId];
 
@@ -248,6 +277,7 @@ Reply karein YES. 🙏`
           } else if (state === 'pitched') {
             if (['yes','haan','han','ha','y','हाँ','हां'].includes(text.toLowerCase())) {
               userState[senderId] = 'done';
+              await updateLead(senderId, '🟢 Hot', 'payment_sent', userProfile[senderId].symptom);
               await sendMessage(senderId,
 `Bahut achha! 🙏
 
@@ -311,7 +341,7 @@ Kisi bhi help ke liye seedha WhatsApp karein:
 📱 ${WHATSAPP_NUMBER}
 
 Hum aapki poori madad karenge.
-(For any assistance, WhatsApp us directly. We are here to help.)
+(For any assistance, WhatsApp us directly.)
 
 Ayusom Herbals 🌿`
             );
