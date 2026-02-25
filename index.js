@@ -1,10 +1,36 @@
 const express = require('express');
 const https = require('https');
+const http = require('http');
 const app = express();
 
 app.use(express.json());
 
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
+const GOOGLE_SHEET_URL = process.env.GOOGLE_SHEET_URL;
+
+function saveToSheet(data) {
+  const postData = JSON.stringify(data);
+  const url = new URL(GOOGLE_SHEET_URL);
+  
+  const options = {
+    hostname: url.hostname,
+    path: url.pathname + url.search,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(postData)
+    }
+  };
+
+  const req = https.request(options, res => {
+    let body = '';
+    res.on('data', chunk => body += chunk);
+    res.on('end', () => console.log('Sheet saved:', body));
+  });
+  req.on('error', e => console.error('Sheet error:', e));
+  req.write(postData);
+  req.end();
+}
 
 function sendMessage(senderId, text) {
   const data = JSON.stringify({
@@ -18,13 +44,14 @@ function sendMessage(senderId, text) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Content-Length': data.length
+      'Content-Length': Buffer.byteLength(data)
     }
   };
 
   const req = https.request(options, res => {
     console.log('Message sent, status:', res.statusCode);
   });
+  req.on('error', e => console.error('Send error:', e));
   req.write(data);
   req.end();
 }
@@ -54,9 +81,18 @@ app.post('/webhook', (req, res) => {
             const text = msg.message.text;
             console.log(`FACEBOOK LEAD - ID: ${senderId} - Message: ${text}`);
 
+            // Save to Google Sheet
+            saveToSheet({
+              timestamp: new Date().toISOString(),
+              platform: 'Facebook',
+              senderId: senderId,
+              name: 'FB_' + senderId,
+              message: text
+            });
+
             // Auto reply
             sendMessage(senderId,
-              `Namaste! 🙏 Ayusom Herbals mein aapka swagat hai.\n\nAapki sinus problem kitne samay se hai?\n\n1️⃣ 6 mahine se kam\n2️⃣ 6 mahine - 2 saal\n3️⃣ 2 saal se zyada\n\nBas number reply karein — hum aapke liye personalized plan taiyaar karenge.`
+              `Namaste! 🙏 Ayusom Herbals mein aapka swagat hai.\n\nAapki sinus problem kitne samay se hai?\n\n1️⃣ 6 mahine se kam\n2️⃣ 6 mahine - 2 saal\n3️⃣ 2 saal se zyada\n\nBas number reply karein.`
             );
           }
         });
