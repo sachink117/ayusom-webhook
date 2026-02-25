@@ -7,6 +7,8 @@ app.use(express.json());
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 const GOOGLE_SHEET_URL = process.env.GOOGLE_SHEET_URL;
 const PAGE_ID = '1035532399636645';
+const PAYMENT_LINK = 'https://rzp.io/rzp/qu8zhQT';
+const WHATSAPP_NUMBER = '+91 85951 60713';
 
 const userState = {};
 const userProfile = {};
@@ -80,22 +82,22 @@ app.post('/webhook', async (req, res) => {
             message: text
           });
 
-          // Contact number request — handle at any stage
+          // Handle contact/whatsapp request at any stage
           if (
             text.toLowerCase().includes('whatsapp') ||
             text.toLowerCase().includes('contact') ||
             text.toLowerCase().includes('call') ||
             text.toLowerCase().includes('phone') ||
-            text.toLowerCase().includes('number') ||
+            text.toLowerCase().includes('helpline') ||
             text.toLowerCase().includes('direct')
           ) {
             await sendMessage(senderId,
-`Bilkul! Aap seedha hamare specialist se baat kar sakte hain. 🙏
+`Bilkul! Aap seedha hamare specialist se WhatsApp pe baat kar sakte hain. 🙏
 
-📱 WhatsApp: +91 85951 60713
+📱 WhatsApp: ${WHATSAPP_NUMBER}
 
 Hum personally aapki problem sunenge aur sahi guidance denge.
-(You can also reach us directly on WhatsApp anytime.)
+(You can reach our Ayurvedic specialist directly on WhatsApp anytime.)
 
 Ayusom Herbals 🌿`
             );
@@ -124,7 +126,7 @@ Number reply karein.`
 
           } else if (state === 'asked_duration') {
             if (!['1','2','3'].includes(text)) {
-              await sendMessage(senderId, `Kripya 1, 2 ya 3 mein se reply karein. 🙏 (Please reply with 1, 2 or 3.)`);
+              await sendMessage(senderId, `Kripya 1, 2 ya 3 mein se reply karein. 🙏\n(Please reply with 1, 2 or 3.)`);
             } else {
               const duration = text === '1' ? '6 mahine se kam' : text === '2' ? '6 mahine se 2 saal' : '2 saal se zyada';
               userProfile[senderId] = { ...profile, duration };
@@ -214,13 +216,12 @@ Aapki details:
 ─────────────────────
 🌿 HAMARE SPECIALIST KA ASSESSMENT
 ─────────────────────
-Aapki condition mein *Prana Vaha Srotas* blockage hai aur respiratory tract mein Ama (toxins) accumulated hain — yeh chronic sinus ka well-documented Ayurvedic diagnosis hai.
+Aapki condition mein Prana Vaha Srotas blockage hai aur respiratory tract mein Ama (toxins) accumulated hain — yeh chronic sinus ka Ayurvedic diagnosis hai.
 
-Allopathic approach (sprays, antihistamines) sirf symptoms suppress karta hai, root cause solve nahi karta. Isliye zyada log saalon tak dependent rehte hain.
+Allopathic approach sirf symptoms suppress karta hai, root cause solve nahi karta. Isliye zyada log saalon tak spray pe dependent rehte hain.
 
-Ayusom ka protocol root cause pe kaam karta hai — not just symptoms.
-
-(Your condition indicates Prana Vaha Srotas blockage with accumulated toxins in the respiratory tract — a well-documented Ayurvedic diagnosis. Standard allopathic treatment suppresses symptoms without resolving root cause. Ayusom addresses the root.)
+Ayusom ka protocol root cause pe kaam karta hai.
+(Our protocol addresses the root cause — not just symptoms.)
 
 ─────────────────────
 🌿 AYUSOM 14-DAY SINUS PROGRAM
@@ -231,7 +232,7 @@ Ayusom ka protocol root cause pe kaam karta hai — not just symptoms.
 ✅ Steam therapy routine
 ✅ 14 din direct WhatsApp guidance
 
-*Verified Result:*
+⭐ Verified Result:
 Shikha Tyagi ji (similar profile) — Day 14: naak 90% clear, Otrivin completely stopped. ✅
 
 ─────────────────────
@@ -246,26 +247,37 @@ Reply karein YES. 🙏`
 
           } else if (state === 'pitched') {
             if (['yes','haan','han','ha','y','हाँ','हां'].includes(text.toLowerCase())) {
-              userState[senderId] = 'payment';
+              userState[senderId] = 'done';
               await sendMessage(senderId,
 `Bahut achha! 🙏
 
-Aapka 14-day personalized Ayurvedic Sinus Program confirm ho gaya.
-(Your 14-day personalized program is confirmed.)
+Aapka 14-day personalized Ayurvedic Sinus Program confirm karne ke liye payment karein:
 
-💳 Program Fee: ₹1,299
+💳 Payment Link: ${PAYMENT_LINK}
+Amount: ₹1,299
 
-Aap apna WhatsApp number aur city share karein —
-(Please share your WhatsApp number and city.)
+Payment ke baad aapko WhatsApp pe milega:
+✅ Aapka personalized 14-day plan
+✅ Daily guidance schedule
+✅ Direct specialist contact
 
-Hum aapko payment details aur personalized plan WhatsApp pe bhejenge kuch hi minutes mein. 🌿`
+Payment karte waqt apna WhatsApp number zaroor daalein — usi pe aapka plan bheja jayega.
+(Please enter your WhatsApp number during payment — your plan will be sent there.)
+
+Koi problem ho toh seedha WhatsApp karein:
+📱 ${WHATSAPP_NUMBER}
+
+Ayusom Herbals 🌿`
               );
+
             } else if (
               text.toLowerCase().includes('price') ||
               text.toLowerCase().includes('cost') ||
               text.toLowerCase().includes('kitna') ||
               text.toLowerCase().includes('fees') ||
-              text.toLowerCase().includes('charge')
+              text.toLowerCase().includes('charge') ||
+              text.toLowerCase().includes('paisa') ||
+              text.toLowerCase().includes('rate')
             ) {
               await sendMessage(senderId,
 `Poora 14-day program sirf ₹1,299 mein.
@@ -278,10 +290,10 @@ Isme shamil hai:
 ✅ Daily morning & evening support
 
 Lasting natural relief ke liye — yeh sabse effective aur affordable solution hai.
-(For lasting natural relief — this is the most effective and affordable solution available.)
 
 Reply karein YES to begin. 🙏`
               );
+
             } else {
               await sendMessage(senderId,
 `Koi bhi sawaal poochh sakte hain — hum yahan hain. 🙏
@@ -291,25 +303,14 @@ Kya aap program shuru karna chahte hain? Reply YES.`
               );
             }
 
-          } else if (state === 'payment') {
-            userState[senderId] = 'done';
+          } else if (state === 'done') {
             await sendMessage(senderId,
 `Shukriya! 🙏
 
-Hamare Ayurvedic specialist aapko WhatsApp pe jald contact karenge — payment details aur aapka personalized 14-day plan bhejenge.
+Kisi bhi help ke liye seedha WhatsApp karein:
+📱 ${WHATSAPP_NUMBER}
 
-Aapka healing journey jald shuru hoga. 🌿
-(Our specialist will contact you on WhatsApp shortly with payment details and your personalized plan.)
-
-Ayusom Herbals`
-            );
-
-          } else if (state === 'done') {
-            await sendMessage(senderId,
-`Kisi bhi help ke liye seedha WhatsApp karein:
-📱 +91 85951 60713
-
-Hum aapki poori madad karenge. 🙏
+Hum aapki poori madad karenge.
 (For any assistance, WhatsApp us directly. We are here to help.)
 
 Ayusom Herbals 🌿`
