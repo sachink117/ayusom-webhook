@@ -9,6 +9,7 @@ const GOOGLE_SHEET_URL = process.env.GOOGLE_SHEET_URL;
 const PAGE_ID = '1035532399636645';
 const PAYMENT_LINK = 'https://rzp.io/rzp/qu8zhQT';
 const WHATSAPP_NUMBER = '+91 85951 60713';
+const WEBSITE = 'www.ayusomamherbals.com';
 
 const userState = {};
 const userProfile = {};
@@ -104,7 +105,7 @@ function getPitchMessage(sinusType, p) {
 
   const specialist = `Yeh koi app nahi. Koi generic PDF nahi.\n\nAapko milega ek dedicated Ayurvedic specialist —\n14 din tak, directly aapke WhatsApp pe.\n\nJab bhi symptoms feel ho — message karein.\nSpecialist personally respond karega aur\naapka protocol usi waqt adjust karega.\n\nDin mein 2 baar. Raat ko. Flare up pe.\nKabhi bhi.\n`;
 
-  const footer = `\n━━━━━━━━━━━━━━━━━━━━\n⭐ CLIENT EXPERIENCE\n━━━━━━━━━━━━━━━━━━━━\n\nShikha Tyagi ji — 5 saal se Otrivin use kar rahi thin. Ayusom 14-day program ke baad unhone naturally spray reduce kar li.\n\nUnke words: "Pehli baar itne saalon baad khulke saans li." ✅\n\n*Results may vary. Yeh ek personal wellness experience hai.*\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299\n━━━━━━━━━━━━━━━━━━━━\n\nBaaki programs plan dete hain.\nHum results dete hain — kabhi bhi, daily.\n\nKya aap apna protocol shuru karna chahte hain?\nReply karein YES. 🙏`;
+  const footer = `\n━━━━━━━━━━━━━━━━━━━━\n⭐ CLIENT EXPERIENCE\n━━━━━━━━━━━━━━━━━━━━\n\nShikha Tyagi ji — 5 saal se Otrivin use kar rahi thin. Ayusomam 14-day program ke baad unhone naturally spray reduce kar li.\n\nUnke words: "Pehli baar itne saalon baad khulke saans li." ✅\n\n*Results may vary. Yeh ek personal wellness experience hai.*\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299\n━━━━━━━━━━━━━━━━━━━━\n\nBaaki programs plan dete hain.\nHum results dete hain — kabhi bhi, daily.\n\nAur jaankari ke liye visit karein:\n🌐 ${WEBSITE}\n\nKya aap apna protocol shuru karna chahte hain?\nReply karein YES. 🙏\n\nAgar plan ke baare mein aur details chahiye — "MORE" type karein.\nHamare specialist khud aapse personally baat karenge.`;
 
   if (sinusType === 'allergic') {
     return header +
@@ -117,7 +118,7 @@ Aapki condition dust, pollution ya season change se trigger hoti hai. Har baar m
 Yeh generic sinus nahi — yeh Allergic Sinus hai. Isko generic solution se address nahi kar sakte.
 
 ━━━━━━━━━━━━━━━━━━━━
-🌿 AYUSOM ALLERGIC SINUS PROTOCOL
+🌿 AYUSOMAM ALLERGIC SINUS PROTOCOL
 ━━━━━━━━━━━━━━━━━━━━
 
 ${specialist}
@@ -140,7 +141,7 @@ Yeh Congestive Sinus hai — nasal passage mein chronic inflammation. Time ke sa
 Steam aur saline temporary hain — surface pe kaam karte hain. Andar ki inflammation untouched rehti hai.
 
 ━━━━━━━━━━━━━━━━━━━━
-🌿 AYUSOM CONGESTIVE SINUS PROTOCOL
+🌿 AYUSOMAM CONGESTIVE SINUS PROTOCOL
 ━━━━━━━━━━━━━━━━━━━━
 
 ${specialist}
@@ -163,7 +164,7 @@ Yeh sirf nasal problem nahi — yeh Heat Sinus hai. Systemic inflammation jo and
 Isko cooling protocol chahiye — generic decongestant nahi.
 
 ━━━━━━━━━━━━━━━━━━━━
-🌿 AYUSOM HEAT SINUS PROTOCOL
+🌿 AYUSOMAM HEAT SINUS PROTOCOL
 ━━━━━━━━━━━━━━━━━━━━
 
 ${specialist}
@@ -186,7 +187,7 @@ Aap akele nahi hain — yeh bahut common hai. Aur yeh aapki galti nahi.
 Spray ne temporarily help ki — lekin ab body uske bina adjust nahi kar pa rahi. Isko naturally reset karna padega.
 
 ━━━━━━━━━━━━━━━━━━━━
-🌿 AYUSOM DEPENDENCY SINUS PROTOCOL
+🌿 AYUSOMAM DEPENDENCY SINUS PROTOCOL
 ━━━━━━━━━━━━━━━━━━━━
 
 ${specialist}
@@ -200,7 +201,7 @@ Day 14 — jo spray saalon se chhut nahi rahi, bahut se clients ne 14 din mein n
 
   return header +
 `━━━━━━━━━━━━━━━━━━━━
-🌿 AYUSOM SINUS PROTOCOL
+🌿 AYUSOMAM SINUS PROTOCOL
 ━━━━━━━━━━━━━━━━━━━━
 
 ${specialist}
@@ -290,14 +291,12 @@ app.post('/webhook', async (req, res) => {
           if (msg.sender.id === PAGE_ID) {
             const recipientId = msg.recipient && msg.recipient.id;
             if (recipientId && recipientId !== PAGE_ID) {
-              // Check if page is reactivating bot
               if (msg.message && msg.message.text && msg.message.text.startsWith('BOT_ON_')) {
                 const targetId = msg.message.text.replace('BOT_ON_', '').trim();
                 userState[targetId] = 'new';
                 delete userProfile[targetId];
                 console.log(`BOT REACTIVATED for ${targetId}`);
               } else {
-                // Page replied manually → pause bot for this user
                 userState[recipientId] = 'human_takeover';
                 console.log(`HUMAN TAKEOVER - bot paused for ${recipientId}`);
               }
@@ -346,13 +345,14 @@ app.post('/webhook', async (req, res) => {
             )
           ) {
             await sendMessage(senderId,
-`Bilkul! Aap seedha hamare specialist se WhatsApp pe baat kar sakte hain. 🙏
+`Bilkul! Aap seedha hamare specialist se baat kar sakte hain. 🙏
 
 📱 WhatsApp: ${WHATSAPP_NUMBER}
+🌐 Website: ${WEBSITE}
 
 Hum personally aapki problem sunenge aur sahi guidance denge.
 
-Ayusom Herbals 🌿`
+Ayusomam Herbals 🌿`
             );
             continue;
           }
@@ -363,10 +363,12 @@ Ayusom Herbals 🌿`
             userState[senderId] = 'asked_duration';
             await updateLead(senderId, '🔴 Cold', 'started', '');
             await sendMessage(senderId,
-`🙏 Namaste! Ayusom Herbals mein aapka swagat hai.
+`🙏 Namaste! Ayusomam Herbals mein aapka swagat hai.
 
 Hum chronic sinus conditions ka Ayurvedic treatment karte hain — naturally, bina spray ya steroid dependency ke.
 (We specialize in Ayurvedic treatment for chronic sinus — without dependency on sprays or steroids.)
+
+🌐 ${WEBSITE}
 
 Aapke liye personalized assessment ke liye kuch quick questions —
 
@@ -518,10 +520,27 @@ Payment ke baad aapko WhatsApp pe milega:
 
 Payment karte waqt apna WhatsApp number zaroor daalein — usi pe aapka plan bheja jayega.
 
-Koi problem ho toh seedha WhatsApp karein:
-📱 ${WHATSAPP_NUMBER}
+Koi problem ho toh:
+📱 WhatsApp: ${WHATSAPP_NUMBER}
+🌐 ${WEBSITE}
 
-Ayusom Herbals 🌿`
+Ayusomam Herbals 🌿`
+              );
+
+            } else if (text.toLowerCase() === 'more') {
+              userState[senderId] = 'human_takeover';
+              await updateLead(senderId, '🟢 Hot', 'requested_specialist', userProfile[senderId].symptom);
+              await sendMessage(senderId,
+`Bilkul! 🙏
+
+Hamare Ayurvedic specialist aapse seedha baat karenge — aapke specific sinus type aur protocol ke baare mein personally guide karenge.
+
+Thoda intezaar karein — specialist abhi aapke paas aate hain.
+(Our specialist will connect with you personally very shortly.)
+
+🌐 ${WEBSITE}
+
+Ayusomam Herbals 🌿`
               );
 
             } else if (
@@ -535,6 +554,7 @@ Ayusom Herbals 🌿`
             ) {
               await sendMessage(senderId,
 `Poora 14-day protocol sirf ₹1,299 mein.
+(Complete 14-day program is ₹1,299 only.)
 
 Isme shamil hai:
 ✅ Aapke specific sinus type ke liye personalized protocol
@@ -542,19 +562,25 @@ Isme shamil hai:
 ✅ Daily adaptive guidance — aapke symptoms ke hisaab se
 ✅ Flare up support — jab bhi zaroorat ho
 
-Reply karein YES to begin. 🙏`
+Aur jaankari ke liye: 🌐 ${WEBSITE}
+
+Reply karein YES to begin. 🙏
+Ya plan details ke liye "MORE" type karein.`
               );
 
             } else {
               await sendMessage(senderId,
 `Koi bhi sawaal poochh sakte hain — hum yahan hain. 🙏
 
-Kya aap apna protocol shuru karna chahte hain? Reply YES.`
+Agar plan ke baare mein aur details chahiye toh "MORE" type karein — hamare specialist khud aapse 1-on-1 baat karenge.
+
+Ya program shuru karne ke liye Reply karein YES.
+
+🌐 ${WEBSITE}`
               );
             }
 
           } else if (state === 'done') {
-            // Silent after payment link sent
             console.log(`DONE STATE - No reply sent to ${senderId}`);
           }
 
@@ -566,4 +592,4 @@ Kya aap apna protocol shuru karna chahte hain? Reply YES.`
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Ayusom webhook running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Ayusomam Herbals webhook running on port ${PORT}`));
