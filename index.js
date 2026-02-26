@@ -273,7 +273,7 @@ async function sendFBMessage(senderId, text) {
 async function sendIGMessage(senderId, text) {
   try {
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/me/messages?access_token=${INSTAGRAM_TOKEN}`,
+      `https://graph.facebook.com/v18.0/${INSTAGRAM_ID}/messages?access_token=${INSTAGRAM_TOKEN}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
