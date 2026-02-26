@@ -505,16 +505,10 @@ Kya aap apna protocol shuru karna chahte hain? Reply YES.`
               );
             }
 
-          } else if (state === 'done') {
-            await sendMessage(senderId,
-`Shukriya! 🙏
-
-Kisi bhi help ke liye seedha WhatsApp karein:
-📱 ${WHATSAPP_NUMBER}
-
-Ayusom Herbals 🌿`
-            );
-          }
+         } else if (state === 'done') {
+    // Silent — no more auto replies after assessment complete
+    console.log(`DONE STATE - No reply sent to ${senderId}`);
+  }
         }
       }
     }
