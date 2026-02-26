@@ -283,7 +283,8 @@ async function sendIGMessage(senderId, text) {
         })
       }
     );
-    console.log('IG message sent, status:', response.status);
+    const result = await response.text();
+    console.log('IG message sent, status:', response.status, 'body:', result);
   } catch(err) {
     console.error('IG send error:', err.message);
   }
