@@ -13,61 +13,92 @@ const WHATSAPP_NUMBER = '+91 85951 60713';
 const userState = {};
 const userProfile = {};
 
+// ─── EXTRACT FIRST NUMBER ─────────────────────────────────────
+function extractFirstNumber(text) {
+  const match = text.match(/\d+/);
+  return match ? match[0] : null;
+}
+
+// ─── DETECTION HELPERS ───────────────────────────────────────
 function detectDuration(text) {
-  const t = text.toLowerCase();
+  const t = text.toLowerCase().trim();
   if (t === '1') return 'short';
   if (t === '2') return 'medium';
   if (t === '3') return 'long';
-  if (t.match(/\b(6 month|6 mahine|chhe mahine|less|kam|thodi|new|naya|abhi|recent|6m)\b/)) return 'short';
-  if (t.match(/\b(1 year|2 year|1 sal|2 sal|1 saal|2 saal|do sal|do saal|ek sal|ek saal|one year|two year|1-2|2-3)\b/)) return 'medium';
-  if (t.match(/\b(3|4|5|6|7|8|9|10)\s*(year|sal|saal|yr)\b/)) return 'long';
-  if (t.match(/\b(teen|paanch|char|saalon|bahut|long|purani|years|kaafi)\b/)) return 'long';
+  if (t.match(/(^|\s)(6|chhe|six)\s*(month|mahine|mah)/)) return 'short';
+  if (t.match(/\b(less|kam|thodi|new|naya|abhi|recent)\b/)) return 'short';
+  if (t.match(/(^|\s)(1|ek|one)\s*(year|saal|sal|yr)/)) return 'medium';
+  if (t.match(/(^|\s)(2|do|two)\s*(year|saal|sal|yr)/)) return 'medium';
+  if (t.match(/(^|\s)([3-9]|10)\s*(year|saal|sal|yr)/)) return 'long';
+  if (t.match(/\b(bahut|kaafi|purani|saalon|long|zyada)\b/)) return 'long';
+  const n = extractFirstNumber(t);
+  if (n === '1') return 'short';
+  if (n === '2') return 'medium';
+  if (n === '3') return 'long';
   return null;
 }
 
 function detectSymptom(text) {
-  const t = text.toLowerCase();
+  const t = text.toLowerCase().trim();
   if (t === '1') return 'allergic';
   if (t === '2') return 'congestive';
   if (t === '3') return 'heat';
   if (t === '4') return 'dependency';
   if (t === '5') return 'congestive';
-  if (t.match(/\b(sneez|watery|runny|allerg|dust|season|pollen|itch|aankhein|aankhon|jhad)\b/)) return 'allergic';
-  if (t.match(/\b(band|block|bhaari|heavy|pressure|congst|chehra|facial|naak band)\b/)) return 'congestive';
-  if (t.match(/\b(burn|jalan|yellow|green|peela|headache|sar dard|pitta|thick|garam)\b/)) return 'heat';
-  if (t.match(/\b(otrivin|spray|depend|nahi chut|addiction|nasivion|nasivin|vicks|inhaler|drop)\b/)) return 'dependency';
-  if (t.match(/\b(neend|sleep|raat|drip|gala|throat|balgam|post nasal)\b/)) return 'congestive';
+  if (t.match(/\b(sneez|watery|runny|allerg|dust|season|pollen)\b/)) return 'allergic';
+  if (t.match(/\b(naak band|block|bhaari|heavy|pressure|congestion)\b/)) return 'congestive';
+  if (t.match(/\b(burn|jalan|yellow|green|headache|sar dard)\b/)) return 'heat';
+  if (t.match(/\b(otrivin|spray|depend|nasivion)\b/)) return 'dependency';
+  if (t.match(/\b(neend|sleep|drip|balgam|gala)\b/)) return 'congestive';
+  const n = extractFirstNumber(t);
+  if (n === '1') return 'allergic';
+  if (n === '2') return 'congestive';
+  if (n === '3') return 'heat';
+  if (n === '4') return 'dependency';
+  if (n === '5') return 'congestive';
   return null;
 }
 
 function detectTried(text) {
-  const t = text.toLowerCase();
+  const t = text.toLowerCase().trim();
   if (t === '1') return 'sirf nasal spray';
   if (t === '2') return 'allopathy medicines';
   if (t === '3') return 'ghar ke nuskhe';
   if (t === '4') return 'kuch nahi';
   if (t === '5') return 'other Ayurvedic';
-  if (t.match(/\b(spray|otrivin|drop|nasal)\b/)) return 'sirf nasal spray';
-  if (t.match(/\b(doctor|allopath|medicine|dawai|tablet|antibiotic|antihistamine)\b/)) return 'allopathy medicines';
-  if (t.match(/\b(ghar|home|nuskha|gharelu|dadi|nani|steam|haldi|honey|shahad)\b/)) return 'ghar ke nuskhe';
-  if (t.match(/\b(nahi|nothing|kuch nahi|no|nope|never)\b/)) return 'kuch nahi';
-  if (t.match(/\b(ayurved|herbal|patanjali|baba|ramdev|hamdard)\b/)) return 'other Ayurvedic';
+  if (t.match(/\b(otrivin|nasal spray|nasivion|drop)\b/)) return 'sirf nasal spray';
+  if (t.match(/\b(doctor|allopath|medicine|dawai|tablet|antibiotic)\b/)) return 'allopathy medicines';
+  if (t.match(/\b(ghar|home|nuskha|gharelu|haldi|shahad)\b/)) return 'ghar ke nuskhe';
+  if (t.match(/\b(kuch nahi|nothing|no treatment|nahi kiya)\b/)) return 'kuch nahi';
+  if (t.match(/\b(ayurved|patanjali|hamdard|herbal)\b/)) return 'other Ayurvedic';
+  const n = extractFirstNumber(t);
+  if (n === '1') return 'sirf nasal spray';
+  if (n === '2') return 'allopathy medicines';
+  if (n === '3') return 'ghar ke nuskhe';
+  if (n === '4') return 'kuch nahi';
+  if (n === '5') return 'other Ayurvedic';
   return null;
 }
 
 function detectSeverity(text) {
-  const t = text.toLowerCase();
+  const t = text.toLowerCase().trim();
   if (t === '1') return 'Mild';
   if (t === '2') return 'Moderate';
   if (t === '3') return 'Severe';
   if (t === '4') return 'Very Severe';
-  if (t.match(/\b(mild|thoda|kabhi kabhi|sometimes|light|halka)\b/)) return 'Mild';
+  if (t.match(/\b(mild|thoda|kabhi kabhi|sometimes|halka)\b/)) return 'Mild';
   if (t.match(/\b(moderate|kaafi|medium|affect|disturb)\b/)) return 'Moderate';
-  if (t.match(/\b(severe|bahut|zyada|daily|routine|har roz|serious)\b/)) return 'Severe';
-  if (t.match(/\b(extreme|worst|mushkil|unbearable|nahi ho pata|critical|bahut zyada)\b/)) return 'Very Severe';
+  if (t.match(/\b(severe|bahut|zyada|daily|har roz|serious)\b/)) return 'Severe';
+  if (t.match(/\b(extreme|worst|mushkil|unbearable|critical)\b/)) return 'Very Severe';
+  const n = extractFirstNumber(t);
+  if (n === '1') return 'Mild';
+  if (n === '2') return 'Moderate';
+  if (n === '3') return 'Severe';
+  if (n === '4') return 'Very Severe';
   return null;
 }
 
+// ─── PITCH MESSAGES ──────────────────────────────────────────
 function getPitchMessage(sinusType, p) {
   const header = `📋 Aapka Sinus Assessment Complete ✅\n\nAapki details:\n• Problem duration: ${p.duration}\n• Main symptom: ${p.symptom}\n• Previous treatment: ${p.tried}\n• Severity: ${p.severity}\n\n`;
 
@@ -179,6 +210,7 @@ Day 14 — significant improvement in comfort. 🌿
 ` + footer;
 }
 
+// ─── SHEET FUNCTIONS ─────────────────────────────────────────
 async function saveToSheet(data) {
   try {
     const response = await fetch(GOOGLE_SHEET_URL, {
@@ -215,6 +247,7 @@ async function updateLead(senderId, temperature, lastStage, symptom) {
   }
 }
 
+// ─── SEND MESSAGE ─────────────────────────────────────────────
 async function sendMessage(senderId, text) {
   try {
     const response = await fetch(
@@ -234,6 +267,7 @@ async function sendMessage(senderId, text) {
   }
 }
 
+// ─── WEBHOOK ──────────────────────────────────────────────────
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -251,7 +285,26 @@ app.post('/webhook', async (req, res) => {
     for (const entry of body.entry) {
       if (entry.messaging) {
         for (const msg of entry.messaging) {
-          if (msg.sender.id === PAGE_ID) continue;
+
+          // ─── PAGE SENDING MESSAGE → HUMAN TAKEOVER ──────────
+          if (msg.sender.id === PAGE_ID) {
+            const recipientId = msg.recipient && msg.recipient.id;
+            if (recipientId && recipientId !== PAGE_ID) {
+              // Check if page is reactivating bot
+              if (msg.message && msg.message.text && msg.message.text.startsWith('BOT_ON_')) {
+                const targetId = msg.message.text.replace('BOT_ON_', '').trim();
+                userState[targetId] = 'new';
+                delete userProfile[targetId];
+                console.log(`BOT REACTIVATED for ${targetId}`);
+              } else {
+                // Page replied manually → pause bot for this user
+                userState[recipientId] = 'human_takeover';
+                console.log(`HUMAN TAKEOVER - bot paused for ${recipientId}`);
+              }
+            }
+            continue;
+          }
+
           if (!msg.message || !msg.message.text) continue;
 
           const senderId = msg.sender.id;
@@ -261,6 +314,13 @@ app.post('/webhook', async (req, res) => {
 
           console.log(`LEAD - ID: ${senderId} - State: ${state} - Message: ${text}`);
 
+          // ─── HUMAN TAKEOVER — BOT SILENT ────────────────────
+          if (state === 'human_takeover') {
+            console.log(`SILENT - human takeover active for ${senderId}`);
+            continue;
+          }
+
+          // ─── SAVE FIRST MESSAGE ──────────────────────────────
           if (state === 'new') {
             await saveToSheet({
               timestamp: new Date().toISOString(),
@@ -271,9 +331,10 @@ app.post('/webhook', async (req, res) => {
             });
           }
 
-          // Contact request — any stage except done
+          // ─── CONTACT REQUEST — ANY STAGE EXCEPT DONE ────────
           if (
             state !== 'done' &&
+            state !== 'human_takeover' &&
             (
               text.toLowerCase().includes('whatsapp') ||
               text.toLowerCase().includes('contact') ||
@@ -295,6 +356,8 @@ Ayusom Herbals 🌿`
             );
             continue;
           }
+
+          // ─── STATE MACHINE ───────────────────────────────────
 
           if (state === 'new') {
             userState[senderId] = 'asked_duration';
@@ -494,6 +557,7 @@ Kya aap apna protocol shuru karna chahte hain? Reply YES.`
             // Silent after payment link sent
             console.log(`DONE STATE - No reply sent to ${senderId}`);
           }
+
         }
       }
     }
