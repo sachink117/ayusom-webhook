@@ -5,8 +5,10 @@ const app = express();
 app.use(express.json());
 
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
+const INSTAGRAM_TOKEN = process.env.INSTAGRAM_TOKEN;
 const GOOGLE_SHEET_URL = process.env.GOOGLE_SHEET_URL;
 const PAGE_ID = '1035532399636645';
+const INSTAGRAM_ID = '17841445309536661';
 const PAYMENT_LINK = 'https://rzp.io/rzp/qu8zhQT';
 const WHATSAPP_NUMBER = '+91 85951 60713';
 const WEBSITE = 'www.ayusomamherbals.com';
@@ -249,7 +251,7 @@ async function updateLead(senderId, temperature, lastStage, symptom) {
 }
 
 // ─── SEND MESSAGE ─────────────────────────────────────────────
-async function sendMessage(senderId, text) {
+async function sendFBMessage(senderId, text) {
   try {
     const response = await fetch(
       `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
@@ -262,89 +264,68 @@ async function sendMessage(senderId, text) {
         })
       }
     );
-    console.log('Message sent, status:', response.status);
+    console.log('FB message sent, status:', response.status);
   } catch(err) {
-    console.error('Send error:', err.message);
+    console.error('FB send error:', err.message);
   }
 }
 
-// ─── WEBHOOK ──────────────────────────────────────────────────
-app.get('/webhook', (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
-  if (mode === 'subscribe' && token === 'ayusom2026') {
-    return res.status(200).send(challenge);
+async function sendIGMessage(senderId, text) {
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/me/messages?access_token=${INSTAGRAM_TOKEN}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient: { id: senderId },
+          message: { text: text }
+        })
+      }
+    );
+    console.log('IG message sent, status:', response.status);
+  } catch(err) {
+    console.error('IG send error:', err.message);
   }
-  return res.sendStatus(403);
-});
+}
 
-app.post('/webhook', async (req, res) => {
-  const body = req.body;
+// ─── PROCESS MESSAGE ─────────────────────────────────────────
+async function processMessage(senderId, text, platform, sendFn, ownId) {
+  const state = userState[senderId] || 'new';
+  const profile = userProfile[senderId] || {};
 
-  if (body.entry) {
-    for (const entry of body.entry) {
-      if (entry.messaging) {
-        for (const msg of entry.messaging) {
+  console.log(`LEAD [${platform}] - ID: ${senderId} - State: ${state} - Message: ${text}`);
 
-          // ─── PAGE SENDING MESSAGE → HUMAN TAKEOVER ──────────
-          if (msg.sender.id === PAGE_ID) {
-            const recipientId = msg.recipient && msg.recipient.id;
-            if (recipientId && recipientId !== PAGE_ID) {
-              if (msg.message && msg.message.text && msg.message.text.startsWith('BOT_ON_')) {
-                const targetId = msg.message.text.replace('BOT_ON_', '').trim();
-                userState[targetId] = 'new';
-                delete userProfile[targetId];
-                console.log(`BOT REACTIVATED for ${targetId}`);
-              } else {
-                userState[recipientId] = 'human_takeover';
-                console.log(`HUMAN TAKEOVER - bot paused for ${recipientId}`);
-              }
-            }
-            continue;
-          }
+  if (state === 'human_takeover') {
+    console.log(`SILENT - human takeover active for ${senderId}`);
+    return;
+  }
 
-          if (!msg.message || !msg.message.text) continue;
+  if (state === 'new') {
+    await saveToSheet({
+      timestamp: new Date().toISOString(),
+      platform: platform,
+      senderId: senderId,
+      name: `${platform}_${senderId}`,
+      message: text
+    });
+  }
 
-          const senderId = msg.sender.id;
-          const text = msg.message.text.trim();
-          const state = userState[senderId] || 'new';
-          const profile = userProfile[senderId] || {};
-
-          console.log(`LEAD - ID: ${senderId} - State: ${state} - Message: ${text}`);
-
-          // ─── HUMAN TAKEOVER — BOT SILENT ────────────────────
-          if (state === 'human_takeover') {
-            console.log(`SILENT - human takeover active for ${senderId}`);
-            continue;
-          }
-
-          // ─── SAVE FIRST MESSAGE ──────────────────────────────
-          if (state === 'new') {
-            await saveToSheet({
-              timestamp: new Date().toISOString(),
-              platform: 'Facebook',
-              senderId: senderId,
-              name: 'FB_' + senderId,
-              message: text
-            });
-          }
-
-          // ─── CONTACT REQUEST — ANY STAGE EXCEPT DONE ────────
-          if (
-            state !== 'done' &&
-            state !== 'human_takeover' &&
-            (
-              text.toLowerCase().includes('whatsapp') ||
-              text.toLowerCase().includes('contact') ||
-              text.toLowerCase().includes('call') ||
-              text.toLowerCase().includes('phone') ||
-              text.toLowerCase().includes('helpline') ||
-              text.toLowerCase().includes('direct') ||
-              text.toLowerCase().includes('number')
-            )
-          ) {
-            await sendMessage(senderId,
+  // Contact request
+  if (
+    state !== 'done' &&
+    state !== 'human_takeover' &&
+    (
+      text.toLowerCase().includes('whatsapp') ||
+      text.toLowerCase().includes('contact') ||
+      text.toLowerCase().includes('call') ||
+      text.toLowerCase().includes('phone') ||
+      text.toLowerCase().includes('helpline') ||
+      text.toLowerCase().includes('direct') ||
+      text.toLowerCase().includes('number')
+    )
+  ) {
+    await sendFn(senderId,
 `Bilkul! Aap seedha hamare specialist se baat kar sakte hain. 🙏
 
 📱 WhatsApp: ${WHATSAPP_NUMBER}
@@ -353,16 +334,14 @@ app.post('/webhook', async (req, res) => {
 Hum personally aapki problem sunenge aur sahi guidance denge.
 
 Ayusomam Herbals 🌿`
-            );
-            continue;
-          }
+    );
+    return;
+  }
 
-          // ─── STATE MACHINE ───────────────────────────────────
-
-          if (state === 'new') {
-            userState[senderId] = 'asked_duration';
-            await updateLead(senderId, '🔴 Cold', 'started', '');
-            await sendMessage(senderId,
+  if (state === 'new') {
+    userState[senderId] = 'asked_duration';
+    await updateLead(senderId, '🔴 Cold', 'started', '');
+    await sendFn(senderId,
 `🙏 Namaste! Ayusomam Herbals mein aapka swagat hai.
 
 Hum chronic sinus conditions ka Ayurvedic treatment karte hain — naturally, bina spray ya steroid dependency ke.
@@ -380,24 +359,24 @@ Aapke liye personalized assessment ke liye kuch quick questions —
 3️⃣ 2 saal se zyada (More than 2 years)
 
 Number ya text mein reply karein.`
-            );
+    );
 
-          } else if (state === 'asked_duration') {
-            const duration = detectDuration(text);
-            if (!duration) {
-              await sendMessage(senderId,
+  } else if (state === 'asked_duration') {
+    const duration = detectDuration(text);
+    if (!duration) {
+      await sendFn(senderId,
 `Thoda aur clearly batayein — kitne saal ya mahine se hai yeh problem?
 
 1️⃣ 6 mahine se kam
 2️⃣ 6 mahine se 2 saal
 3️⃣ 2 saal se zyada`
-              );
-            } else {
-              const durationLabel = duration === 'short' ? '6 mahine se kam' : duration === 'medium' ? '6 mahine se 2 saal' : '2 saal se zyada';
-              userProfile[senderId] = { ...profile, duration: durationLabel };
-              userState[senderId] = 'asked_symptoms';
-              await updateLead(senderId, '🔴 Cold', 'asked_duration', '');
-              await sendMessage(senderId,
+      );
+    } else {
+      const durationLabel = duration === 'short' ? '6 mahine se kam' : duration === 'medium' ? '6 mahine se 2 saal' : '2 saal se zyada';
+      userProfile[senderId] = { ...profile, duration: durationLabel };
+      userState[senderId] = 'asked_symptoms';
+      await updateLead(senderId, '🔴 Cold', 'asked_duration', '');
+      await sendFn(senderId,
 `Noted. ✅
 
 ✦ Aapke mukhya symptoms kya hain?
@@ -410,13 +389,13 @@ Number ya text mein reply karein.`
 5️⃣ Raat ko neend nahi, gale mein balgam (post nasal drip)
 
 Number ya describe karein.`
-              );
-            }
+      );
+    }
 
-          } else if (state === 'asked_symptoms') {
-            const symptom = detectSymptom(text);
-            if (!symptom) {
-              await sendMessage(senderId,
+  } else if (state === 'asked_symptoms') {
+    const symptom = detectSymptom(text);
+    if (!symptom) {
+      await sendFn(senderId,
 `Thoda aur clearly batayein — aapki main problem kya hai?
 
 1️⃣ Sneezing, watery eyes — dust/season se
@@ -424,18 +403,18 @@ Number ya describe karein.`
 3️⃣ Burning, thick mucus, headache
 4️⃣ Spray/Otrivin dependency
 5️⃣ Post nasal drip, sleep problem`
-              );
-            } else {
-              const symptomLabel = {
-                allergic: 'Allergic — sneezing, watery, dust triggered',
-                congestive: 'Congestive — naak band, pressure, heaviness',
-                heat: 'Heat Sinus — burning, thick mucus, headache',
-                dependency: 'Dependency — Otrivin/spray dependent'
-              }[symptom];
-              userProfile[senderId] = { ...profile, symptom: symptomLabel, sinusType: symptom };
-              userState[senderId] = 'asked_tried';
-              await updateLead(senderId, '🟡 Warm', 'asked_symptoms', symptomLabel);
-              await sendMessage(senderId,
+      );
+    } else {
+      const symptomLabel = {
+        allergic: 'Allergic — sneezing, watery, dust triggered',
+        congestive: 'Congestive — naak band, pressure, heaviness',
+        heat: 'Heat Sinus — burning, thick mucus, headache',
+        dependency: 'Dependency — Otrivin/spray dependent'
+      }[symptom];
+      userProfile[senderId] = { ...profile, symptom: symptomLabel, sinusType: symptom };
+      userState[senderId] = 'asked_tried';
+      await updateLead(senderId, '🟡 Warm', 'asked_symptoms', symptomLabel);
+      await sendFn(senderId,
 `Samajh gaya. ✅
 
 ✦ Pehle koi treatment try ki hai?
@@ -448,13 +427,13 @@ Number ya describe karein.`
 5️⃣ Koi aur Ayurvedic treatment
 
 Number ya describe karein.`
-              );
-            }
+      );
+    }
 
-          } else if (state === 'asked_tried') {
-            const tried = detectTried(text);
-            if (!tried) {
-              await sendMessage(senderId,
+  } else if (state === 'asked_tried') {
+    const tried = detectTried(text);
+    if (!tried) {
+      await sendFn(senderId,
 `Kya treatment try ki thi? Number ya describe karein:
 
 1️⃣ Sirf nasal spray
@@ -462,12 +441,12 @@ Number ya describe karein.`
 3️⃣ Ghar ke nuskhe
 4️⃣ Kuch nahi
 5️⃣ Ayurvedic treatment`
-              );
-            } else {
-              userProfile[senderId] = { ...profile, tried };
-              userState[senderId] = 'asked_severity';
-              await updateLead(senderId, '🟡 Warm', 'asked_tried', userProfile[senderId].symptom);
-              await sendMessage(senderId,
+      );
+    } else {
+      userProfile[senderId] = { ...profile, tried };
+      userState[senderId] = 'asked_severity';
+      await updateLead(senderId, '🟡 Warm', 'asked_tried', userProfile[senderId].symptom);
+      await sendFn(senderId,
 `Samajh gaya. ✅
 
 ✦ Sinus aapki daily life ko kitna affect karta hai?
@@ -479,33 +458,33 @@ Number ya describe karein.`
 4️⃣ Extreme — normal kaam karna mushkil (Very Severe)
 
 Number ya describe karein.`
-              );
-            }
+      );
+    }
 
-          } else if (state === 'asked_severity') {
-            const severity = detectSeverity(text);
-            if (!severity) {
-              await sendMessage(senderId,
+  } else if (state === 'asked_severity') {
+    const severity = detectSeverity(text);
+    if (!severity) {
+      await sendFn(senderId,
 `Kitni severe hai problem? Number ya describe karein:
 
 1️⃣ Mild — kabhi kabhi
 2️⃣ Moderate — regularly affect hoti hai
 3️⃣ Severe — daily routine affect
 4️⃣ Very Severe — bahut mushkil`
-              );
-            } else {
-              userProfile[senderId] = { ...profile, severity };
-              userState[senderId] = 'pitched';
-              const p = userProfile[senderId];
-              await updateLead(senderId, '🟡 Warm', 'pitched', p.symptom);
-              await sendMessage(senderId, getPitchMessage(p.sinusType, p));
-            }
+      );
+    } else {
+      userProfile[senderId] = { ...profile, severity };
+      userState[senderId] = 'pitched';
+      const p = userProfile[senderId];
+      await updateLead(senderId, '🟡 Warm', 'pitched', p.symptom);
+      await sendFn(senderId, getPitchMessage(p.sinusType, p));
+    }
 
-          } else if (state === 'pitched') {
-            if (['yes','haan','han','ha','y','हाँ','हां'].includes(text.toLowerCase())) {
-              userState[senderId] = 'done';
-              await updateLead(senderId, '🟢 Hot', 'payment_sent', userProfile[senderId].symptom);
-              await sendMessage(senderId,
+  } else if (state === 'pitched') {
+    if (['yes','haan','han','ha','y','हाँ','हां'].includes(text.toLowerCase())) {
+      userState[senderId] = 'done';
+      await updateLead(senderId, '🟢 Hot', 'payment_sent', userProfile[senderId].symptom);
+      await sendFn(senderId,
 `Bahut achha! 🙏
 
 Aapka 14-day personalized Ayurvedic Sinus Protocol confirm karne ke liye payment karein:
@@ -525,12 +504,12 @@ Koi problem ho toh:
 🌐 ${WEBSITE}
 
 Ayusomam Herbals 🌿`
-              );
+      );
 
-            } else if (text.toLowerCase() === 'more') {
-              userState[senderId] = 'human_takeover';
-              await updateLead(senderId, '🟢 Hot', 'requested_specialist', userProfile[senderId].symptom);
-              await sendMessage(senderId,
+    } else if (text.toLowerCase() === 'more') {
+      userState[senderId] = 'human_takeover';
+      await updateLead(senderId, '🟢 Hot', 'requested_specialist', userProfile[senderId].symptom);
+      await sendFn(senderId,
 `Bilkul! 🙏
 
 Hamare Ayurvedic specialist aapse seedha baat karenge — aapke specific sinus type aur protocol ke baare mein personally guide karenge.
@@ -541,20 +520,19 @@ Thoda intezaar karein — specialist abhi aapke paas aate hain.
 🌐 ${WEBSITE}
 
 Ayusomam Herbals 🌿`
-              );
+      );
 
-            } else if (
-              text.toLowerCase().includes('price') ||
-              text.toLowerCase().includes('cost') ||
-              text.toLowerCase().includes('kitna') ||
-              text.toLowerCase().includes('fees') ||
-              text.toLowerCase().includes('charge') ||
-              text.toLowerCase().includes('paisa') ||
-              text.toLowerCase().includes('rate')
-            ) {
-              await sendMessage(senderId,
+    } else if (
+      text.toLowerCase().includes('price') ||
+      text.toLowerCase().includes('cost') ||
+      text.toLowerCase().includes('kitna') ||
+      text.toLowerCase().includes('fees') ||
+      text.toLowerCase().includes('charge') ||
+      text.toLowerCase().includes('paisa') ||
+      text.toLowerCase().includes('rate')
+    ) {
+      await sendFn(senderId,
 `Poora 14-day protocol sirf ₹1,299 mein.
-(Complete 14-day program is ₹1,299 only.)
 
 Isme shamil hai:
 ✅ Aapke specific sinus type ke liye personalized protocol
@@ -566,10 +544,10 @@ Aur jaankari ke liye: 🌐 ${WEBSITE}
 
 Reply karein YES to begin. 🙏
 Ya plan details ke liye "MORE" type karein.`
-              );
+      );
 
-            } else {
-              await sendMessage(senderId,
+    } else {
+      await sendFn(senderId,
 `Koi bhi sawaal poochh sakte hain — hum yahan hain. 🙏
 
 Agar plan ke baare mein aur details chahiye toh "MORE" type karein — hamare specialist khud aapse 1-on-1 baat karenge.
@@ -577,15 +555,85 @@ Agar plan ke baare mein aur details chahiye toh "MORE" type karein — hamare sp
 Ya program shuru karne ke liye Reply karein YES.
 
 🌐 ${WEBSITE}`
-              );
+      );
+    }
+
+  } else if (state === 'done') {
+    console.log(`DONE STATE - No reply sent to ${senderId}`);
+  }
+}
+
+// ─── WEBHOOK ──────────────────────────────────────────────────
+app.get('/webhook', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  if (mode === 'subscribe' && token === 'ayusom2026') {
+    return res.status(200).send(challenge);
+  }
+  return res.sendStatus(403);
+});
+
+app.post('/webhook', async (req, res) => {
+  const body = req.body;
+
+  if (body.entry) {
+    for (const entry of body.entry) {
+
+      // ─── INSTAGRAM MESSAGES ──────────────────────────────
+      if (entry.id === INSTAGRAM_ID) {
+        if (entry.messaging) {
+          for (const msg of entry.messaging) {
+            if (msg.sender.id === INSTAGRAM_ID) {
+              // Instagram page sent message → human takeover
+              const recipientId = msg.recipient && msg.recipient.id;
+              if (recipientId && recipientId !== INSTAGRAM_ID) {
+                if (msg.message && msg.message.text && msg.message.text.startsWith('BOT_ON_')) {
+                  const targetId = msg.message.text.replace('BOT_ON_', '').trim();
+                  userState[targetId] = 'new';
+                  delete userProfile[targetId];
+                  console.log(`BOT REACTIVATED for ${targetId}`);
+                } else {
+                  userState[recipientId] = 'human_takeover';
+                  console.log(`IG HUMAN TAKEOVER for ${recipientId}`);
+                }
+              }
+              continue;
             }
-
-          } else if (state === 'done') {
-            console.log(`DONE STATE - No reply sent to ${senderId}`);
+            if (!msg.message || !msg.message.text) continue;
+            const senderId = msg.sender.id;
+            const text = msg.message.text.trim();
+            await processMessage(senderId, text, 'Instagram', sendIGMessage, INSTAGRAM_ID);
           }
+        }
+        continue;
+      }
 
+      // ─── FACEBOOK MESSAGES ───────────────────────────────
+      if (entry.messaging) {
+        for (const msg of entry.messaging) {
+          if (msg.sender.id === PAGE_ID) {
+            const recipientId = msg.recipient && msg.recipient.id;
+            if (recipientId && recipientId !== PAGE_ID) {
+              if (msg.message && msg.message.text && msg.message.text.startsWith('BOT_ON_')) {
+                const targetId = msg.message.text.replace('BOT_ON_', '').trim();
+                userState[targetId] = 'new';
+                delete userProfile[targetId];
+                console.log(`BOT REACTIVATED for ${targetId}`);
+              } else {
+                userState[recipientId] = 'human_takeover';
+                console.log(`FB HUMAN TAKEOVER for ${recipientId}`);
+              }
+            }
+            continue;
+          }
+          if (!msg.message || !msg.message.text) continue;
+          const senderId = msg.sender.id;
+          const text = msg.message.text.trim();
+          await processMessage(senderId, text, 'Facebook', sendFBMessage, PAGE_ID);
         }
       }
+
     }
   }
   res.status(200).send('EVENT_RECEIVED');
