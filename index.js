@@ -13,8 +13,6 @@ const WHATSAPP_NUMBER = '+91 85951 60713';
 const userState = {};
 const userProfile = {};
 
-// ─── DETECTION HELPERS ───────────────────────────────────────
-
 function detectDuration(text) {
   const t = text.toLowerCase();
   if (t === '1') return 'short';
@@ -70,14 +68,12 @@ function detectSeverity(text) {
   return null;
 }
 
-// ─── PITCH MESSAGES ──────────────────────────────────────────
-
 function getPitchMessage(sinusType, p) {
   const header = `📋 Aapka Sinus Assessment Complete ✅\n\nAapki details:\n• Problem duration: ${p.duration}\n• Main symptom: ${p.symptom}\n• Previous treatment: ${p.tried}\n• Severity: ${p.severity}\n\n`;
 
-  const footer = `\n⭐ CLIENT EXPERIENCE\n\nShikha Tyagi ji — 5 saal se Otrivin use kar rahi thin. Ayusom 14-day program ke baad unhone naturally spray reduce kar li.\n\nUnke words: "Pehli baar itne saalon baad khulke saans li." ✅\n\n*Results may vary. Yeh ek personal wellness experience hai.*\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299\n━━━━━━━━━━━━━━━━━━━━\n\nBaaki programs plan dete hain.\nHum results dete hain — kabhi bhi, daily.\n\nKya aap apna program shuru karna chahte hain?\nReply karein YES. 🙏`;
-
   const specialist = `Yeh koi app nahi. Koi generic PDF nahi.\n\nAapko milega ek dedicated Ayurvedic specialist —\n14 din tak, directly aapke WhatsApp pe.\n\nJab bhi symptoms feel ho — message karein.\nSpecialist personally respond karega aur\naapka protocol usi waqt adjust karega.\n\nDin mein 2 baar. Raat ko. Flare up pe.\nKabhi bhi.\n`;
+
+  const footer = `\n━━━━━━━━━━━━━━━━━━━━\n⭐ CLIENT EXPERIENCE\n━━━━━━━━━━━━━━━━━━━━\n\nShikha Tyagi ji — 5 saal se Otrivin use kar rahi thin. Ayusom 14-day program ke baad unhone naturally spray reduce kar li.\n\nUnke words: "Pehli baar itne saalon baad khulke saans li." ✅\n\n*Results may vary. Yeh ek personal wellness experience hai.*\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299\n━━━━━━━━━━━━━━━━━━━━\n\nBaaki programs plan dete hain.\nHum results dete hain — kabhi bhi, daily.\n\nKya aap apna protocol shuru karna chahte hain?\nReply karein YES. 🙏`;
 
   if (sinusType === 'allergic') {
     return header +
@@ -171,7 +167,6 @@ Day 14 — jo spray saalon se chhut nahi rahi, bahut se clients ne 14 din mein n
 ` + footer;
   }
 
-  // Fallback
   return header +
 `━━━━━━━━━━━━━━━━━━━━
 🌿 AYUSOM SINUS PROTOCOL
@@ -183,8 +178,6 @@ Day 7 — breathing better feel hogi.
 Day 14 — significant improvement in comfort. 🌿
 ` + footer;
 }
-
-// ─── SHEET FUNCTIONS ─────────────────────────────────────────
 
 async function saveToSheet(data) {
   try {
@@ -222,8 +215,6 @@ async function updateLead(senderId, temperature, lastStage, symptom) {
   }
 }
 
-// ─── SEND MESSAGE ─────────────────────────────────────────────
-
 async function sendMessage(senderId, text) {
   try {
     const response = await fetch(
@@ -242,8 +233,6 @@ async function sendMessage(senderId, text) {
     console.error('Send error:', err.message);
   }
 }
-
-// ─── WEBHOOK ──────────────────────────────────────────────────
 
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
@@ -272,7 +261,6 @@ app.post('/webhook', async (req, res) => {
 
           console.log(`LEAD - ID: ${senderId} - State: ${state} - Message: ${text}`);
 
-          // Save first message
           if (state === 'new') {
             await saveToSheet({
               timestamp: new Date().toISOString(),
@@ -283,15 +271,18 @@ app.post('/webhook', async (req, res) => {
             });
           }
 
-          // Contact request — any stage
+          // Contact request — any stage except done
           if (
-            text.toLowerCase().includes('whatsapp') ||
-            text.toLowerCase().includes('contact') ||
-            text.toLowerCase().includes('call') ||
-            text.toLowerCase().includes('phone') ||
-            text.toLowerCase().includes('helpline') ||
-            text.toLowerCase().includes('direct') ||
-            text.toLowerCase().includes('number')
+            state !== 'done' &&
+            (
+              text.toLowerCase().includes('whatsapp') ||
+              text.toLowerCase().includes('contact') ||
+              text.toLowerCase().includes('call') ||
+              text.toLowerCase().includes('phone') ||
+              text.toLowerCase().includes('helpline') ||
+              text.toLowerCase().includes('direct') ||
+              text.toLowerCase().includes('number')
+            )
           ) {
             await sendMessage(senderId,
 `Bilkul! Aap seedha hamare specialist se WhatsApp pe baat kar sakte hain. 🙏
@@ -299,14 +290,11 @@ app.post('/webhook', async (req, res) => {
 📱 WhatsApp: ${WHATSAPP_NUMBER}
 
 Hum personally aapki problem sunenge aur sahi guidance denge.
-(You can reach our Ayurvedic specialist directly on WhatsApp anytime.)
 
 Ayusom Herbals 🌿`
             );
             continue;
           }
-
-          // ─── STATE MACHINE ───────────────────────────────────
 
           if (state === 'new') {
             userState[senderId] = 'asked_duration';
@@ -334,7 +322,6 @@ Number ya text mein reply karein.`
             if (!duration) {
               await sendMessage(senderId,
 `Thoda aur clearly batayein — kitne saal ya mahine se hai yeh problem?
-(Please tell us how many months or years you have had this problem.)
 
 1️⃣ 6 mahine se kam
 2️⃣ 6 mahine se 2 saal
@@ -492,8 +479,6 @@ Isme shamil hai:
 ✅ Daily adaptive guidance — aapke symptoms ke hisaab se
 ✅ Flare up support — jab bhi zaroorat ho
 
-Lasting wellness ke liye — yeh sabse effective solution hai.
-
 Reply karein YES to begin. 🙏`
               );
 
@@ -505,10 +490,10 @@ Kya aap apna protocol shuru karna chahte hain? Reply YES.`
               );
             }
 
-         } else if (state === 'done') {
-    // Silent — no more auto replies after assessment complete
-    console.log(`DONE STATE - No reply sent to ${senderId}`);
-  }
+          } else if (state === 'done') {
+            // Silent after payment link sent
+            console.log(`DONE STATE - No reply sent to ${senderId}`);
+          }
         }
       }
     }
