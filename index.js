@@ -303,11 +303,28 @@ async function processMessage(senderId, text, platform, sendFn) {
   }
 
   // Restart trigger — any state
-  if (['restart', 'dobara', 'reset', 'fir se', 'start again'].some(k => t.includes(k))) {
-    userState[senderId] = 'new';
+ if (['restart', 'dobara', 'reset', 'fir se', 'start again'].some(k => t.includes(k))) {
+    userState[senderId] = 'asked_duration';
     delete userProfile[senderId];
     delete rowCache[senderId];
-    await processMessage(senderId, text, platform, sendFn);
+    saveToSheet(senderId, platform, 'restart', 'asked_duration', '🔴 Cold', '', '', {});
+    await sendFn(senderId,
+`🙏 Namaste! Ayusomam Herbals mein aapka swagat hai.
+
+Hum sinus discomfort ke liye personalized Ayurvedic wellness guidance dete hain — naturally, bina spray ya steroid dependency ke.
+
+🌐 ${WEBSITE}
+
+Aapke liye best guidance ke liye kuch quick questions —
+
+✦ Aapko sinus ki takleef kitne samay se hai?
+
+1️⃣ 6 mahine se kam
+2️⃣ 6 mahine se 2 saal
+3️⃣ 2 saal se zyada
+
+Number ya text mein reply karein.`
+    );
     return;
   }
 
