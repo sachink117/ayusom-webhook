@@ -81,8 +81,9 @@ async function getLeadData(senderId) {
     userCache[senderId] = data;
     return data;
   } catch (err) {
-    console.error('getLeadData error:', err.message);
-    return null;
+    console.error('saveLead FULL error:', JSON.stringify(err, null, 2));
+    console.error('saveLead message:', err.message);
+    console.error('saveLead stack:', err.stack);
   }
 }
 
