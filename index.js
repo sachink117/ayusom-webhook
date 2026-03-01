@@ -1,38 +1,262 @@
 const express = require('express');
 const fetch = require('node-fetch');
-const app = express();
+const { google } = require('googleapis');
+const Anthropic = require('@anthropic-ai/sdk');
 
+const app = express();
 app.use(express.json());
 
+// ─── ENV VARIABLES ────────────────────────────────────────────
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
-const INSTAGRAM_TOKEN = process.env.INSTAGRAM_TOKEN;
-const GOOGLE_SHEET_URL = process.env.GOOGLE_SHEET_URL;
+const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
+const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+const GOOGLE_PRIVATE_KEY = (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+
 const PAGE_ID = '1035532399636645';
 const INSTAGRAM_ID = '17841445309536661';
 const PAYMENT_LINK = 'https://rzp.io/rzp/qu8zhQT';
 const WHATSAPP_NUMBER = '+91 85951 60713';
 const WEBSITE = 'www.ayusomamherbals.com';
+const SHEET_NAME = 'Leads';
 
-const userState = {};
-const userProfile = {};
+// ─── CLIENTS ─────────────────────────────────────────────────
+const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
-// ─── EXTRACT FIRST NUMBER ─────────────────────────────────────
+const auth = new google.auth.JWT(
+  GOOGLE_SERVICE_ACCOUNT_EMAIL,
+  null,
+  GOOGLE_PRIVATE_KEY,
+  ['https://www.googleapis.com/auth/spreadsheets']
+);
+const sheets = google.sheets({ version: 'v4', auth });
+
+// ─── IN-MEMORY CACHE ─────────────────────────────────────────
+const userCache = {};
+
+// ─── GOOGLE SHEETS HELPERS ────────────────────────────────────
+async function findLeadRow(senderId) {
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${SHEET_NAME}!A:C`,
+    });
+    const rows = res.data.values || [];
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][2] === senderId) return i + 1;
+    }
+    return null;
+  } catch (err) {
+    console.error('findLeadRow error:', err.message);
+    return null;
+  }
+}
+
+async function getLeadData(senderId) {
+  if (userCache[senderId]) return userCache[senderId];
+  try {
+    const row = await findLeadRow(senderId);
+    if (!row) return null;
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${SHEET_NAME}!A${row}:L${row}`,
+    });
+    const r = res.data.values?.[0] || [];
+    const data = {
+      timestamp: r[0] || '',
+      platform: r[1] || '',
+      senderId: r[2] || '',
+      name: r[3] || '',
+      message: r[4] || '',
+      status: r[5] || 'New Lead',
+      lastStage: r[6] || 'new',
+      lastActive: r[7] || '',
+      symptom: r[8] || '',
+      notes: r[9] || '',
+      sinusType: r[10] || '',
+      profileJson: r[11] || '{}',
+      row,
+    };
+    data.profile = JSON.parse(data.profileJson);
+    userCache[senderId] = data;
+    return data;
+  } catch (err) {
+    console.error('getLeadData error:', err.message);
+    return null;
+  }
+}
+
+async function saveLead(senderId, platform, text) {
+  try {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${SHEET_NAME}!A:L`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [[
+          new Date().toISOString(),
+          platform,
+          senderId,
+          `${platform}_${senderId}`,
+          text,
+          'New Lead',
+          'asked_duration',
+          new Date().toISOString(),
+          '', '', '', '{}'
+        ]]
+      }
+    });
+    console.log('Lead saved:', senderId);
+  } catch (err) {
+    console.error('saveLead error:', err.message);
+  }
+}
+
+async function updateLead(senderId, updates) {
+  try {
+    let lead = await getLeadData(senderId);
+    if (!lead) return;
+    const row = lead.row;
+    const merged = { ...lead, ...updates };
+    if (updates.profile) {
+      merged.profileJson = JSON.stringify(updates.profile);
+    }
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${SHEET_NAME}!A${row}:L${row}`,
+      valueInputOption: 'RAW',
+      resource: {
+        values: [[
+          merged.timestamp,
+          merged.platform,
+          merged.senderId,
+          merged.name,
+          merged.message,
+          merged.status,
+          merged.lastStage,
+          new Date().toISOString(),
+          merged.symptom || '',
+          merged.notes || '',
+          merged.sinusType || '',
+          merged.profileJson || '{}'
+        ]]
+      }
+    });
+    userCache[senderId] = { ...merged, profile: updates.profile || lead.profile };
+    console.log('Lead updated:', senderId, updates.lastStage);
+  } catch (err) {
+    console.error('updateLead error:', err.message);
+  }
+}
+
+// ─── SEND MESSAGES ────────────────────────────────────────────
+async function sendFBMessage(senderId, text) {
+  try {
+    await fetch(
+      `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient: { id: senderId }, message: { text } })
+      }
+    );
+  } catch (err) {
+    console.error('FB send error:', err.message);
+  }
+}
+
+async function sendIGMessage(senderId, text) {
+  try {
+    await fetch(
+      `https://graph.facebook.com/v18.0/${INSTAGRAM_ID}/messages`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient: { id: senderId },
+          message: { text },
+          messaging_type: 'RESPONSE',
+          access_token: PAGE_ACCESS_TOKEN
+        })
+      }
+    );
+  } catch (err) {
+    console.error('IG send error:', err.message);
+  }
+}
+
+// ─── CLAUDE AI ────────────────────────────────────────────────
+async function getClaudeResponse(stage, userMessage, profile) {
+  const systemPrompt = `You are an Ayurvedic sinus specialist assistant for Ayusomam Herbals.
+You help people with chronic sinus problems through a 14-day personalized program costing ₹1299.
+
+Your personality:
+- Warm, empathetic, professional
+- Speak in simple Hindi/Hinglish
+- Never use complex medical jargon
+- Always validate the person's pain before pitching
+
+Current lead profile: ${JSON.stringify(profile)}
+Current conversation stage: ${stage}
+
+Sinus types:
+- Allergic: sneezing, watery eyes, dust/season triggered
+- Congestive: nose block, face pressure, heaviness
+- Heat Sinus: burning, thick mucus, headache
+- Dependency: Otrivin/spray dependent
+
+Payment link: ${PAYMENT_LINK}
+WhatsApp: ${WHATSAPP_NUMBER}
+Website: ${WEBSITE}
+
+Rules:
+- Keep responses concise and conversational
+- For price objections, emphasize daily personal guidance value
+- If person says YES, give payment link immediately
+- If person asks for specialist, say one will contact them on WhatsApp soon
+- Never give up on a lead — always re-engage`;
+
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 500,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userMessage }]
+  });
+  return response.content[0].text;
+}
+
+// ─── PITCH MESSAGES ──────────────────────────────────────────
+function getPitchMessage(sinusType, p) {
+  const header = `📋 Aapka Sinus Assessment Complete ✅\n\nAapki details:\n• Problem duration: ${p.duration}\n• Main symptom: ${p.symptom}\n• Previous treatment: ${p.tried}\n• Severity: ${p.severity}\n\n`;
+  const specialist = `Yeh koi app nahi. Koi generic PDF nahi.\n\nAapko milega ek dedicated Ayurvedic specialist —\n14 din tak, directly aapke WhatsApp pe.\n\nKabhi bhi symptoms feel ho — message karein.\nSpecialist personally respond karega aur\naapka protocol usi waqt adjust karega.\n`;
+  const footer = `\n━━━━━━━━━━━━━━━━━━━━\n⭐ CLIENT EXPERIENCE\n━━━━━━━━━━━━━━━━━━━━\n\nShikha Tyagi ji — 5 saal se Otrivin use kar rahi thin. Ayusomam 14-day program ke baad spray naturally reduce kar li.\n\n"Pehli baar itne saalon baad khulke saans li." ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299\n━━━━━━━━━━━━━━━━━━━━\n\nKya aap apna protocol shuru karna chahte hain?\nReply karein YES 🙏\n\nAur details ke liye "MORE" type karein.\n\n🌐 ${WEBSITE}`;
+
+  const types = {
+    allergic: `━━━━━━━━━━━━━━━━━━━━\n🌿 AAPKA SINUS TYPE: ALLERGIC SINUS\n━━━━━━━━━━━━━━━━━━━━\n\nDust, pollution ya season change se trigger hoti hai. Generic solution kaam nahi karega.\n\n${specialist}\nDay 3 — discomfort kam.\nDay 7 — breathing comfortable.\nDay 14 — jo har season mein hota tha, is baar nahi hua. 🌿`,
+    congestive: `━━━━━━━━━━━━━━━━━━━━\n🔴 AAPKA SINUS TYPE: CONGESTIVE SINUS\n━━━━━━━━━━━━━━━━━━━━\n\nSubah uthte hi naak band. Chehra bhaari. Steam aur saline sirf surface pe kaam karte hain.\n\n${specialist}\nDay 3 — pressure kam.\nDay 7 — subah breathing better.\nDay 14 — bina kuch kiye khulke saans. 🌿`,
+    heat: `━━━━━━━━━━━━━━━━━━━━\n🔥 AAPKA SINUS TYPE: HEAT SINUS\n━━━━━━━━━━━━━━━━━━━━\n\nAndar se burning. Headache intense. Cooling protocol chahiye — generic decongestant nahi.\n\n${specialist}\nDay 3 — burning kam.\nDay 7 — headache frequency reduce.\nDay 14 — Burning gone. Clear naak. 🌿`,
+    dependency: `━━━━━━━━━━━━━━━━━━━━\n⚠️ AAPKA SINUS TYPE: DEPENDENCY SINUS\n━━━━━━━━━━━━━━━━━━━━\n\nSpray ke bina breathe mushkil. Yeh aapki galti nahi — body ko naturally reset karna padega.\n\n${specialist}\nDay 3 — natural breathing improve.\nDay 7 — spray ki zaroorat kam.\nDay 14 — spray naturally reduce. 🌿`,
+  };
+
+  return header + (types[sinusType] || specialist) + footer;
+}
+
+// ─── DETECTION HELPERS ────────────────────────────────────────
 function extractFirstNumber(text) {
   const match = text.match(/\d+/);
   return match ? match[0] : null;
 }
 
-// ─── DETECTION HELPERS ───────────────────────────────────────
 function detectDuration(text) {
   const t = text.toLowerCase().trim();
   if (t === '1') return 'short';
   if (t === '2') return 'medium';
   if (t === '3') return 'long';
-  if (t.match(/(^|\s)(6|chhe|six)\s*(month|mahine|mah)/)) return 'short';
+  if (t.match(/(6|chhe|six)\s*(month|mahine)/)) return 'short';
   if (t.match(/\b(less|kam|thodi|new|naya|abhi|recent)\b/)) return 'short';
-  if (t.match(/(^|\s)(1|ek|one)\s*(year|saal|sal|yr)/)) return 'medium';
-  if (t.match(/(^|\s)(2|do|two)\s*(year|saal|sal|yr)/)) return 'medium';
-  if (t.match(/(^|\s)([3-9]|10)\s*(year|saal|sal|yr)/)) return 'long';
+  if (t.match(/(1|ek|one)\s*(year|saal)/)) return 'medium';
+  if (t.match(/(2|do|two)\s*(year|saal)/)) return 'medium';
+  if (t.match(/([3-9]|10)\s*(year|saal)/)) return 'long';
   if (t.match(/\b(bahut|kaafi|purani|saalon|long|zyada)\b/)) return 'long';
   const n = extractFirstNumber(t);
   if (n === '1') return 'short';
@@ -52,7 +276,6 @@ function detectSymptom(text) {
   if (t.match(/\b(naak band|block|bhaari|heavy|pressure|congestion)\b/)) return 'congestive';
   if (t.match(/\b(burn|jalan|yellow|green|headache|sar dard)\b/)) return 'heat';
   if (t.match(/\b(otrivin|spray|depend|nasivion)\b/)) return 'dependency';
-  if (t.match(/\b(neend|sleep|drip|balgam|gala)\b/)) return 'congestive';
   const n = extractFirstNumber(t);
   if (n === '1') return 'allergic';
   if (n === '2') return 'congestive';
@@ -70,10 +293,9 @@ function detectTried(text) {
   if (t === '4') return 'kuch nahi';
   if (t === '5') return 'other Ayurvedic';
   if (t.match(/\b(otrivin|nasal spray|nasivion|drop)\b/)) return 'sirf nasal spray';
-  if (t.match(/\b(doctor|allopath|medicine|dawai|tablet|antibiotic)\b/)) return 'allopathy medicines';
-  if (t.match(/\b(ghar|home|nuskha|gharelu|haldi|shahad)\b/)) return 'ghar ke nuskhe';
-  if (t.match(/\b(kuch nahi|nothing|no treatment|nahi kiya)\b/)) return 'kuch nahi';
-  if (t.match(/\b(ayurved|patanjali|hamdard|herbal)\b/)) return 'other Ayurvedic';
+  if (t.match(/\b(doctor|allopath|medicine|dawai|tablet)\b/)) return 'allopathy medicines';
+  if (t.match(/\b(ghar|home|nuskha|gharelu|haldi)\b/)) return 'ghar ke nuskhe';
+  if (t.match(/\b(kuch nahi|nothing|nahi kiya)\b/)) return 'kuch nahi';
   const n = extractFirstNumber(t);
   if (n === '1') return 'sirf nasal spray';
   if (n === '2') return 'allopathy medicines';
@@ -89,10 +311,10 @@ function detectSeverity(text) {
   if (t === '2') return 'Moderate';
   if (t === '3') return 'Severe';
   if (t === '4') return 'Very Severe';
-  if (t.match(/\b(mild|thoda|kabhi kabhi|sometimes|halka)\b/)) return 'Mild';
-  if (t.match(/\b(moderate|kaafi|medium|affect|disturb)\b/)) return 'Moderate';
-  if (t.match(/\b(severe|bahut|zyada|daily|har roz|serious)\b/)) return 'Severe';
-  if (t.match(/\b(extreme|worst|mushkil|unbearable|critical)\b/)) return 'Very Severe';
+  if (t.match(/\b(mild|thoda|kabhi kabhi|halka)\b/)) return 'Mild';
+  if (t.match(/\b(moderate|kaafi|medium|affect)\b/)) return 'Moderate';
+  if (t.match(/\b(severe|bahut|zyada|daily|har roz)\b/)) return 'Severe';
+  if (t.match(/\b(extreme|worst|mushkil|unbearable)\b/)) return 'Very Severe';
   const n = extractFirstNumber(t);
   if (n === '1') return 'Mild';
   if (n === '2') return 'Moderate';
@@ -101,328 +323,94 @@ function detectSeverity(text) {
   return null;
 }
 
-// ─── PITCH MESSAGES ──────────────────────────────────────────
-function getPitchMessage(sinusType, p) {
-  const header = `📋 Aapka Sinus Assessment Complete ✅\n\nAapki details:\n• Problem duration: ${p.duration}\n• Main symptom: ${p.symptom}\n• Previous treatment: ${p.tried}\n• Severity: ${p.severity}\n\n`;
-
-  const specialist = `Yeh koi app nahi. Koi generic PDF nahi.\n\nAapko milega ek dedicated Ayurvedic specialist —\n14 din tak, directly aapke WhatsApp pe.\n\nJab bhi symptoms feel ho — message karein.\nSpecialist personally respond karega aur\naapka protocol usi waqt adjust karega.\n\nDin mein 2 baar. Raat ko. Flare up pe.\nKabhi bhi.\n`;
-
-  const footer = `\n━━━━━━━━━━━━━━━━━━━━\n⭐ CLIENT EXPERIENCE\n━━━━━━━━━━━━━━━━━━━━\n\nShikha Tyagi ji — 5 saal se Otrivin use kar rahi thin. Ayusomam 14-day program ke baad unhone naturally spray reduce kar li.\n\nUnke words: "Pehli baar itne saalon baad khulke saans li." ✅\n\n*Results may vary. Yeh ek personal wellness experience hai.*\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299\n━━━━━━━━━━━━━━━━━━━━\n\nBaaki programs plan dete hain.\nHum results dete hain — kabhi bhi, daily.\n\nAur jaankari ke liye visit karein:\n🌐 ${WEBSITE}\n\nKya aap apna protocol shuru karna chahte hain?\nReply karein YES. 🙏\n\nAgar plan ke baare mein aur details chahiye — "MORE" type karein.\nHamare specialist khud aapse personally baat karenge.`;
-
-  if (sinusType === 'allergic') {
-    return header +
-`━━━━━━━━━━━━━━━━━━━━
-🌿 AAPKA SINUS TYPE: ALLERGIC SINUS
-━━━━━━━━━━━━━━━━━━━━
-
-Aapki condition dust, pollution ya season change se trigger hoti hai. Har baar mausam badla — naak shuru ho gayi.
-
-Yeh generic sinus nahi — yeh Allergic Sinus hai. Isko generic solution se address nahi kar sakte.
-
-━━━━━━━━━━━━━━━━━━━━
-🌿 AYUSOMAM ALLERGIC SINUS PROTOCOL
-━━━━━━━━━━━━━━━━━━━━
-
-${specialist}
-Day 3 — discomfort kam hona shuru.
-Day 7 — breathing comfortable feel hogi.
-Day 14 — jo har season mein hota tha, woh is baar nahi hua. 🌿
-` + footer;
-  }
-
-  if (sinusType === 'congestive') {
-    return header +
-`━━━━━━━━━━━━━━━━━━━━
-🔴 AAPKA SINUS TYPE: CONGESTIVE SINUS
-━━━━━━━━━━━━━━━━━━━━
-
-Subah uthte hi naak band. Chehra bhaari. Sar mein pressure. Din bhar yahi haal.
-
-Yeh Congestive Sinus hai — nasal passage mein chronic inflammation. Time ke saath yeh aur worsen hoti hai.
-
-Steam aur saline temporary hain — surface pe kaam karte hain. Andar ki inflammation untouched rehti hai.
-
-━━━━━━━━━━━━━━━━━━━━
-🌿 AYUSOMAM CONGESTIVE SINUS PROTOCOL
-━━━━━━━━━━━━━━━━━━━━
-
-${specialist}
-Day 3 — pressure kam hona shuru.
-Day 7 — subah breathing better feel hogi.
-Day 14 — subah uthke pehli baar khulke saans li — bina kuch kiye. 🌿
-` + footer;
-  }
-
-  if (sinusType === 'heat') {
-    return header +
-`━━━━━━━━━━━━━━━━━━━━
-🔥 AAPKA SINUS TYPE: HEAT SINUS
-━━━━━━━━━━━━━━━━━━━━
-
-Andar se burning feel hoti hai. Headache intense hai. Spicy ya oily khana symptoms worsen kar deta hai.
-
-Yeh sirf nasal problem nahi — yeh Heat Sinus hai. Systemic inflammation jo andar se aa rahi hai.
-
-Isko cooling protocol chahiye — generic decongestant nahi.
-
-━━━━━━━━━━━━━━━━━━━━
-🌿 AYUSOMAM HEAT SINUS PROTOCOL
-━━━━━━━━━━━━━━━━━━━━
-
-${specialist}
-Day 3 — burning sensation kam hona shuru.
-Day 7 — headache frequency reduce hogi.
-Day 14 — Burning gone. Headache gone. Naak clear. 🌿
-` + footer;
-  }
-
-  if (sinusType === 'dependency') {
-    return header +
-`━━━━━━━━━━━━━━━━━━━━
-⚠️ AAPKA SINUS TYPE: DEPENDENCY SINUS
-━━━━━━━━━━━━━━━━━━━━
-
-Spray ke bina breathe karna mushkil lagta hai. Spray lagate ho — thodi der relief. Phir wahi blockage. Yeh cycle band hone ka naam nahi le raha.
-
-Aap akele nahi hain — yeh bahut common hai. Aur yeh aapki galti nahi.
-
-Spray ne temporarily help ki — lekin ab body uske bina adjust nahi kar pa rahi. Isko naturally reset karna padega.
-
-━━━━━━━━━━━━━━━━━━━━
-🌿 AYUSOMAM DEPENDENCY SINUS PROTOCOL
-━━━━━━━━━━━━━━━━━━━━
-
-${specialist}
-Yeh protocol mein daily guidance sabse zaroori hai — kyunki har din alag hoga. Specialist har step pe aapke saath hoga.
-
-Day 3 — natural breathing improve hona shuru.
-Day 7 — spray ki zaroorat kam hogi.
-Day 14 — jo spray saalon se chhut nahi rahi, bahut se clients ne 14 din mein naturally reduce kar li. 🌿
-` + footer;
-  }
-
-  return header +
-`━━━━━━━━━━━━━━━━━━━━
-🌿 AYUSOMAM SINUS PROTOCOL
-━━━━━━━━━━━━━━━━━━━━
-
-${specialist}
-Day 3 — discomfort kam hona shuru.
-Day 7 — breathing better feel hogi.
-Day 14 — significant improvement in comfort. 🌿
-` + footer;
-}
-
-// ─── SHEET FUNCTIONS ─────────────────────────────────────────
-async function saveToSheet(data) {
-  try {
-    const response = await fetch(GOOGLE_SHEET_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      redirect: 'follow'
-    });
-    const text = await response.text();
-    console.log('Sheet saved:', response.status, text.substring(0, 100));
-  } catch(err) {
-    console.error('Sheet error:', err.message);
-  }
-}
-
-async function updateLead(senderId, temperature, lastStage, symptom) {
-  try {
-    const response = await fetch(GOOGLE_SHEET_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        update: true,
-        senderId,
-        temperature,
-        lastStage,
-        symptom: symptom || ''
-      }),
-      redirect: 'follow'
-    });
-    const text = await response.text();
-    console.log('Lead updated:', text.substring(0, 100));
-  } catch(err) {
-    console.error('Update error:', err.message);
-  }
-}
-
-// ─── SEND MESSAGE ─────────────────────────────────────────────
-async function sendFBMessage(senderId, text) {
-  try {
-    const response = await fetch(
-      `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipient: { id: senderId },
-          message: { text: text }
-        })
-      }
-    );
-    console.log('FB message sent, status:', response.status);
-  } catch(err) {
-    console.error('FB send error:', err.message);
-  }
-}
-
-async function sendIGMessage(senderId, text) {
-  try {
-    // Try Instagram Graph API endpoint
-    const response = await fetch(
-      `https://graph.facebook.com/v18.0/${INSTAGRAM_ID}/messages`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipient: { id: senderId },
-          message: { text: text },
-          messaging_type: 'RESPONSE',
-          access_token: PAGE_ACCESS_TOKEN
-        })
-      }
-    );
-    const result = await response.text();
-    console.log('IG message sent, status:', response.status, 'body:', result);
-  } catch(err) {
-    console.error('IG send error:', err.message);
-  }
-}
-
 // ─── PROCESS MESSAGE ─────────────────────────────────────────
-async function processMessage(senderId, text, platform, sendFn, ownId) {
-  const state = userState[senderId] || 'new';
-  const profile = userProfile[senderId] || {};
+async function processMessage(senderId, text, platform, sendFn) {
+  let lead = await getLeadData(senderId);
+  const state = lead?.lastStage || 'new';
+  const profile = lead?.profile || {};
 
-  console.log(`LEAD [${platform}] - ID: ${senderId} - State: ${state} - Message: ${text}`);
+  console.log(`[${platform}] ID: ${senderId} | State: ${state} | Msg: ${text}`);
 
-  if (state === 'human_takeover') {
-    console.log(`SILENT - human takeover active for ${senderId}`);
-    return;
-  }
+  if (state === 'human_takeover') return;
 
-  if (state === 'new') {
-    await saveToSheet({
-      timestamp: new Date().toISOString(),
-      platform: platform,
-      senderId: senderId,
-      name: `${platform}_${senderId}`,
-      message: text
-    });
-  }
-
-  // Contact request
-  if (
-    state !== 'done' &&
-    state !== 'human_takeover' &&
-    (
-      text.toLowerCase().includes('whatsapp') ||
-      text.toLowerCase().includes('contact') ||
-      text.toLowerCase().includes('call') ||
-      text.toLowerCase().includes('phone') ||
-      text.toLowerCase().includes('helpline') ||
-      text.toLowerCase().includes('direct') ||
-      text.toLowerCase().includes('number')
-    )
-  ) {
+  const contactKeywords = ['whatsapp', 'contact', 'call', 'phone', 'helpline', 'direct', 'number'];
+  if (state !== 'done' && contactKeywords.some(k => text.toLowerCase().includes(k))) {
     await sendFn(senderId,
-`Bilkul! Aap seedha hamare specialist se baat kar sakte hain. 🙏
+`Bilkul! Seedha specialist se baat karein. 🙏
 
 📱 WhatsApp: ${WHATSAPP_NUMBER}
 🌐 Website: ${WEBSITE}
-
-Hum personally aapki problem sunenge aur sahi guidance denge.
 
 Ayusomam Herbals 🌿`
     );
     return;
   }
 
-  if (state === 'new') {
-    userState[senderId] = 'asked_duration';
-    await updateLead(senderId, '🔴 Cold', 'started', '');
+  if (!lead) {
+    await saveLead(senderId, platform, text);
     await sendFn(senderId,
 `🙏 Namaste! Ayusomam Herbals mein aapka swagat hai.
 
 Hum chronic sinus conditions ka Ayurvedic treatment karte hain — naturally, bina spray ya steroid dependency ke.
-(We specialize in Ayurvedic treatment for chronic sinus — without dependency on sprays or steroids.)
 
 🌐 ${WEBSITE}
 
-Aapke liye personalized assessment ke liye kuch quick questions —
+Personalized assessment ke liye kuch quick questions —
 
 ✦ Aapko sinus ki problem kitne samay se hai?
-(How long have you been suffering from sinus?)
-
-1️⃣ 6 mahine se kam (Less than 6 months)
-2️⃣ 6 mahine se 2 saal (6 months – 2 years)
-3️⃣ 2 saal se zyada (More than 2 years)
-
-Number ya text mein reply karein.`
-    );
-
-  } else if (state === 'asked_duration') {
-    const duration = detectDuration(text);
-    if (!duration) {
-      await sendFn(senderId,
-`Thoda aur clearly batayein — kitne saal ya mahine se hai yeh problem?
 
 1️⃣ 6 mahine se kam
 2️⃣ 6 mahine se 2 saal
-3️⃣ 2 saal se zyada`
-      );
-    } else {
-      const durationLabel = duration === 'short' ? '6 mahine se kam' : duration === 'medium' ? '6 mahine se 2 saal' : '2 saal se zyada';
-      userProfile[senderId] = { ...profile, duration: durationLabel };
-      userState[senderId] = 'asked_symptoms';
-      await updateLead(senderId, '🔴 Cold', 'asked_duration', '');
-      await sendFn(senderId,
+3️⃣ 2 saal se zyada
+
+Number ya text mein reply karein.`
+    );
+    return;
+  }
+
+  if (state === 'asked_duration') {
+    const duration = detectDuration(text);
+    if (!duration) {
+      await sendFn(senderId, `Thoda aur clearly batayein — kitne mahine ya saal se hai?\n\n1️⃣ 6 mahine se kam\n2️⃣ 6 mahine se 2 saal\n3️⃣ 2 saal se zyada`);
+      return;
+    }
+    const durationLabel = duration === 'short' ? '6 mahine se kam' : duration === 'medium' ? '6 mahine se 2 saal' : '2 saal se zyada';
+    const newProfile = { ...profile, duration: durationLabel };
+    await updateLead(senderId, { lastStage: 'asked_symptoms', status: '🔴 Cold', profile: newProfile });
+    await sendFn(senderId,
 `Noted. ✅
 
 ✦ Aapke mukhya symptoms kya hain?
-(What are your main symptoms?)
 
-1️⃣ Sneezing, watery eyes, runny nose — dust ya season change se worse hota hai
+1️⃣ Sneezing, watery eyes, runny nose — dust ya season change se worse
 2️⃣ Naak band, chehra bhaari, sar mein pressure
-3️⃣ Andar se burning feel, thick mucus, intense headache
+3️⃣ Andar se burning, thick mucus, intense headache
 4️⃣ Otrivin ya nasal spray pe dependent ho gaya
-5️⃣ Raat ko neend nahi, gale mein balgam (post nasal drip)
+5️⃣ Raat ko neend nahi, gale mein balgam
 
 Number ya describe karein.`
-      );
-    }
+    );
+    return;
+  }
 
-  } else if (state === 'asked_symptoms') {
+  if (state === 'asked_symptoms') {
     const symptom = detectSymptom(text);
     if (!symptom) {
-      await sendFn(senderId,
-`Thoda aur clearly batayein — aapki main problem kya hai?
-
-1️⃣ Sneezing, watery eyes — dust/season se
-2️⃣ Naak band, pressure, heaviness
-3️⃣ Burning, thick mucus, headache
-4️⃣ Spray/Otrivin dependency
-5️⃣ Post nasal drip, sleep problem`
-      );
-    } else {
-      const symptomLabel = {
-        allergic: 'Allergic — sneezing, watery, dust triggered',
-        congestive: 'Congestive — naak band, pressure, heaviness',
-        heat: 'Heat Sinus — burning, thick mucus, headache',
-        dependency: 'Dependency — Otrivin/spray dependent'
-      }[symptom];
-      userProfile[senderId] = { ...profile, symptom: symptomLabel, sinusType: symptom };
-      userState[senderId] = 'asked_tried';
-      await updateLead(senderId, '🟡 Warm', 'asked_symptoms', symptomLabel);
-      await sendFn(senderId,
+      await sendFn(senderId, `Main symptom kya hai?\n\n1️⃣ Sneezing, watery — dust/season se\n2️⃣ Naak band, pressure\n3️⃣ Burning, thick mucus, headache\n4️⃣ Spray/Otrivin dependency\n5️⃣ Post nasal drip, neend problem`);
+      return;
+    }
+    const symptomLabel = {
+      allergic: 'Allergic — sneezing, watery, dust triggered',
+      congestive: 'Congestive — naak band, pressure, heaviness',
+      heat: 'Heat Sinus — burning, thick mucus, headache',
+      dependency: 'Dependency — Otrivin/spray dependent'
+    }[symptom];
+    const newProfile = { ...profile, symptom: symptomLabel, sinusType: symptom };
+    await updateLead(senderId, { lastStage: 'asked_tried', status: '🟡 Warm', symptom: symptomLabel, sinusType: symptom, profile: newProfile });
+    await sendFn(senderId,
 `Samajh gaya. ✅
 
 ✦ Pehle koi treatment try ki hai?
-(Have you tried any treatment before?)
 
 1️⃣ Sirf nasal spray
 2️⃣ Doctor ki allopathy dawai
@@ -431,30 +419,22 @@ Number ya describe karein.`
 5️⃣ Koi aur Ayurvedic treatment
 
 Number ya describe karein.`
-      );
-    }
+    );
+    return;
+  }
 
-  } else if (state === 'asked_tried') {
+  if (state === 'asked_tried') {
     const tried = detectTried(text);
     if (!tried) {
-      await sendFn(senderId,
-`Kya treatment try ki thi? Number ya describe karein:
-
-1️⃣ Sirf nasal spray
-2️⃣ Doctor ki dawai
-3️⃣ Ghar ke nuskhe
-4️⃣ Kuch nahi
-5️⃣ Ayurvedic treatment`
-      );
-    } else {
-      userProfile[senderId] = { ...profile, tried };
-      userState[senderId] = 'asked_severity';
-      await updateLead(senderId, '🟡 Warm', 'asked_tried', userProfile[senderId].symptom);
-      await sendFn(senderId,
+      await sendFn(senderId, `Kya treatment try ki thi?\n\n1️⃣ Sirf nasal spray\n2️⃣ Doctor ki dawai\n3️⃣ Ghar ke nuskhe\n4️⃣ Kuch nahi\n5️⃣ Ayurvedic treatment`);
+      return;
+    }
+    const newProfile = { ...profile, tried };
+    await updateLead(senderId, { lastStage: 'asked_severity', status: '🟡 Warm', profile: newProfile });
+    await sendFn(senderId,
 `Samajh gaya. ✅
 
 ✦ Sinus aapki daily life ko kitna affect karta hai?
-(How severely does sinus affect your daily life?)
 
 1️⃣ Thodi problem — kabhi kabhi (Mild)
 2️⃣ Kaafi problem — kaam aur neend affect (Moderate)
@@ -462,116 +442,91 @@ Number ya describe karein.`
 4️⃣ Extreme — normal kaam karna mushkil (Very Severe)
 
 Number ya describe karein.`
-      );
-    }
+    );
+    return;
+  }
 
-  } else if (state === 'asked_severity') {
+  if (state === 'asked_severity') {
     const severity = detectSeverity(text);
     if (!severity) {
-      await sendFn(senderId,
-`Kitni severe hai problem? Number ya describe karein:
-
-1️⃣ Mild — kabhi kabhi
-2️⃣ Moderate — regularly affect hoti hai
-3️⃣ Severe — daily routine affect
-4️⃣ Very Severe — bahut mushkil`
-      );
-    } else {
-      userProfile[senderId] = { ...profile, severity };
-      userState[senderId] = 'pitched';
-      const p = userProfile[senderId];
-      await updateLead(senderId, '🟡 Warm', 'pitched', p.symptom);
-      await sendFn(senderId, getPitchMessage(p.sinusType, p));
+      await sendFn(senderId, `Kitni severe hai problem?\n\n1️⃣ Mild\n2️⃣ Moderate\n3️⃣ Severe\n4️⃣ Very Severe`);
+      return;
     }
+    const newProfile = { ...profile, severity };
+    await updateLead(senderId, { lastStage: 'pitched', status: '🟡 Warm', profile: newProfile });
+    await sendFn(senderId, getPitchMessage(newProfile.sinusType, newProfile));
+    return;
+  }
 
-  } else if (state === 'pitched') {
-    if (['yes','haan','han','ha','y','हाँ','हां'].includes(text.toLowerCase())) {
-      userState[senderId] = 'done';
-      await updateLead(senderId, '🟢 Hot', 'payment_sent', userProfile[senderId].symptom);
+  if (state === 'pitched' || state === 'following_up') {
+    const t = text.toLowerCase();
+
+    if (['yes', 'haan', 'han', 'ha', 'y', 'हाँ', 'हां'].includes(t)) {
+      await updateLead(senderId, { lastStage: 'done', status: '🟢 Hot' });
       await sendFn(senderId,
 `Bahut achha! 🙏
 
-Aapka 14-day personalized Ayurvedic Sinus Protocol confirm karne ke liye payment karein:
+Aapka 14-day personalized protocol confirm karne ke liye:
 
 💳 Payment Link: ${PAYMENT_LINK}
 Amount: ₹1,299
 
-Payment ke baad aapko WhatsApp pe milega:
+Payment ke baad WhatsApp pe milega:
 ✅ Aapka personalized protocol
 ✅ Daily guidance schedule
-✅ Direct specialist WhatsApp access
+✅ Direct specialist access
 
-Payment karte waqt apna WhatsApp number zaroor daalein — usi pe aapka plan bheja jayega.
+Payment karte waqt apna WhatsApp number zaroor daalein.
 
-Koi problem ho toh:
 📱 WhatsApp: ${WHATSAPP_NUMBER}
 🌐 ${WEBSITE}
 
 Ayusomam Herbals 🌿`
       );
+      return;
+    }
 
-    } else if (text.toLowerCase() === 'more') {
-      userState[senderId] = 'human_takeover';
-      await updateLead(senderId, '🟢 Hot', 'requested_specialist', userProfile[senderId].symptom);
+    if (t === 'more') {
+      await updateLead(senderId, { lastStage: 'human_takeover', status: '🟢 Hot' });
       await sendFn(senderId,
 `Bilkul! 🙏
 
-Hamare Ayurvedic specialist aapse seedha baat karenge — aapke specific sinus type aur protocol ke baare mein personally guide karenge.
+Hamare specialist aapse seedha baat karenge.
 
 Thoda intezaar karein — specialist abhi aapke paas aate hain.
-(Our specialist will connect with you personally very shortly.)
 
 🌐 ${WEBSITE}
 
 Ayusomam Herbals 🌿`
       );
+      return;
+    }
 
-    } else if (
-      text.toLowerCase().includes('price') ||
-      text.toLowerCase().includes('cost') ||
-      text.toLowerCase().includes('kitna') ||
-      text.toLowerCase().includes('fees') ||
-      text.toLowerCase().includes('charge') ||
-      text.toLowerCase().includes('paisa') ||
-      text.toLowerCase().includes('rate')
-    ) {
-      await sendFn(senderId,
-`Poora 14-day protocol sirf ₹1,299 mein.
-
-Isme shamil hai:
-✅ Aapke specific sinus type ke liye personalized protocol
-✅ 14 din dedicated specialist — kabhi bhi WhatsApp pe
-✅ Daily adaptive guidance — aapke symptoms ke hisaab se
-✅ Flare up support — jab bhi zaroorat ho
-
-Aur jaankari ke liye: 🌐 ${WEBSITE}
-
-Reply karein YES to begin. 🙏
-Ya plan details ke liye "MORE" type karein.`
-      );
-
-    } else {
+    try {
+      await updateLead(senderId, { lastStage: 'following_up', status: '🟡 Warm' });
+      const aiResponse = await getClaudeResponse(state, text, profile);
+      await sendFn(senderId, aiResponse);
+    } catch (err) {
+      console.error('Claude error:', err.message);
       await sendFn(senderId,
 `Koi bhi sawaal poochh sakte hain — hum yahan hain. 🙏
 
-Agar plan ke baare mein aur details chahiye toh "MORE" type karein — hamare specialist khud aapse 1-on-1 baat karenge.
-
-Ya program shuru karne ke liye Reply karein YES.
+Details ke liye "MORE" type karein ya shuru karne ke liye YES reply karein.
 
 🌐 ${WEBSITE}`
       );
     }
+    return;
+  }
 
-  } else if (state === 'done') {
-    console.log(`DONE STATE - No reply sent to ${senderId}`);
+  if (state === 'done') {
+    console.log(`DONE STATE - No reply for ${senderId}`);
   }
 }
 
-// ─── WEBHOOK ──────────────────────────────────────────────────
+// ─── WEBHOOK ─────────────────────────────────────────────────
 app.get('/webhook', (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
+  const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = req.query;
   if (mode === 'subscribe' && token === 'ayusom2026') {
     return res.status(200).send(challenge);
   }
@@ -579,69 +534,41 @@ app.get('/webhook', (req, res) => {
 });
 
 app.post('/webhook', async (req, res) => {
+  res.status(200).send('EVENT_RECEIVED');
   const body = req.body;
+  if (!body.entry) return;
 
-  if (body.entry) {
-    for (const entry of body.entry) {
+  for (const entry of body.entry) {
+    if (!entry.messaging) continue;
+    const isInstagram = entry.id === INSTAGRAM_ID;
+    const sendFn = isInstagram ? sendIGMessage : sendFBMessage;
+    const ownId = isInstagram ? INSTAGRAM_ID : PAGE_ID;
 
-      // ─── INSTAGRAM MESSAGES ──────────────────────────────
-      if (entry.id === INSTAGRAM_ID) {
-        if (entry.messaging) {
-          for (const msg of entry.messaging) {
-            if (msg.sender.id === INSTAGRAM_ID) {
-              // Instagram page sent message → human takeover
-              const recipientId = msg.recipient && msg.recipient.id;
-              if (recipientId && recipientId !== INSTAGRAM_ID) {
-                if (msg.message && msg.message.text && msg.message.text.startsWith('BOT_ON_')) {
-                  const targetId = msg.message.text.replace('BOT_ON_', '').trim();
-                  userState[targetId] = 'new';
-                  delete userProfile[targetId];
-                  console.log(`BOT REACTIVATED for ${targetId}`);
-                } else {
-                  userState[recipientId] = 'human_takeover';
-                  console.log(`IG HUMAN TAKEOVER for ${recipientId}`);
-                }
-              }
-              continue;
-            }
-            if (!msg.message || !msg.message.text) continue;
-            const senderId = msg.sender.id;
-            const text = msg.message.text.trim();
-            await processMessage(senderId, text, 'Instagram', sendIGMessage, INSTAGRAM_ID);
+    for (const msg of entry.messaging) {
+      if (msg.sender.id === ownId) {
+        const recipientId = msg.recipient?.id;
+        if (recipientId && recipientId !== ownId) {
+          if (msg.message?.text?.startsWith('BOT_ON_')) {
+            const targetId = msg.message.text.replace('BOT_ON_', '').trim();
+            await updateLead(targetId, { lastStage: 'new', status: 'New Lead', profile: {} });
+            delete userCache[targetId];
+            console.log(`BOT REACTIVATED for ${targetId}`);
+          } else {
+            await updateLead(recipientId, { lastStage: 'human_takeover' });
+            console.log(`HUMAN TAKEOVER for ${recipientId}`);
           }
         }
         continue;
       }
-
-      // ─── FACEBOOK MESSAGES ───────────────────────────────
-      if (entry.messaging) {
-        for (const msg of entry.messaging) {
-          if (msg.sender.id === PAGE_ID) {
-            const recipientId = msg.recipient && msg.recipient.id;
-            if (recipientId && recipientId !== PAGE_ID) {
-              if (msg.message && msg.message.text && msg.message.text.startsWith('BOT_ON_')) {
-                const targetId = msg.message.text.replace('BOT_ON_', '').trim();
-                userState[targetId] = 'new';
-                delete userProfile[targetId];
-                console.log(`BOT REACTIVATED for ${targetId}`);
-              } else {
-                userState[recipientId] = 'human_takeover';
-                console.log(`FB HUMAN TAKEOVER for ${recipientId}`);
-              }
-            }
-            continue;
-          }
-          if (!msg.message || !msg.message.text) continue;
-          const senderId = msg.sender.id;
-          const text = msg.message.text.trim();
-          await processMessage(senderId, text, 'Facebook', sendFBMessage, PAGE_ID);
-        }
-      }
-
+      if (!msg.message?.text) continue;
+      const senderId = msg.sender.id;
+      const text = msg.message.text.trim();
+      const platform = isInstagram ? 'Instagram' : 'Facebook';
+      await processMessage(senderId, text, platform, sendFn);
     }
   }
-  res.status(200).send('EVENT_RECEIVED');
 });
 
+// ─── START ───────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Ayusomam Herbals webhook running on port ${PORT}`));
+app.listen(PORT, () => console.log(`✅ Ayusomam webhook running on port ${PORT}`));
