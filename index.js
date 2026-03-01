@@ -70,15 +70,14 @@ async function saveToSheet(senderId, platform, text, stage, status, symptom, sin
 // ─── SHEETS: UPDATE LEAD ─────────────────────────────────────
 async function updateSheetLead(senderId, stage, status, symptom, sinusType, profile) {
   try {
-    // Find row
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${SHEET_NAME}!C:C`,
+      range: `${SHEET_NAME}!A:C`,
     });
     const rows = res.data.values || [];
     let rowIndex = -1;
-    for (let i = 0; i < rows.length; i++) {
-      if (rows[i][0] === senderId) { rowIndex = i + 1; break; }
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][2] === senderId) { rowIndex = i + 1; break; }
     }
     if (rowIndex === -1) {
       console.log('Row not found for update:', senderId);
