@@ -152,6 +152,8 @@ async function sendIGMessage(senderId, text) {
 
 // ─── CLAUDE AI ────────────────────────────────────────────────
 async function getClaudeResponse(stage, userMessage, profile) {
+  const isPostPayment = stage === 'post_payment';
+
   const systemPrompt = `You are an Ayurvedic sinus specialist assistant for Ayusomam Herbals.
 You help people with chronic sinus problems through a 14-day personalized program costing ₹1299.
 
@@ -174,12 +176,23 @@ Payment link: ${PAYMENT_LINK}
 WhatsApp: ${WHATSAPP_NUMBER}
 Website: ${WEBSITE}
 
+${isPostPayment ? `
+IMPORTANT — Yeh person program join kar chuka hai ya payment link le chuka hai.
+Ab inke sawaalon ka jawab do:
+- Payment confirmation ke liye WhatsApp number bhejo: ${WHATSAPP_NUMBER}
+- Results timeline: Day 3 se feel hoga, Day 7 better, Day 14 significant improvement
+- Ayurvedic mein koi side effects nahi hote — reassure karo
+- Program ke liye excitement build karo
+- Agar koi concern ho toh specialist se milwao
+- Kabhi bhi payment link dobara dena ho toh: ${PAYMENT_LINK}
+` : `
 Rules:
 - Keep responses concise and conversational
 - For price objections, emphasize daily personal guidance value
 - If person says YES, give payment link immediately
 - If person asks for specialist, say one will contact them on WhatsApp soon
-- Never give up on a lead — always re-engage`;
+- Never give up on a lead — always re-engage
+`}`;
 
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
@@ -190,70 +203,39 @@ Rules:
   return response.content[0].text;
 }
 
-// ─── TRIED RESPONSE MESSAGES ─────────────────────────────────
-function getTriedResponseMessage(tried) {
-  if (tried === 'sirf nasal spray') {
-    return `Samajh gaya. ✅
-
-Nasal spray se waqti rahat milti hai — par yeh naak ki nas ko sikodt hai.
-Baar baar use karne se naak ki andar ki skin aur sukh jaati hai aur sujan badhti hai.
-Isliye spray band karo toh aur bura lagta hai — yeh cycle hai jo todna zaroori hai.`;
+// ─── SYMPTOM RESPONSE MESSAGES ───────────────────────────────
+function getSymptomResponseMessage(symptom) {
+  if (symptom === 'allergic') {
+    return `Samajh gaya. ✅\n\nYeh dust, pollution ya season change se trigger hoti hai — matlab body bahar ki cheez ko enemy samajhti hai aur overreact karti hai.\nGeneric treatment kaam nahi karega — aapko specifically allergic pattern todna hoga.`;
   }
-  if (tried === 'allopathy medicines') {
-    return `Samajh gaya. ✅
-
-Allopathy medicines symptoms ko dabati hain — andar ki wajah nahi hatati.
-Isliye kuch din theek lagta hai phir wahi problem wapas aa jaati hai.
-Yeh ek cycle ban jaata hai — symptoms suppress, wajah untouched.`;
+  if (symptom === 'congestive') {
+    return `Samajh gaya. ✅\n\nNaak band, chehra bhaari — yeh nasal passage mein chronic sujan hai.\nSteam aur saline sirf surface pe kaam karte hain — andar ki sujan untouched rehti hai.\nIsliye baar baar wahi problem hoti hai.`;
   }
-  if (tried === 'ghar ke nuskhe') {
-    return `Samajh gaya. ✅
-
-Ghar ke nuskhe thodi der ke liye aaram dete hain — par structured protocol ke bina andar ki sujan theek nahi hoti.
-Ek systematic approach chahiye jo roz ek direction mein kaam kare.`;
+  if (symptom === 'heat') {
+    return `Samajh gaya. ✅\n\nAndar se burning, thick mucus — yeh sirf nasal problem nahi, systemic inflammation hai.\nIsko cooling protocol chahiye — jo andar se kaam kare, bahar se nahi.`;
   }
-  if (tried === 'kuch nahi') {
-    return `Samajh gaya. ✅
-
-Abhi tak kuch nahi kiya — isliye problem badhti ja rahi hai.
-Sinus apne aap theek nahi hota — jitna time lagega utna aur mushkil hoga.
-Abhi sahi waqt hai sahi direction mein kaam karne ka.`;
-  }
-  if (tried === 'other Ayurvedic') {
-    return `Samajh gaya. ✅
-
-Ayurvedic approach sahi direction hai — par generic treatment aur personalized protocol mein bahut fark hota hai.
-Aapke specific sinus type ke hisaab se tailored plan chahiye — tabhi results aate hain.`;
+  if (symptom === 'dependency') {
+    return `Samajh gaya. ✅\n\nSpray ke bina breathe mushkil — yeh aapki galti nahi, spray ne ek artificial cycle bana di hai.\nBody ko naturally reset karna padega — step by step, properly.`;
   }
   return `Samajh gaya. ✅`;
 }
 
-// ─── SYMPTOM RESPONSE MESSAGES ───────────────────────────────
-function getSymptomResponseMessage(symptom) {
-  if (symptom === 'allergic') {
-    return `Samajh gaya. ✅
-
-Yeh dust, pollution ya season change se trigger hoti hai — matlab body bahar ki cheez ko enemy samajhti hai aur overreact karti hai.
-Generic treatment kaam nahi karega — aapko specifically allergic pattern todna hoga.`;
+// ─── TRIED RESPONSE MESSAGES ─────────────────────────────────
+function getTriedResponseMessage(tried) {
+  if (tried === 'sirf nasal spray') {
+    return `Samajh gaya. ✅\n\nNasal spray se waqti rahat milti hai — par yeh naak ki nas ko sikodti hai.\nBaar baar use karne se naak ki andar ki skin aur sukh jaati hai aur sujan badhti hai.\nIsliye spray band karo toh aur bura lagta hai — yeh cycle hai jo todna zaroori hai.`;
   }
-  if (symptom === 'congestive') {
-    return `Samajh gaya. ✅
-
-Naak band, chehra bhaari — yeh nasal passage mein chronic sujan hai.
-Steam aur saline sirf surface pe kaam karte hain — andar ki sujan untouched rehti hai.
-Isliye baar baar wahi problem hoti hai.`;
+  if (tried === 'allopathy medicines') {
+    return `Samajh gaya. ✅\n\nAllopathy medicines symptoms ko dabati hain — andar ki wajah nahi hatati.\nIsliye kuch din theek lagta hai phir wahi problem wapas aa jaati hai.\nYeh ek cycle ban jaata hai — symptoms suppress, wajah untouched.`;
   }
-  if (symptom === 'heat') {
-    return `Samajh gaya. ✅
-
-Andar se burning, thick mucus — yeh sirf nasal problem nahi, systemic inflammation hai.
-Isko cooling protocol chahiye — jo andar se kaam kare, bahar se nahi.`;
+  if (tried === 'ghar ke nuskhe') {
+    return `Samajh gaya. ✅\n\nGhar ke nuskhe thodi der ke liye aaram dete hain — par structured protocol ke bina andar ki sujan theek nahi hoti.\nEk systematic approach chahiye jo roz ek direction mein kaam kare.`;
   }
-  if (symptom === 'dependency') {
-    return `Samajh gaya. ✅
-
-Spray ke bina breathe mushkil — yeh aapki galti nahi, spray ne ek artificial cycle bana di hai.
-Body ko naturally reset karna padega — step by step, properly.`;
+  if (tried === 'kuch nahi') {
+    return `Samajh gaya. ✅\n\nAbhi tak kuch nahi kiya — isliye problem badhti ja rahi hai.\nSinus apne aap theek nahi hota — jitna time lagega utna aur mushkil hoga.\nAbhi sahi waqt hai sahi direction mein kaam karne ka.`;
+  }
+  if (tried === 'other Ayurvedic') {
+    return `Samajh gaya. ✅\n\nAyurvedic approach sahi direction hai — par generic treatment aur personalized protocol mein bahut fark hota hai.\nAapke specific sinus type ke hisaab se tailored plan chahiye — tabhi results aate hain.`;
   }
   return `Samajh gaya. ✅`;
 }
@@ -363,6 +345,7 @@ async function processMessage(senderId, text, platform, sendFn) {
 
   console.log(`[${platform}] ID: ${senderId} | State: ${state} | Msg: ${text}`);
 
+  // Human takeover
   if (state === 'human_takeover') {
     if (text.startsWith('BOT_ON_')) {
       const targetId = text.replace('BOT_ON_', '').trim();
@@ -374,8 +357,19 @@ async function processMessage(senderId, text, platform, sendFn) {
     return;
   }
 
+  // Restart trigger — any state
+  const t = text.toLowerCase();
+  if (['restart', 'dobara', 'reset', 'fir se', 'start again'].some(k => t.includes(k))) {
+    userState[senderId] = 'new';
+    delete userProfile[senderId];
+    delete rowCache[senderId];
+    await processMessage(senderId, text, platform, sendFn);
+    return;
+  }
+
+  // Contact request
   const contactKeywords = ['whatsapp', 'contact', 'call', 'phone', 'helpline', 'direct', 'number'];
-  if (state !== 'done' && contactKeywords.some(k => text.toLowerCase().includes(k))) {
+  if (state !== 'done' && contactKeywords.some(k => t.includes(k))) {
     await sendFn(senderId,
 `Bilkul! Seedha specialist se baat karein. 🙏
 
@@ -454,8 +448,6 @@ Number ya describe karein.`
     userProfile[senderId] = { ...profile, symptom: symptomLabel, sinusType: symptom };
     userState[senderId] = 'asked_tried';
     updateSheetLead(senderId, 'asked_tried', '🟡 Warm', symptomLabel, symptom, userProfile[senderId]);
-
-    // Symptom-specific insight + next question
     const symptomMsg = getSymptomResponseMessage(symptom);
     await sendFn(senderId, symptomMsg + `
 
@@ -482,8 +474,6 @@ Number ya describe karein.`
     userProfile[senderId] = { ...profile, tried };
     userState[senderId] = 'asked_severity';
     updateSheetLead(senderId, 'asked_severity', '🟡 Warm', userProfile[senderId].symptom, userProfile[senderId].sinusType, userProfile[senderId]);
-
-    // Treatment-specific insight + next question
     const triedMsg = getTriedResponseMessage(tried);
     await sendFn(senderId, triedMsg + `
 
@@ -509,20 +499,15 @@ Number ya describe karein.`
     userProfile[senderId] = { ...profile, severity };
     userState[senderId] = 'pitched';
     updateSheetLead(senderId, 'pitched', '🟡 Warm', userProfile[senderId].symptom, userProfile[senderId].sinusType, userProfile[senderId]);
-
-    // Severity insight before pitch
     const severityMsg = severity === 'Severe' || severity === 'Very Severe'
       ? `Samajh gaya. ✅\n\nItni severe problem — matlab body kaafi time se struggle kar rahi hai. Jitna zyada time lagega, andar ki sujan utni aur pakki hoti jaayegi.\n\nAbhi sahi waqt hai isko seriously lene ka.\n\n`
       : `Samajh gaya. ✅\n\nAbhi bhi manageable hai — par agar ignore kiya toh worse hoga. Sahi waqt hai theek karne ka.\n\n`;
-
     await sendFn(senderId, severityMsg + getPitchMessage(userProfile[senderId].sinusType, userProfile[senderId]));
     return;
   }
 
-  // PITCHED → Claude AI
+  // PITCHED → Claude handles objections
   if (state === 'pitched' || state === 'following_up') {
-    const t = text.toLowerCase();
-
     if (['yes', 'haan', 'han', 'ha', 'y', 'हाँ', 'हां'].includes(t)) {
       userState[senderId] = 'done';
       updateSheetLead(senderId, 'done', '🟢 Hot', userProfile[senderId]?.symptom, userProfile[senderId]?.sinusType, userProfile[senderId]);
@@ -568,7 +553,7 @@ Ayusomam Herbals 🌿`
     try {
       userState[senderId] = 'following_up';
       updateSheetLead(senderId, 'following_up', '🟡 Warm', userProfile[senderId]?.symptom, userProfile[senderId]?.sinusType, userProfile[senderId]);
-      const aiResponse = await getClaudeResponse(state, text, userProfile[senderId] || {});
+      const aiResponse = await getClaudeResponse('following_up', text, userProfile[senderId] || {});
       await sendFn(senderId, aiResponse);
     } catch (err) {
       console.error('Claude error:', err.message);
@@ -583,17 +568,22 @@ Details ke liye "MORE" type karein ya shuru karne ke liye YES reply karein.
     return;
   }
 
+  // DONE STATE → Claude handles post payment + restart option
   if (state === 'done') {
-    await sendFn(senderId,
-`Aapka program already confirm ho gaya hai. 🙏
-
-Koi bhi sawaal ho ya kuch aur jaanna ho toh hamare specialist se seedha baat karein —
+    try {
+      const aiResponse = await getClaudeResponse('post_payment', text, userProfile[senderId] || {});
+      await sendFn(senderId, aiResponse);
+    } catch (err) {
+      console.error('Claude post payment error:', err.message);
+      await sendFn(senderId,
+`Koi bhi sawaal ho toh hamare specialist se seedha baat karein. 🙏
 
 📱 WhatsApp: ${WHATSAPP_NUMBER}
 🌐 ${WEBSITE}
 
 Ayusomam Herbals 🌿`
-    );
+      );
+    }
     return;
   }
 }
