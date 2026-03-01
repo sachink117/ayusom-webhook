@@ -31,15 +31,16 @@ const auth = new google.auth.JWT(
 );
 const sheets = google.sheets({ version: 'v4', auth });
 
-// ─── IN-MEMORY STATE (primary) ───────────────────────────────
+// ─── IN-MEMORY STATE ─────────────────────────────────────────
 const userState = {};
 const userProfile = {};
+const rowCache = {};
 
 // ─── SHEETS: SAVE NEW LEAD ───────────────────────────────────
 async function saveToSheet(senderId, platform, text, stage, status, symptom, sinusType, profile) {
   try {
     console.log('Saving to sheet:', senderId);
-    await sheets.spreadsheets.values.append({
+    const res = await sheets.spreadsheets.values.append({
       spreadsheetId: GOOGLE_SHEET_ID,
       range: `${SHEET_NAME}!A:L`,
       valueInputOption: 'RAW',
@@ -60,7 +61,11 @@ async function saveToSheet(senderId, platform, text, stage, status, symptom, sin
         ]]
       }
     });
-    console.log('Sheet save SUCCESS:', senderId);
+    // Cache the row number
+    const updatedRange = res.data.updates?.updatedRange || '';
+    const match = updatedRange.match(/(\d+)$/);
+    if (match) rowCache[senderId] = parseInt(match[1]);
+    console.log('Sheet save SUCCESS:', senderId, 'row:', rowCache[senderId]);
   } catch (err) {
     console.error('SHEET SAVE ERROR:', err.message);
     console.error('SHEET SAVE STACK:', err.stack);
@@ -70,20 +75,26 @@ async function saveToSheet(senderId, platform, text, stage, status, symptom, sin
 // ─── SHEETS: UPDATE LEAD ─────────────────────────────────────
 async function updateSheetLead(senderId, stage, status, symptom, sinusType, profile) {
   try {
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${SHEET_NAME}!A:C`,
-    });
-    const rows = res.data.values || [];
-    let rowIndex = -1;
-    for (let i = 1; i < rows.length; i++) {
-      if (rows[i][2] === senderId) { rowIndex = i + 1; break; }
+    let rowIndex = rowCache[senderId];
+
+    if (!rowIndex) {
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: GOOGLE_SHEET_ID,
+        range: `${SHEET_NAME}!A:C`,
+      });
+      const rows = res.data.values || [];
+      // Find LAST occurrence
+      for (let i = rows.length - 1; i >= 1; i--) {
+        if (rows[i][2] === senderId) { rowIndex = i + 1; break; }
+      }
+      if (rowIndex) rowCache[senderId] = rowIndex;
     }
-    if (rowIndex === -1) {
+
+    if (!rowIndex) {
       console.log('Row not found for update:', senderId);
       return;
     }
-    // Update G, F, H, I, K, L columns
+
     await sheets.spreadsheets.values.update({
       spreadsheetId: GOOGLE_SHEET_ID,
       range: `${SHEET_NAME}!F${rowIndex}:L${rowIndex}`,
@@ -100,7 +111,7 @@ async function updateSheetLead(senderId, stage, status, symptom, sinusType, prof
         ]]
       }
     });
-    console.log('Sheet update SUCCESS:', senderId, stage);
+    console.log('Sheet update SUCCESS:', senderId, stage, 'row:', rowIndex);
   } catch (err) {
     console.error('SHEET UPDATE ERROR:', err.message);
   }
@@ -289,18 +300,17 @@ async function processMessage(senderId, text, platform, sendFn) {
 
   console.log(`[${platform}] ID: ${senderId} | State: ${state} | Msg: ${text}`);
 
-  // Human takeover
   if (state === 'human_takeover') {
     if (text.startsWith('BOT_ON_')) {
       const targetId = text.replace('BOT_ON_', '').trim();
       userState[targetId] = 'new';
       delete userProfile[targetId];
+      delete rowCache[targetId];
       console.log(`BOT REACTIVATED for ${targetId}`);
     }
     return;
   }
 
-  // Contact request
   const contactKeywords = ['whatsapp', 'contact', 'call', 'phone', 'helpline', 'direct', 'number'];
   if (state !== 'done' && contactKeywords.some(k => text.toLowerCase().includes(k))) {
     await sendFn(senderId,
@@ -314,10 +324,8 @@ Ayusomam Herbals 🌿`
     return;
   }
 
-  // NEW LEAD
   if (state === 'new') {
     userState[senderId] = 'asked_duration';
-    // Save to sheet async — don't block
     saveToSheet(senderId, platform, text, 'asked_duration', '🔴 Cold', '', '', {});
     await sendFn(senderId,
 `🙏 Namaste! Ayusomam Herbals mein aapka swagat hai.
@@ -339,7 +347,6 @@ Number ya text mein reply karein.`
     return;
   }
 
-  // ASKED DURATION
   if (state === 'asked_duration') {
     const duration = detectDuration(text);
     if (!duration) {
@@ -366,7 +373,6 @@ Number ya describe karein.`
     return;
   }
 
-  // ASKED SYMPTOMS
   if (state === 'asked_symptoms') {
     const symptom = detectSymptom(text);
     if (!symptom) {
@@ -398,7 +404,6 @@ Number ya describe karein.`
     return;
   }
 
-  // ASKED TRIED
   if (state === 'asked_tried') {
     const tried = detectTried(text);
     if (!tried) {
@@ -423,7 +428,6 @@ Number ya describe karein.`
     return;
   }
 
-  // ASKED SEVERITY → PITCH
   if (state === 'asked_severity') {
     const severity = detectSeverity(text);
     if (!severity) {
@@ -437,7 +441,6 @@ Number ya describe karein.`
     return;
   }
 
-  // PITCHED → Claude AI handles objections
   if (state === 'pitched' || state === 'following_up') {
     const t = text.toLowerCase();
 
@@ -483,7 +486,6 @@ Ayusomam Herbals 🌿`
       return;
     }
 
-    // Claude handles everything else
     try {
       userState[senderId] = 'following_up';
       updateSheetLead(senderId, 'following_up', '🟡 Warm', userProfile[senderId]?.symptom, userProfile[senderId]?.sinusType, userProfile[senderId]);
@@ -535,6 +537,7 @@ app.post('/webhook', async (req, res) => {
             const targetId = msg.message.text.replace('BOT_ON_', '').trim();
             userState[targetId] = 'new';
             delete userProfile[targetId];
+            delete rowCache[targetId];
             console.log(`BOT REACTIVATED for ${targetId}`);
           } else {
             userState[recipientId] = 'human_takeover';
