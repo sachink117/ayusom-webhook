@@ -31,64 +31,14 @@ const auth = new google.auth.JWT(
 );
 const sheets = google.sheets({ version: 'v4', auth });
 
-// ─── IN-MEMORY CACHE ─────────────────────────────────────────
-const userCache = {};
+// ─── IN-MEMORY STATE (primary) ───────────────────────────────
+const userState = {};
+const userProfile = {};
 
-// ─── GOOGLE SHEETS HELPERS ────────────────────────────────────
-async function findLeadRow(senderId) {
+// ─── SHEETS: SAVE NEW LEAD ───────────────────────────────────
+async function saveToSheet(senderId, platform, text, stage, status, symptom, sinusType, profile) {
   try {
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${SHEET_NAME}!A:C`,
-    });
-    const rows = res.data.values || [];
-    for (let i = 1; i < rows.length; i++) {
-      if (rows[i][2] === senderId) return i + 1;
-    }
-    return null;
-  } catch (err) {
-    console.error('findLeadRow error:', err.message);
-    return null;
-  }
-}
-
-async function getLeadData(senderId) {
-  if (userCache[senderId]) return userCache[senderId];
-  try {
-    const row = await findLeadRow(senderId);
-    if (!row) return null;
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${SHEET_NAME}!A${row}:L${row}`,
-    });
-    const r = res.data.values?.[0] || [];
-    const data = {
-      timestamp: r[0] || '',
-      platform: r[1] || '',
-      senderId: r[2] || '',
-      name: r[3] || '',
-      message: r[4] || '',
-      status: r[5] || 'New Lead',
-      lastStage: r[6] || 'new',
-      lastActive: r[7] || '',
-      symptom: r[8] || '',
-      notes: r[9] || '',
-      sinusType: r[10] || '',
-      profileJson: r[11] || '{}',
-      row,
-    };
-    data.profile = JSON.parse(data.profileJson);
-    userCache[senderId] = data;
-    return data;
-  } catch (err) {
-    console.error('saveLead FULL error:', JSON.stringify(err, null, 2));
-    console.error('saveLead message:', err.message);
-    console.error('saveLead stack:', err.stack);
-  }
-}
-
-async function saveLead(senderId, platform, text) {
-  try {
+    console.log('Saving to sheet:', senderId);
     await sheets.spreadsheets.values.append({
       spreadsheetId: GOOGLE_SHEET_ID,
       range: `${SHEET_NAME}!A:L`,
@@ -100,60 +50,67 @@ async function saveLead(senderId, platform, text) {
           senderId,
           `${platform}_${senderId}`,
           text,
-          'New Lead',
-          'asked_duration',
+          status || 'New Lead',
+          stage || 'new',
           new Date().toISOString(),
-          '', '', '', '{}'
+          symptom || '',
+          '',
+          sinusType || '',
+          JSON.stringify(profile || {})
         ]]
       }
     });
-    console.log('Lead saved:', senderId);
+    console.log('Sheet save SUCCESS:', senderId);
   } catch (err) {
-    console.error('saveLead error:', err.message);
+    console.error('SHEET SAVE ERROR:', err.message);
+    console.error('SHEET SAVE STACK:', err.stack);
   }
 }
 
-async function updateLead(senderId, updates) {
+// ─── SHEETS: UPDATE LEAD ─────────────────────────────────────
+async function updateSheetLead(senderId, stage, status, symptom, sinusType, profile) {
   try {
-    let lead = await getLeadData(senderId);
-    if (!lead) return;
-    const row = lead.row;
-    const merged = { ...lead, ...updates };
-    if (updates.profile) {
-      merged.profileJson = JSON.stringify(updates.profile);
+    // Find row
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${SHEET_NAME}!C:C`,
+    });
+    const rows = res.data.values || [];
+    let rowIndex = -1;
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i][0] === senderId) { rowIndex = i + 1; break; }
     }
+    if (rowIndex === -1) {
+      console.log('Row not found for update:', senderId);
+      return;
+    }
+    // Update G, F, H, I, K, L columns
     await sheets.spreadsheets.values.update({
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${SHEET_NAME}!A${row}:L${row}`,
+      range: `${SHEET_NAME}!F${rowIndex}:L${rowIndex}`,
       valueInputOption: 'RAW',
       resource: {
         values: [[
-          merged.timestamp,
-          merged.platform,
-          merged.senderId,
-          merged.name,
-          merged.message,
-          merged.status,
-          merged.lastStage,
+          status || 'New Lead',
+          stage || 'new',
           new Date().toISOString(),
-          merged.symptom || '',
-          merged.notes || '',
-          merged.sinusType || '',
-          merged.profileJson || '{}'
+          symptom || '',
+          '',
+          sinusType || '',
+          JSON.stringify(profile || {})
         ]]
       }
     });
-    userCache[senderId] = { ...merged, profile: updates.profile || lead.profile };
-    console.log('Lead updated:', senderId, updates.lastStage);
+    console.log('Sheet update SUCCESS:', senderId, stage);
   } catch (err) {
-    console.error('updateLead error:', err.message);
+    console.error('SHEET UPDATE ERROR:', err.message);
   }
 }
 
 // ─── SEND MESSAGES ────────────────────────────────────────────
 async function sendFBMessage(senderId, text) {
   try {
-    await fetch(
+    const res = await fetch(
       `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
       {
         method: 'POST',
@@ -161,6 +118,7 @@ async function sendFBMessage(senderId, text) {
         body: JSON.stringify({ recipient: { id: senderId }, message: { text } })
       }
     );
+    console.log('FB sent:', res.status);
   } catch (err) {
     console.error('FB send error:', err.message);
   }
@@ -168,7 +126,7 @@ async function sendFBMessage(senderId, text) {
 
 async function sendIGMessage(senderId, text) {
   try {
-    await fetch(
+    const res = await fetch(
       `https://graph.facebook.com/v18.0/${INSTAGRAM_ID}/messages`,
       {
         method: 'POST',
@@ -181,6 +139,7 @@ async function sendIGMessage(senderId, text) {
         })
       }
     );
+    console.log('IG sent:', res.status);
   } catch (err) {
     console.error('IG send error:', err.message);
   }
@@ -235,8 +194,8 @@ function getPitchMessage(sinusType, p) {
   const types = {
     allergic: `━━━━━━━━━━━━━━━━━━━━\n🌿 AAPKA SINUS TYPE: ALLERGIC SINUS\n━━━━━━━━━━━━━━━━━━━━\n\nDust, pollution ya season change se trigger hoti hai. Generic solution kaam nahi karega.\n\n${specialist}\nDay 3 — discomfort kam.\nDay 7 — breathing comfortable.\nDay 14 — jo har season mein hota tha, is baar nahi hua. 🌿`,
     congestive: `━━━━━━━━━━━━━━━━━━━━\n🔴 AAPKA SINUS TYPE: CONGESTIVE SINUS\n━━━━━━━━━━━━━━━━━━━━\n\nSubah uthte hi naak band. Chehra bhaari. Steam aur saline sirf surface pe kaam karte hain.\n\n${specialist}\nDay 3 — pressure kam.\nDay 7 — subah breathing better.\nDay 14 — bina kuch kiye khulke saans. 🌿`,
-    heat: `━━━━━━━━━━━━━━━━━━━━\n🔥 AAPKA SINUS TYPE: HEAT SINUS\n━━━━━━━━━━━━━━━━━━━━\n\nAndar se burning. Headache intense. Cooling protocol chahiye — generic decongestant nahi.\n\n${specialist}\nDay 3 — burning kam.\nDay 7 — headache frequency reduce.\nDay 14 — Burning gone. Clear naak. 🌿`,
-    dependency: `━━━━━━━━━━━━━━━━━━━━\n⚠️ AAPKA SINUS TYPE: DEPENDENCY SINUS\n━━━━━━━━━━━━━━━━━━━━\n\nSpray ke bina breathe mushkil. Yeh aapki galti nahi — body ko naturally reset karna padega.\n\n${specialist}\nDay 3 — natural breathing improve.\nDay 7 — spray ki zaroorat kam.\nDay 14 — spray naturally reduce. 🌿`,
+    heat: `━━━━━━━━━━━━━━━━━━━━\n🔥 AAPKA SINUS TYPE: HEAT SINUS\n━━━━━━━━━━━━━━━━━━━━\n\nAndar se burning. Headache intense. Cooling protocol chahiye.\n\n${specialist}\nDay 3 — burning kam.\nDay 7 — headache reduce.\nDay 14 — Burning gone. Clear naak. 🌿`,
+    dependency: `━━━━━━━━━━━━━━━━━━━━\n⚠️ AAPKA SINUS TYPE: DEPENDENCY SINUS\n━━━━━━━━━━━━━━━━━━━━\n\nSpray ke bina breathe mushkil. Body ko naturally reset karna padega.\n\n${specialist}\nDay 3 — natural breathing improve.\nDay 7 — spray ki zaroorat kam.\nDay 14 — spray naturally reduce. 🌿`,
   };
 
   return header + (types[sinusType] || specialist) + footer;
@@ -326,14 +285,23 @@ function detectSeverity(text) {
 
 // ─── PROCESS MESSAGE ─────────────────────────────────────────
 async function processMessage(senderId, text, platform, sendFn) {
-  let lead = await getLeadData(senderId);
-  const state = lead?.lastStage || 'new';
-  const profile = lead?.profile || {};
+  const state = userState[senderId] || 'new';
+  const profile = userProfile[senderId] || {};
 
   console.log(`[${platform}] ID: ${senderId} | State: ${state} | Msg: ${text}`);
 
-  if (state === 'human_takeover') return;
+  // Human takeover
+  if (state === 'human_takeover') {
+    if (text.startsWith('BOT_ON_')) {
+      const targetId = text.replace('BOT_ON_', '').trim();
+      userState[targetId] = 'new';
+      delete userProfile[targetId];
+      console.log(`BOT REACTIVATED for ${targetId}`);
+    }
+    return;
+  }
 
+  // Contact request
   const contactKeywords = ['whatsapp', 'contact', 'call', 'phone', 'helpline', 'direct', 'number'];
   if (state !== 'done' && contactKeywords.some(k => text.toLowerCase().includes(k))) {
     await sendFn(senderId,
@@ -347,8 +315,11 @@ Ayusomam Herbals 🌿`
     return;
   }
 
-  if (!lead) {
-    await saveLead(senderId, platform, text);
+  // NEW LEAD
+  if (state === 'new') {
+    userState[senderId] = 'asked_duration';
+    // Save to sheet async — don't block
+    saveToSheet(senderId, platform, text, 'asked_duration', '🔴 Cold', '', '', {});
     await sendFn(senderId,
 `🙏 Namaste! Ayusomam Herbals mein aapka swagat hai.
 
@@ -369,6 +340,7 @@ Number ya text mein reply karein.`
     return;
   }
 
+  // ASKED DURATION
   if (state === 'asked_duration') {
     const duration = detectDuration(text);
     if (!duration) {
@@ -376,8 +348,9 @@ Number ya text mein reply karein.`
       return;
     }
     const durationLabel = duration === 'short' ? '6 mahine se kam' : duration === 'medium' ? '6 mahine se 2 saal' : '2 saal se zyada';
-    const newProfile = { ...profile, duration: durationLabel };
-    await updateLead(senderId, { lastStage: 'asked_symptoms', status: '🔴 Cold', profile: newProfile });
+    userProfile[senderId] = { ...profile, duration: durationLabel };
+    userState[senderId] = 'asked_symptoms';
+    updateSheetLead(senderId, 'asked_symptoms', '🔴 Cold', '', '', userProfile[senderId]);
     await sendFn(senderId,
 `Noted. ✅
 
@@ -394,6 +367,7 @@ Number ya describe karein.`
     return;
   }
 
+  // ASKED SYMPTOMS
   if (state === 'asked_symptoms') {
     const symptom = detectSymptom(text);
     if (!symptom) {
@@ -406,8 +380,9 @@ Number ya describe karein.`
       heat: 'Heat Sinus — burning, thick mucus, headache',
       dependency: 'Dependency — Otrivin/spray dependent'
     }[symptom];
-    const newProfile = { ...profile, symptom: symptomLabel, sinusType: symptom };
-    await updateLead(senderId, { lastStage: 'asked_tried', status: '🟡 Warm', symptom: symptomLabel, sinusType: symptom, profile: newProfile });
+    userProfile[senderId] = { ...profile, symptom: symptomLabel, sinusType: symptom };
+    userState[senderId] = 'asked_tried';
+    updateSheetLead(senderId, 'asked_tried', '🟡 Warm', symptomLabel, symptom, userProfile[senderId]);
     await sendFn(senderId,
 `Samajh gaya. ✅
 
@@ -424,14 +399,16 @@ Number ya describe karein.`
     return;
   }
 
+  // ASKED TRIED
   if (state === 'asked_tried') {
     const tried = detectTried(text);
     if (!tried) {
       await sendFn(senderId, `Kya treatment try ki thi?\n\n1️⃣ Sirf nasal spray\n2️⃣ Doctor ki dawai\n3️⃣ Ghar ke nuskhe\n4️⃣ Kuch nahi\n5️⃣ Ayurvedic treatment`);
       return;
     }
-    const newProfile = { ...profile, tried };
-    await updateLead(senderId, { lastStage: 'asked_severity', status: '🟡 Warm', profile: newProfile });
+    userProfile[senderId] = { ...profile, tried };
+    userState[senderId] = 'asked_severity';
+    updateSheetLead(senderId, 'asked_severity', '🟡 Warm', userProfile[senderId].symptom, userProfile[senderId].sinusType, userProfile[senderId]);
     await sendFn(senderId,
 `Samajh gaya. ✅
 
@@ -447,23 +424,27 @@ Number ya describe karein.`
     return;
   }
 
+  // ASKED SEVERITY → PITCH
   if (state === 'asked_severity') {
     const severity = detectSeverity(text);
     if (!severity) {
       await sendFn(senderId, `Kitni severe hai problem?\n\n1️⃣ Mild\n2️⃣ Moderate\n3️⃣ Severe\n4️⃣ Very Severe`);
       return;
     }
-    const newProfile = { ...profile, severity };
-    await updateLead(senderId, { lastStage: 'pitched', status: '🟡 Warm', profile: newProfile });
-    await sendFn(senderId, getPitchMessage(newProfile.sinusType, newProfile));
+    userProfile[senderId] = { ...profile, severity };
+    userState[senderId] = 'pitched';
+    updateSheetLead(senderId, 'pitched', '🟡 Warm', userProfile[senderId].symptom, userProfile[senderId].sinusType, userProfile[senderId]);
+    await sendFn(senderId, getPitchMessage(userProfile[senderId].sinusType, userProfile[senderId]));
     return;
   }
 
+  // PITCHED → Claude AI handles objections
   if (state === 'pitched' || state === 'following_up') {
     const t = text.toLowerCase();
 
     if (['yes', 'haan', 'han', 'ha', 'y', 'हाँ', 'हां'].includes(t)) {
-      await updateLead(senderId, { lastStage: 'done', status: '🟢 Hot' });
+      userState[senderId] = 'done';
+      updateSheetLead(senderId, 'done', '🟢 Hot', userProfile[senderId]?.symptom, userProfile[senderId]?.sinusType, userProfile[senderId]);
       await sendFn(senderId,
 `Bahut achha! 🙏
 
@@ -488,12 +469,12 @@ Ayusomam Herbals 🌿`
     }
 
     if (t === 'more') {
-      await updateLead(senderId, { lastStage: 'human_takeover', status: '🟢 Hot' });
+      userState[senderId] = 'human_takeover';
+      updateSheetLead(senderId, 'human_takeover', '🟢 Hot', userProfile[senderId]?.symptom, userProfile[senderId]?.sinusType, userProfile[senderId]);
       await sendFn(senderId,
 `Bilkul! 🙏
 
 Hamare specialist aapse seedha baat karenge.
-
 Thoda intezaar karein — specialist abhi aapke paas aate hain.
 
 🌐 ${WEBSITE}
@@ -503,9 +484,11 @@ Ayusomam Herbals 🌿`
       return;
     }
 
+    // Claude handles everything else
     try {
-      await updateLead(senderId, { lastStage: 'following_up', status: '🟡 Warm' });
-      const aiResponse = await getClaudeResponse(state, text, profile);
+      userState[senderId] = 'following_up';
+      updateSheetLead(senderId, 'following_up', '🟡 Warm', userProfile[senderId]?.symptom, userProfile[senderId]?.sinusType, userProfile[senderId]);
+      const aiResponse = await getClaudeResponse(state, text, userProfile[senderId] || {});
       await sendFn(senderId, aiResponse);
     } catch (err) {
       console.error('Claude error:', err.message);
@@ -551,11 +534,11 @@ app.post('/webhook', async (req, res) => {
         if (recipientId && recipientId !== ownId) {
           if (msg.message?.text?.startsWith('BOT_ON_')) {
             const targetId = msg.message.text.replace('BOT_ON_', '').trim();
-            await updateLead(targetId, { lastStage: 'new', status: 'New Lead', profile: {} });
-            delete userCache[targetId];
+            userState[targetId] = 'new';
+            delete userProfile[targetId];
             console.log(`BOT REACTIVATED for ${targetId}`);
           } else {
-            await updateLead(recipientId, { lastStage: 'human_takeover' });
+            userState[recipientId] = 'human_takeover';
             console.log(`HUMAN TAKEOVER for ${recipientId}`);
           }
         }
