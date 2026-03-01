@@ -61,7 +61,6 @@ async function saveToSheet(senderId, platform, text, stage, status, symptom, sin
         ]]
       }
     });
-    // Cache the row number
     const updatedRange = res.data.updates?.updatedRange || '';
     const match = updatedRange.match(/(\d+)$/);
     if (match) rowCache[senderId] = parseInt(match[1]);
@@ -76,25 +75,21 @@ async function saveToSheet(senderId, platform, text, stage, status, symptom, sin
 async function updateSheetLead(senderId, stage, status, symptom, sinusType, profile) {
   try {
     let rowIndex = rowCache[senderId];
-
     if (!rowIndex) {
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: GOOGLE_SHEET_ID,
         range: `${SHEET_NAME}!A:C`,
       });
       const rows = res.data.values || [];
-      // Find LAST occurrence
       for (let i = rows.length - 1; i >= 1; i--) {
         if (rows[i][2] === senderId) { rowIndex = i + 1; break; }
       }
       if (rowIndex) rowCache[senderId] = rowIndex;
     }
-
     if (!rowIndex) {
       console.log('Row not found for update:', senderId);
       return;
     }
-
     await sheets.spreadsheets.values.update({
       spreadsheetId: GOOGLE_SHEET_ID,
       range: `${SHEET_NAME}!F${rowIndex}:L${rowIndex}`,
@@ -193,6 +188,74 @@ Rules:
     messages: [{ role: 'user', content: userMessage }]
   });
   return response.content[0].text;
+}
+
+// ─── TRIED RESPONSE MESSAGES ─────────────────────────────────
+function getTriedResponseMessage(tried) {
+  if (tried === 'sirf nasal spray') {
+    return `Samajh gaya. ✅
+
+Nasal spray se waqti rahat milti hai — par yeh naak ki nas ko sikodt hai.
+Baar baar use karne se naak ki andar ki skin aur sukh jaati hai aur sujan badhti hai.
+Isliye spray band karo toh aur bura lagta hai — yeh cycle hai jo todna zaroori hai.`;
+  }
+  if (tried === 'allopathy medicines') {
+    return `Samajh gaya. ✅
+
+Allopathy medicines symptoms ko dabati hain — andar ki wajah nahi hatati.
+Isliye kuch din theek lagta hai phir wahi problem wapas aa jaati hai.
+Yeh ek cycle ban jaata hai — symptoms suppress, wajah untouched.`;
+  }
+  if (tried === 'ghar ke nuskhe') {
+    return `Samajh gaya. ✅
+
+Ghar ke nuskhe thodi der ke liye aaram dete hain — par structured protocol ke bina andar ki sujan theek nahi hoti.
+Ek systematic approach chahiye jo roz ek direction mein kaam kare.`;
+  }
+  if (tried === 'kuch nahi') {
+    return `Samajh gaya. ✅
+
+Abhi tak kuch nahi kiya — isliye problem badhti ja rahi hai.
+Sinus apne aap theek nahi hota — jitna time lagega utna aur mushkil hoga.
+Abhi sahi waqt hai sahi direction mein kaam karne ka.`;
+  }
+  if (tried === 'other Ayurvedic') {
+    return `Samajh gaya. ✅
+
+Ayurvedic approach sahi direction hai — par generic treatment aur personalized protocol mein bahut fark hota hai.
+Aapke specific sinus type ke hisaab se tailored plan chahiye — tabhi results aate hain.`;
+  }
+  return `Samajh gaya. ✅`;
+}
+
+// ─── SYMPTOM RESPONSE MESSAGES ───────────────────────────────
+function getSymptomResponseMessage(symptom) {
+  if (symptom === 'allergic') {
+    return `Samajh gaya. ✅
+
+Yeh dust, pollution ya season change se trigger hoti hai — matlab body bahar ki cheez ko enemy samajhti hai aur overreact karti hai.
+Generic treatment kaam nahi karega — aapko specifically allergic pattern todna hoga.`;
+  }
+  if (symptom === 'congestive') {
+    return `Samajh gaya. ✅
+
+Naak band, chehra bhaari — yeh nasal passage mein chronic sujan hai.
+Steam aur saline sirf surface pe kaam karte hain — andar ki sujan untouched rehti hai.
+Isliye baar baar wahi problem hoti hai.`;
+  }
+  if (symptom === 'heat') {
+    return `Samajh gaya. ✅
+
+Andar se burning, thick mucus — yeh sirf nasal problem nahi, systemic inflammation hai.
+Isko cooling protocol chahiye — jo andar se kaam kare, bahar se nahi.`;
+  }
+  if (symptom === 'dependency') {
+    return `Samajh gaya. ✅
+
+Spray ke bina breathe mushkil — yeh aapki galti nahi, spray ne ek artificial cycle bana di hai.
+Body ko naturally reset karna padega — step by step, properly.`;
+  }
+  return `Samajh gaya. ✅`;
 }
 
 // ─── PITCH MESSAGES ──────────────────────────────────────────
@@ -324,6 +387,7 @@ Ayusomam Herbals 🌿`
     return;
   }
 
+  // NEW LEAD
   if (state === 'new') {
     userState[senderId] = 'asked_duration';
     saveToSheet(senderId, platform, text, 'asked_duration', '🔴 Cold', '', '', {});
@@ -347,6 +411,7 @@ Number ya text mein reply karein.`
     return;
   }
 
+  // ASKED DURATION
   if (state === 'asked_duration') {
     const duration = detectDuration(text);
     if (!duration) {
@@ -373,6 +438,7 @@ Number ya describe karein.`
     return;
   }
 
+  // ASKED SYMPTOMS
   if (state === 'asked_symptoms') {
     const symptom = detectSymptom(text);
     if (!symptom) {
@@ -388,8 +454,10 @@ Number ya describe karein.`
     userProfile[senderId] = { ...profile, symptom: symptomLabel, sinusType: symptom };
     userState[senderId] = 'asked_tried';
     updateSheetLead(senderId, 'asked_tried', '🟡 Warm', symptomLabel, symptom, userProfile[senderId]);
-    await sendFn(senderId,
-`Samajh gaya. ✅
+
+    // Symptom-specific insight + next question
+    const symptomMsg = getSymptomResponseMessage(symptom);
+    await sendFn(senderId, symptomMsg + `
 
 ✦ Pehle koi treatment try ki hai?
 
@@ -404,6 +472,7 @@ Number ya describe karein.`
     return;
   }
 
+  // ASKED TRIED
   if (state === 'asked_tried') {
     const tried = detectTried(text);
     if (!tried) {
@@ -413,8 +482,10 @@ Number ya describe karein.`
     userProfile[senderId] = { ...profile, tried };
     userState[senderId] = 'asked_severity';
     updateSheetLead(senderId, 'asked_severity', '🟡 Warm', userProfile[senderId].symptom, userProfile[senderId].sinusType, userProfile[senderId]);
-    await sendFn(senderId,
-`Samajh gaya. ✅
+
+    // Treatment-specific insight + next question
+    const triedMsg = getTriedResponseMessage(tried);
+    await sendFn(senderId, triedMsg + `
 
 ✦ Sinus aapki daily life ko kitna affect karta hai?
 
@@ -428,6 +499,7 @@ Number ya describe karein.`
     return;
   }
 
+  // ASKED SEVERITY → PITCH
   if (state === 'asked_severity') {
     const severity = detectSeverity(text);
     if (!severity) {
@@ -437,10 +509,17 @@ Number ya describe karein.`
     userProfile[senderId] = { ...profile, severity };
     userState[senderId] = 'pitched';
     updateSheetLead(senderId, 'pitched', '🟡 Warm', userProfile[senderId].symptom, userProfile[senderId].sinusType, userProfile[senderId]);
-    await sendFn(senderId, getPitchMessage(userProfile[senderId].sinusType, userProfile[senderId]));
+
+    // Severity insight before pitch
+    const severityMsg = severity === 'Severe' || severity === 'Very Severe'
+      ? `Samajh gaya. ✅\n\nItni severe problem — matlab body kaafi time se struggle kar rahi hai. Jitna zyada time lagega, andar ki sujan utni aur pakki hoti jaayegi.\n\nAbhi sahi waqt hai isko seriously lene ka.\n\n`
+      : `Samajh gaya. ✅\n\nAbhi bhi manageable hai — par agar ignore kiya toh worse hoga. Sahi waqt hai theek karne ka.\n\n`;
+
+    await sendFn(senderId, severityMsg + getPitchMessage(userProfile[senderId].sinusType, userProfile[senderId]));
     return;
   }
 
+  // PITCHED → Claude AI
   if (state === 'pitched' || state === 'following_up') {
     const t = text.toLowerCase();
 
@@ -509,6 +588,37 @@ Details ke liye "MORE" type karein ya shuru karne ke liye YES reply karein.
   }
 }
 
+// ─── LOAD STATE FROM SHEETS ON STARTUP ───────────────────────
+async function loadStateFromSheets() {
+  try {
+    console.log('Loading state from sheets...');
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${SHEET_NAME}!A:L`,
+    });
+    const rows = res.data.values || [];
+    const seen = {};
+    for (let i = rows.length - 1; i >= 1; i--) {
+      const r = rows[i];
+      const senderId = r[2];
+      if (!senderId || seen[senderId]) continue;
+      seen[senderId] = true;
+      const stage = r[6] || 'new';
+      const profileJson = r[11] || '{}';
+      userState[senderId] = stage;
+      rowCache[senderId] = i + 1;
+      try {
+        userProfile[senderId] = JSON.parse(profileJson);
+      } catch {
+        userProfile[senderId] = {};
+      }
+    }
+    console.log(`State loaded: ${Object.keys(seen).length} leads`);
+  } catch (err) {
+    console.error('loadStateFromSheets error:', err.message);
+  }
+}
+
 // ─── WEBHOOK ─────────────────────────────────────────────────
 app.get('/webhook', (req, res) => {
   const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = req.query;
@@ -557,4 +667,7 @@ app.post('/webhook', async (req, res) => {
 
 // ─── START ───────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ Ayusomam webhook running on port ${PORT}`));
+app.listen(PORT, async () => {
+  console.log(`✅ Ayusomam webhook running on port ${PORT}`);
+  await loadStateFromSheets();
+});
