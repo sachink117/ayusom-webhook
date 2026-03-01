@@ -153,54 +153,36 @@ async function sendIGMessage(senderId, text) {
 // ─── CLAUDE AI ────────────────────────────────────────────────
 async function getClaudeResponse(stage, userMessage, profile) {
   const isPostPayment = stage === 'post_payment';
-
+  
   const systemPrompt = `You are an Ayurvedic sinus specialist assistant for Ayusomam Herbals.
 You help people with chronic sinus problems through a 14-day personalized program costing ₹1299.
+Speak in simple Hindi/Hinglish. Be warm and empathetic.
 
-Your personality:
-- Warm, empathetic, professional
-- Speak in simple Hindi/Hinglish
-- Never use complex medical jargon
-- Always validate the person's pain before pitching
-
-Current lead profile: ${JSON.stringify(profile)}
-Current conversation stage: ${stage}
-
-Sinus types:
-- Allergic: sneezing, watery eyes, dust/season triggered
-- Congestive: nose block, face pressure, heaviness
-- Heat Sinus: burning, thick mucus, headache
-- Dependency: Otrivin/spray dependent
-
+Profile: ${JSON.stringify(profile)}
+Stage: ${stage}
 Payment link: ${PAYMENT_LINK}
 WhatsApp: ${WHATSAPP_NUMBER}
-Website: ${WEBSITE}
 
-${isPostPayment ? `
-IMPORTANT — Yeh person program join kar chuka hai ya payment link le chuka hai.
-Ab inke sawaalon ka jawab do:
-- Payment confirmation ke liye WhatsApp number bhejo: ${WHATSAPP_NUMBER}
-- Results timeline: Day 3 se feel hoga, Day 7 better, Day 14 significant improvement
-- Ayurvedic mein koi side effects nahi hote — reassure karo
-- Program ke liye excitement build karo
-- Agar koi concern ho toh specialist se milwao
-- Kabhi bhi payment link dobara dena ho toh: ${PAYMENT_LINK}
-` : `
-Rules:
-- Keep responses concise and conversational
-- For price objections, emphasize daily personal guidance value
-- If person says YES, give payment link immediately
-- If person asks for specialist, say one will contact them on WhatsApp soon
-- Never give up on a lead — always re-engage
-`}`;
+${isPostPayment ? `Person ne payment link le liya hai. Results Day 3 se feel honge, Day 7 better, Day 14 significant. Reassure karo, excitement build karo.` : `For objections emphasize value. If YES give payment link. Never give up on lead.`}`;
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 500,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: userMessage }]
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      max_tokens: 500,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage }
+      ]
+    })
   });
-  return response.content[0].text;
+  
+  const data = await response.json();
+  return data.choices[0].message.content;
 }
 
 // ─── SYMPTOM RESPONSE MESSAGES ───────────────────────────────
