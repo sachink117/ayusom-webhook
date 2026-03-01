@@ -2,7 +2,6 @@ const express = require('express');
 const fetch = require('node-fetch');
 const { google } = require('googleapis');
 
-
 const app = express();
 app.use(express.json());
 
@@ -11,7 +10,6 @@ const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 const GOOGLE_PRIVATE_KEY = (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 const PAGE_ID = '1035532399636645';
 const INSTAGRAM_ID = '17841445309536661';
@@ -20,8 +18,7 @@ const WHATSAPP_NUMBER = '+91 85951 60713';
 const WEBSITE = 'www.ayusomamherbals.com';
 const SHEET_NAME = 'Leads';
 
-// ─── CLIENTS ─────────────────────────────────────────────────
-
+// ─── GOOGLE SHEETS ────────────────────────────────────────────
 const auth = new google.auth.JWT(
   GOOGLE_SERVICE_ACCOUNT_EMAIL,
   null,
@@ -66,7 +63,6 @@ async function saveToSheet(senderId, platform, text, stage, status, symptom, sin
     console.log('Sheet save SUCCESS:', senderId, 'row:', rowCache[senderId]);
   } catch (err) {
     console.error('SHEET SAVE ERROR:', err.message);
-    console.error('SHEET SAVE STACK:', err.stack);
   }
 }
 
@@ -149,54 +145,19 @@ async function sendIGMessage(senderId, text) {
   }
 }
 
-// ─── CLAUDE AI ────────────────────────────────────────────────
-async function getClaudeResponse(stage, userMessage, profile) {
-  const isPostPayment = stage === 'post_payment';
-  
-  const systemPrompt = `You are an Ayurvedic sinus specialist assistant for Ayusomam Herbals.
-You help people with chronic sinus problems through a 14-day personalized program costing ₹1299.
-Speak in simple Hindi/Hinglish. Be warm and empathetic.
-
-Profile: ${JSON.stringify(profile)}
-Stage: ${stage}
-Payment link: ${PAYMENT_LINK}
-WhatsApp: ${WHATSAPP_NUMBER}
-
-${isPostPayment ? `Person ne payment link le liya hai. Results Day 3 se feel honge, Day 7 better, Day 14 significant. Reassure karo, excitement build karo.` : `For objections emphasize value. If YES give payment link. Never give up on lead.`}`;
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      max_tokens: 500,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage }
-      ]
-    })
-  });
-  
-  const data = await response.json();
-  return data.choices[0].message.content;
-}
-
 // ─── SYMPTOM RESPONSE MESSAGES ───────────────────────────────
 function getSymptomResponseMessage(symptom) {
   if (symptom === 'allergic') {
-    return `Samajh gaya. ✅\n\nYeh dust, pollution ya season change se trigger hoti hai — matlab body bahar ki cheez ko enemy samajhti hai aur overreact karti hai.\nGeneric treatment kaam nahi karega — aapko specifically allergic pattern todna hoga.`;
+    return `Samajh gaya. ✅\n\nYeh dust, pollution ya season change se trigger hoti hai — body bahar ki cheez pe overreact karti hai.\nGeneric approach se fark nahi padta — aapke specific pattern ke hisaab se guidance chahiye.`;
   }
   if (symptom === 'congestive') {
-    return `Samajh gaya. ✅\n\nNaak band, chehra bhaari — yeh nasal passage mein chronic sujan hai.\nSteam aur saline sirf surface pe kaam karte hain — andar ki sujan untouched rehti hai.\nIsliye baar baar wahi problem hoti hai.`;
+    return `Samajh gaya. ✅\n\nNaak band, chehra bhaari — nasal passage mein chronic sujan hoti hai.\nSteam aur saline sirf upar se kaam karte hain — isliye baar baar wahi problem hoti hai.`;
   }
   if (symptom === 'heat') {
-    return `Samajh gaya. ✅\n\nAndar se burning, thick mucus — yeh sirf nasal problem nahi, systemic inflammation hai.\nIsko cooling protocol chahiye — jo andar se kaam kare, bahar se nahi.`;
+    return `Samajh gaya. ✅\n\nAndar se burning, thick mucus — isko cooling aur soothing approach chahiye.\nGeneric decongestant se yeh address nahi hota.`;
   }
   if (symptom === 'dependency') {
-    return `Samajh gaya. ✅\n\nSpray ke bina breathe mushkil — yeh aapki galti nahi, spray ne ek artificial cycle bana di hai.\nBody ko naturally reset karna padega — step by step, properly.`;
+    return `Samajh gaya. ✅\n\nSpray ke bina mushkil hoti hai — yeh ek common pattern hai jo naturally reset kiya ja sakta hai.\nStep by step, properly karna padta hai.`;
   }
   return `Samajh gaya. ✅`;
 }
@@ -204,34 +165,36 @@ function getSymptomResponseMessage(symptom) {
 // ─── TRIED RESPONSE MESSAGES ─────────────────────────────────
 function getTriedResponseMessage(tried) {
   if (tried === 'sirf nasal spray') {
-    return `Samajh gaya. ✅\n\nNasal spray se waqti rahat milti hai — par yeh naak ki nas ko sikodti hai.\nBaar baar use karne se naak ki andar ki skin aur sukh jaati hai aur sujan badhti hai.\nIsliye spray band karo toh aur bura lagta hai — yeh cycle hai jo todna zaroori hai.`;
+    return `Samajh gaya. ✅\n\nNasal spray waqti rahat deta hai — par baar baar use karne se ek cycle ban jaati hai.\nIsliye spray band karte ho toh aur takleef hoti hai — yeh cycle todna zaroori hai.`;
   }
   if (tried === 'allopathy medicines') {
-    return `Samajh gaya. ✅\n\nAllopathy medicines symptoms ko dabati hain — andar ki wajah nahi hatati.\nIsliye kuch din theek lagta hai phir wahi problem wapas aa jaati hai.\nYeh ek cycle ban jaata hai — symptoms suppress, wajah untouched.`;
+    return `Samajh gaya. ✅\n\nAllopathy se symptoms temporarily kam hote hain — par cycle continue rehti hai.\nIsliye kuch din baad wahi problem wapas aati hai.`;
   }
   if (tried === 'ghar ke nuskhe') {
-    return `Samajh gaya. ✅\n\nGhar ke nuskhe thodi der ke liye aaram dete hain — par structured protocol ke bina andar ki sujan theek nahi hoti.\nEk systematic approach chahiye jo roz ek direction mein kaam kare.`;
+    return `Samajh gaya. ✅\n\nGhar ke nuskhe thodi rahat dete hain — par bina structured approach ke consistent results nahi milte.\nEk systematic daily routine chahiye jo ek direction mein kaam kare.`;
   }
   if (tried === 'kuch nahi') {
-    return `Samajh gaya. ✅\n\nAbhi tak kuch nahi kiya — isliye problem badhti ja rahi hai.\nSinus apne aap theek nahi hota — jitna time lagega utna aur mushkil hoga.\nAbhi sahi waqt hai sahi direction mein kaam karne ka.`;
+    return `Samajh gaya. ✅\n\nAbhi tak kuch nahi kiya — isliye problem time ke saath aur uncomfortable hoti ja rahi hai.\nAbhi sahi waqt hai sahi direction mein kaam karne ka.`;
   }
   if (tried === 'other Ayurvedic') {
-    return `Samajh gaya. ✅\n\nAyurvedic approach sahi direction hai — par generic treatment aur personalized protocol mein bahut fark hota hai.\nAapke specific sinus type ke hisaab se tailored plan chahiye — tabhi results aate hain.`;
+    return `Samajh gaya. ✅\n\nAyurvedic direction sahi hai — par generic aur personalized mein bahut fark hota hai.\nAapke specific sinus type ke hisaab se tailored routine chahiye.`;
   }
   return `Samajh gaya. ✅`;
 }
 
-// ─── PITCH MESSAGES ──────────────────────────────────────────
+// ─── PITCH MESSAGE ────────────────────────────────────────────
 function getPitchMessage(sinusType, p) {
-  const header = `📋 Aapka Sinus Assessment Complete ✅\n\nAapki details:\n• Problem duration: ${p.duration}\n• Main symptom: ${p.symptom}\n• Previous treatment: ${p.tried}\n• Severity: ${p.severity}\n\n`;
-  const specialist = `Yeh koi app nahi. Koi generic PDF nahi.\n\nAapko milega ek dedicated Ayurvedic specialist —\n14 din tak, directly aapke WhatsApp pe.\n\nKabhi bhi symptoms feel ho — message karein.\nSpecialist personally respond karega aur\naapka protocol usi waqt adjust karega.\n`;
-  const footer = `\n━━━━━━━━━━━━━━━━━━━━\n⭐ CLIENT EXPERIENCE\n━━━━━━━━━━━━━━━━━━━━\n\nShikha Tyagi ji — 5 saal se Otrivin use kar rahi thin. Ayusomam 14-day program ke baad spray naturally reduce kar li.\n\n"Pehli baar itne saalon baad khulke saans li." ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299\n━━━━━━━━━━━━━━━━━━━━\n\nKya aap apna protocol shuru karna chahte hain?\nReply karein YES 🙏\n\nAur details ke liye "MORE" type karein.\n\n🌐 ${WEBSITE}`;
+  const header = `📋 Aapka Sinus Assessment Complete ✅\n\nAapki details:\n• Problem duration: ${p.duration}\n• Main symptom: ${p.symptom}\n• Previous approach: ${p.tried}\n• Severity: ${p.severity}\n\n`;
+
+  const specialist = `Yeh koi app nahi. Koi generic PDF nahi.\n\nAapko milega ek dedicated Sinus Relief Specialist —\n14 din tak, directly aapke WhatsApp pe.\n\nKabhi bhi kuch feel ho — message karein.\nSpecialist personally respond karega aur\naapki daily routine usi waqt adjust karega.\n`;
+
+  const footer = `\n━━━━━━━━━━━━━━━━━━━━\n⭐ CLIENT EXPERIENCE\n━━━━━━━━━━━━━━━━━━━━\n\nShikha ji — 5 saal se nasal spray use kar rahi thin.\nAyusomam 14-day program ke baad spray ki zaroorat naturally kam ho gayi.\n\n"Pehli baar itne saalon baad khulke saans li." ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299\n━━━━━━━━━━━━━━━━━━━━\n\nKya aap apna personalized routine shuru karna chahte hain?\nReply karein YES 🙏\n\nAur details ke liye "MORE" type karein.\n\n🌐 ${WEBSITE}`;
 
   const types = {
-    allergic: `━━━━━━━━━━━━━━━━━━━━\n🌿 AAPKA SINUS TYPE: ALLERGIC SINUS\n━━━━━━━━━━━━━━━━━━━━\n\nDust, pollution ya season change se trigger hoti hai. Generic solution kaam nahi karega.\n\n${specialist}\nDay 3 — discomfort kam.\nDay 7 — breathing comfortable.\nDay 14 — jo har season mein hota tha, is baar nahi hua. 🌿`,
-    congestive: `━━━━━━━━━━━━━━━━━━━━\n🔴 AAPKA SINUS TYPE: CONGESTIVE SINUS\n━━━━━━━━━━━━━━━━━━━━\n\nSubah uthte hi naak band. Chehra bhaari. Steam aur saline sirf surface pe kaam karte hain.\n\n${specialist}\nDay 3 — pressure kam.\nDay 7 — subah breathing better.\nDay 14 — bina kuch kiye khulke saans. 🌿`,
-    heat: `━━━━━━━━━━━━━━━━━━━━\n🔥 AAPKA SINUS TYPE: HEAT SINUS\n━━━━━━━━━━━━━━━━━━━━\n\nAndar se burning. Headache intense. Cooling protocol chahiye.\n\n${specialist}\nDay 3 — burning kam.\nDay 7 — headache reduce.\nDay 14 — Burning gone. Clear naak. 🌿`,
-    dependency: `━━━━━━━━━━━━━━━━━━━━\n⚠️ AAPKA SINUS TYPE: DEPENDENCY SINUS\n━━━━━━━━━━━━━━━━━━━━\n\nSpray ke bina breathe mushkil. Body ko naturally reset karna padega.\n\n${specialist}\nDay 3 — natural breathing improve.\nDay 7 — spray ki zaroorat kam.\nDay 14 — spray naturally reduce. 🌿`,
+    allergic: `━━━━━━━━━━━━━━━━━━━━\n🌿 AAPKA SINUS TYPE: ALLERGIC PATTERN\n━━━━━━━━━━━━━━━━━━━━\n\nDust, pollution ya season change se trigger hota hai.\nPersonalized routine is pattern ko address karti hai.\n\n${specialist}\nDin 3 tak — discomfort mein fark.\nDin 7 tak — breathing comfortable.\nDin 14 tak — pattern mein significant change. 🌿`,
+    congestive: `━━━━━━━━━━━━━━━━━━━━\n🔴 AAPKA SINUS TYPE: CONGESTIVE PATTERN\n━━━━━━━━━━━━━━━━━━━━\n\nSubah uthte hi naak band. Chehra bhaari.\nPersonalized routine andar se kaam karti hai.\n\n${specialist}\nDin 3 tak — pressure mein fark.\nDin 7 tak — subah breathing better.\nDin 14 tak — significant improvement. 🌿`,
+    heat: `━━━━━━━━━━━━━━━━━━━━\n🔥 AAPKA SINUS TYPE: HEAT PATTERN\n━━━━━━━━━━━━━━━━━━━━\n\nAndar se burning, thick mucus.\nCooling aur soothing routine chahiye.\n\n${specialist}\nDin 3 tak — burning mein fark.\nDin 7 tak — discomfort reduce.\nDin 14 tak — significant improvement. 🌿`,
+    dependency: `━━━━━━━━━━━━━━━━━━━━\n⚠️ AAPKA SINUS TYPE: DEPENDENCY PATTERN\n━━━━━━━━━━━━━━━━━━━━\n\nSpray ke bina mushkil — yeh ek common pattern hai.\nNatural reset step by step hota hai.\n\n${specialist}\nDin 3 tak — natural breathing mein fark.\nDin 7 tak — spray ki zaroorat kam.\nDin 14 tak — significant improvement. 🌿`,
   };
 
   return header + (types[sinusType] || specialist) + footer;
@@ -323,6 +286,7 @@ function detectSeverity(text) {
 async function processMessage(senderId, text, platform, sendFn) {
   const state = userState[senderId] || 'new';
   const profile = userProfile[senderId] || {};
+  const t = text.toLowerCase().trim();
 
   console.log(`[${platform}] ID: ${senderId} | State: ${state} | Msg: ${text}`);
 
@@ -339,7 +303,6 @@ async function processMessage(senderId, text, platform, sendFn) {
   }
 
   // Restart trigger — any state
-  const t = text.toLowerCase();
   if (['restart', 'dobara', 'reset', 'fir se', 'start again'].some(k => t.includes(k))) {
     userState[senderId] = 'new';
     delete userProfile[senderId];
@@ -350,9 +313,9 @@ async function processMessage(senderId, text, platform, sendFn) {
 
   // Contact request
   const contactKeywords = ['whatsapp', 'contact', 'call', 'phone', 'helpline', 'direct', 'number'];
-  if (state !== 'done' && contactKeywords.some(k => t.includes(k))) {
+  if (contactKeywords.some(k => t.includes(k))) {
     await sendFn(senderId,
-`Bilkul! Seedha specialist se baat karein. 🙏
+`Bilkul! Seedha hamare Sinus Relief Specialist se baat karein. 🙏
 
 📱 WhatsApp: ${WHATSAPP_NUMBER}
 🌐 Website: ${WEBSITE}
@@ -369,13 +332,13 @@ Ayusomam Herbals 🌿`
     await sendFn(senderId,
 `🙏 Namaste! Ayusomam Herbals mein aapka swagat hai.
 
-Hum chronic sinus conditions ka Ayurvedic treatment karte hain — naturally, bina spray ya steroid dependency ke.
+Hum sinus discomfort ke liye personalized Ayurvedic wellness guidance dete hain — naturally, bina spray ya steroid dependency ke.
 
 🌐 ${WEBSITE}
 
-Personalized assessment ke liye kuch quick questions —
+Aapke liye best guidance ke liye kuch quick questions —
 
-✦ Aapko sinus ki problem kitne samay se hai?
+✦ Aapko sinus ki takleef kitne samay se hai?
 
 1️⃣ 6 mahine se kam
 2️⃣ 6 mahine se 2 saal
@@ -423,7 +386,7 @@ Number ya describe karein.`
     const symptomLabel = {
       allergic: 'Allergic — sneezing, watery, dust triggered',
       congestive: 'Congestive — naak band, pressure, heaviness',
-      heat: 'Heat Sinus — burning, thick mucus, headache',
+      heat: 'Heat — burning, thick mucus, headache',
       dependency: 'Dependency — Otrivin/spray dependent'
     }[symptom];
     userProfile[senderId] = { ...profile, symptom: symptomLabel, sinusType: symptom };
@@ -432,13 +395,13 @@ Number ya describe karein.`
     const symptomMsg = getSymptomResponseMessage(symptom);
     await sendFn(senderId, symptomMsg + `
 
-✦ Pehle koi treatment try ki hai?
+✦ Pehle koi approach try ki hai?
 
 1️⃣ Sirf nasal spray
 2️⃣ Doctor ki allopathy dawai
 3️⃣ Ghar ke nuskhe
 4️⃣ Abhi kuch nahi kiya
-5️⃣ Koi aur Ayurvedic treatment
+5️⃣ Koi aur Ayurvedic approach
 
 Number ya describe karein.`
     );
@@ -449,7 +412,7 @@ Number ya describe karein.`
   if (state === 'asked_tried') {
     const tried = detectTried(text);
     if (!tried) {
-      await sendFn(senderId, `Kya treatment try ki thi?\n\n1️⃣ Sirf nasal spray\n2️⃣ Doctor ki dawai\n3️⃣ Ghar ke nuskhe\n4️⃣ Kuch nahi\n5️⃣ Ayurvedic treatment`);
+      await sendFn(senderId, `Kya approach try ki thi?\n\n1️⃣ Sirf nasal spray\n2️⃣ Doctor ki dawai\n3️⃣ Ghar ke nuskhe\n4️⃣ Kuch nahi\n5️⃣ Ayurvedic approach`);
       return;
     }
     userProfile[senderId] = { ...profile, tried };
@@ -458,12 +421,12 @@ Number ya describe karein.`
     const triedMsg = getTriedResponseMessage(tried);
     await sendFn(senderId, triedMsg + `
 
-✦ Sinus aapki daily life ko kitna affect karta hai?
+✦ Yeh takleef aapki daily life ko kitna affect karti hai?
 
-1️⃣ Thodi problem — kabhi kabhi (Mild)
-2️⃣ Kaafi problem — kaam aur neend affect (Moderate)
+1️⃣ Thodi — kabhi kabhi (Mild)
+2️⃣ Kaafi — kaam aur neend affect (Moderate)
 3️⃣ Bahut zyada — daily routine affect (Severe)
-4️⃣ Extreme — normal kaam karna mushkil (Very Severe)
+4️⃣ Extreme — normal kaam mushkil (Very Severe)
 
 Number ya describe karein.`
     );
@@ -474,43 +437,39 @@ Number ya describe karein.`
   if (state === 'asked_severity') {
     const severity = detectSeverity(text);
     if (!severity) {
-      await sendFn(senderId, `Kitni severe hai problem?\n\n1️⃣ Mild\n2️⃣ Moderate\n3️⃣ Severe\n4️⃣ Very Severe`);
+      await sendFn(senderId, `Kitna affect karti hai?\n\n1️⃣ Mild\n2️⃣ Moderate\n3️⃣ Severe\n4️⃣ Very Severe`);
       return;
     }
     userProfile[senderId] = { ...profile, severity };
     userState[senderId] = 'pitched';
     updateSheetLead(senderId, 'pitched', '🟡 Warm', userProfile[senderId].symptom, userProfile[senderId].sinusType, userProfile[senderId]);
     const severityMsg = severity === 'Severe' || severity === 'Very Severe'
-      ? `Samajh gaya. ✅\n\nItni severe problem — matlab body kaafi time se struggle kar rahi hai. Jitna zyada time lagega, andar ki sujan utni aur pakki hoti jaayegi.\n\nAbhi sahi waqt hai isko seriously lene ka.\n\n`
-      : `Samajh gaya. ✅\n\nAbhi bhi manageable hai — par agar ignore kiya toh worse hoga. Sahi waqt hai theek karne ka.\n\n`;
+      ? `Samajh gaya. ✅\n\nItne time se itni takleef — aur abhi tak koi consistent relief nahi mili.\nAbhi ek structured approach try karna sahi rahega.\n\n`
+      : `Samajh gaya. ✅\n\nAbhi manageable hai — par consistent approach se aur comfortable ho sakta hai.\n\n`;
     await sendFn(senderId, severityMsg + getPitchMessage(userProfile[senderId].sinusType, userProfile[senderId]));
     return;
   }
 
-  // PITCHED → Claude handles objections
+  // PITCHED → Objection handling
   if (state === 'pitched' || state === 'following_up') {
+
     if (['yes', 'haan', 'han', 'ha', 'y', 'हाँ', 'हां'].includes(t)) {
       userState[senderId] = 'done';
       updateSheetLead(senderId, 'done', '🟢 Hot', userProfile[senderId]?.symptom, userProfile[senderId]?.sinusType, userProfile[senderId]);
       await sendFn(senderId,
 `Bahut achha! 🙏
 
-Aapka 14-day personalized protocol confirm karne ke liye:
+Aapka 14-day personalized wellness routine confirm karne ke liye:
 
 💳 Payment Link: ${PAYMENT_LINK}
 Amount: ₹1,299
 
-Payment ke baad WhatsApp pe milega:
-✅ Aapka personalized protocol
-✅ Daily guidance schedule
-✅ Direct specialist access
-
-Payment karte waqt apna WhatsApp number zaroor daalein.
+Payment ke baad WhatsApp pe message karein — Sinus Relief Specialist khud aapko personally guide karenge.
 
 📱 WhatsApp: ${WHATSAPP_NUMBER}
 🌐 ${WEBSITE}
 
-Ayusomam Herbals 🌿`
+Thoda wait karein — specialist jald connect karenge. 🌿`
       );
       return;
     }
@@ -521,50 +480,98 @@ Ayusomam Herbals 🌿`
       await sendFn(senderId,
 `Bilkul! 🙏
 
-Hamare specialist aapse seedha baat karenge.
-Thoda intezaar karein — specialist abhi aapke paas aate hain.
+Hamare Sinus Relief Specialist aapse seedha baat karenge.
 
-🌐 ${WEBSITE}
+Thoda wait karein — ya seedha WhatsApp pe message karein:
+📱 ${WHATSAPP_NUMBER}
 
 Ayusomam Herbals 🌿`
       );
       return;
     }
 
-    try {
-      userState[senderId] = 'following_up';
-      updateSheetLead(senderId, 'following_up', '🟡 Warm', userProfile[senderId]?.symptom, userProfile[senderId]?.sinusType, userProfile[senderId]);
-      const aiResponse = await getClaudeResponse('following_up', text, userProfile[senderId] || {});
-      await sendFn(senderId, aiResponse);
-    } catch (err) {
-      console.error('Claude error:', err.message);
+    // Objection handling — no AI, smart fallbacks
+    userState[senderId] = 'following_up';
+    updateSheetLead(senderId, 'following_up', '🟡 Warm', userProfile[senderId]?.symptom, userProfile[senderId]?.sinusType, userProfile[senderId]);
+
+    if (t.match(/\b(price|kitna|cost|mahanga|1299|paise|paisa|costly|expensive|kam karo|discount)\b/)) {
       await sendFn(senderId,
-`Koi bhi sawaal poochh sakte hain — hum yahan hain. 🙏
+`Samajh sakte hain. 🙏
 
-Details ke liye "MORE" type karein ya shuru karne ke liye YES reply karein.
+₹1,299 mein milta hai:
+✅ 14 din tak dedicated Sinus Relief Specialist
+✅ Aapke specific pattern ke hisaab se daily routine
+✅ Direct WhatsApp access — kabhi bhi message karo
+✅ Roz ka feedback aur adjustment
 
-🌐 ${WEBSITE}`
+Ek specialist ka itna personal attention — yeh value hai. 🌿
+
+Shuru karne ke liye YES reply karein ya seedha WhatsApp karein:
+📱 ${WHATSAPP_NUMBER}`
       );
+      return;
     }
-    return;
-  }
 
-  // DONE STATE → Claude handles post payment + restart option
-  if (state === 'done') {
-    try {
-      const aiResponse = await getClaudeResponse('post_payment', text, userProfile[senderId] || {});
-      await sendFn(senderId, aiResponse);
-    } catch (err) {
-      console.error('Claude post payment error:', err.message);
+    if (t.match(/\b(guarantee|results|kaam karega|sach|proof|trust|bharosa|pakka)\b/)) {
       await sendFn(senderId,
-`Koi bhi sawaal ho toh hamare specialist se seedha baat karein. 🙏
+`Bilkul valid sawaal hai. 🙏
 
-📱 WhatsApp: ${WHATSAPP_NUMBER}
-🌐 ${WEBSITE}
+Hum koi medical claim nahi karte — par hamare clients ki personal experience hai ki consistent Ayurvedic routine se unhe fark mila.
+
+Shikha ji — 5 saal spray use karti thin — 14 din baad spray ki zaroorat naturally kam ho gayi.
+
+Aap khud 14 din try karo — specialist personally guide karega. 🌿
+
+Shuru karne ke liye YES reply karein.`
+      );
+      return;
+    }
+
+    if (t.match(/\b(sochna|think|baad mein|later|kal|time|abhi nahi)\b/)) {
+      await sendFn(senderId,
+`Bilkul, aaram se socho. 🙏
+
+Jab bhi ready ho — hum yahan hain.
+
+Koi bhi sawaal ho toh seedha poochh sakte ho ya WhatsApp pe message karo:
+📱 ${WHATSAPP_NUMBER}
+
+💳 Payment Link: ${PAYMENT_LINK}
 
 Ayusomam Herbals 🌿`
       );
+      return;
     }
+
+    // Default fallback
+    await sendFn(senderId,
+`Koi bhi sawaal ho toh poochh sakte hain. 🙏
+
+Seedha hamare Sinus Relief Specialist se baat karne ke liye:
+📱 WhatsApp: ${WHATSAPP_NUMBER}
+
+Ya shuru karne ke liye YES reply karein.
+💳 ${PAYMENT_LINK}
+
+🌐 ${WEBSITE}`
+    );
+    return;
+  }
+
+  // DONE STATE
+  if (state === 'done') {
+    await sendFn(senderId,
+`Aapka program confirm ho gaya hai. 🙏
+
+Payment ke baad WhatsApp pe message karein — Sinus Relief Specialist khud aapko personally guide karenge.
+
+Thoda wait karein — ya seedha WhatsApp pe message karein:
+📱 ${WHATSAPP_NUMBER}
+
+🌐 ${WEBSITE}
+
+Ayusomam Herbals 🌿`
+    );
     return;
   }
 }
