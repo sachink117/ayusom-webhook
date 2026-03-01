@@ -1,7 +1,7 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const { google } = require('googleapis');
-const Anthropic = require('@anthropic-ai/sdk');
+
 
 const app = express();
 app.use(express.json());
@@ -21,7 +21,6 @@ const WEBSITE = 'www.ayusomamherbals.com';
 const SHEET_NAME = 'Leads';
 
 // ─── CLIENTS ─────────────────────────────────────────────────
-const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
 const auth = new google.auth.JWT(
   GOOGLE_SERVICE_ACCOUNT_EMAIL,
