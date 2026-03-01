@@ -584,7 +584,17 @@ Details ke liye "MORE" type karein ya shuru karne ke liye YES reply karein.
   }
 
   if (state === 'done') {
-    console.log(`DONE STATE - No reply for ${senderId}`);
+    await sendFn(senderId,
+`Aapka program already confirm ho gaya hai. 🙏
+
+Koi bhi sawaal ho ya kuch aur jaanna ho toh hamare specialist se seedha baat karein —
+
+📱 WhatsApp: ${WHATSAPP_NUMBER}
+🌐 ${WEBSITE}
+
+Ayusomam Herbals 🌿`
+    );
+    return;
   }
 }
 
