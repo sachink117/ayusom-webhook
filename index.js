@@ -53,18 +53,40 @@ Hindi → Hindi
 Hinglish → Hinglish
 Punjabi/Regional → usi mein
 
-MEDICAL TERMS KO SIMPLE KARO:
-❌ "Congestive sinus" → ✅ "Naak mein jamav"
-❌ "Allergic rhinitis" → ✅ "Dhool ya mausam se naak kharab hona"
-❌ "Mucus drainage" → ✅ "Naak ka kichad bahar aana"
-❌ "Inflammation" → ✅ "Andar sujan"
-❌ "Dependency" → ✅ "Spray ki aadat"
-❌ "Protocol" → ✅ "Ilaaj ka tarika"
-❌ "Chronic" → ✅ "Purani / kaafi time se"
-❌ "Symptoms" → ✅ "Takleef / pareshani"
+MEDICAL TERMS — SMART USE:
 
-Jo bhi term use karo — simple roz ki boli mein —
-jaise koi doctor patient ko ghar pe samjhaye.
+DEFAULT — English/Hinglish users ke liye:
+Proper medical terms use karo — professional lagta hai:
+"Allergic Sinus", "Congestive Sinus",
+"Heat Pattern Sinus", "Spray Dependency"
+
+SIMPLE KARO — Sirf in 2 cases mein:
+1. User Devanagari (Hindi script) mein likhe
+   jaise: "मेरी नाक बंद है"
+2. User confused lage — "matlab?" pooche
+   ya terms samajh na aaye
+
+SIMPLE REPLACEMENTS (sirf zarurat pe):
+"Allergic Sinus" → "Allergy wali naak"
+"Congestive Sinus" → "Jam wali naak"
+"Heat Pattern Sinus" → "Garmi wali naak"
+"Spray Dependency" → "Spray ki aadat"
+"Inflammation" → "Andar sujan"
+"Mucus" → "Kichad / balgam"
+"Protocol" → "Ilaaj ka tarika"
+"Chronic" → "Purani"
+"Symptoms" → "Takleef"
+
+EXAMPLES:
+User: "my nose is blocked" (English)
+→ "You have Congestive Sinus —" ✅
+
+User: "मेरी नाक बंद है" (Devanagari)
+→ "Aapko Jam wali naak ki problem hai —" ✅
+
+User: "naak band hai" (Hinglish)
+→ "Yeh Congestive Sinus hai —" ✅
+→ Agar confused lage tab simple karo
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TONE RULES — STRICT
@@ -462,20 +484,45 @@ function detectSymptom(text) {
 // GOOGLE SHEETS
 // ============================================================
 
-async function updateLead(userId, temp, stage, symptom) {
+async function updateLead(userId, temp, stage, symptom, name, firstMessage) {
   if (!GOOGLE_SHEET_URL) return;
   try {
-    await fetch(GOOGLE_SHEET_URL, {
+    // Step 1 — Try to update existing lead
+    const updateRes = await fetch(GOOGLE_SHEET_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        action: 'updateLead',
-        userId,
-        leadTemp: temp,
-        stage,
+        update: true,
+        senderId: userId,
+        temperature: temp,
+        lastStage: stage,
         symptom: symptom || ''
       })
     });
+
+    const updateData = await updateRes.json();
+    console.log('Sheet update response:', updateData.status);
+
+    // Step 2 — Agar new lead hai — new row add karo
+    if (updateData.status !== 'updated') {
+      const newRes = await fetch(GOOGLE_SHEET_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timestamp: new Date().toISOString(),
+          platform: 'Facebook',
+          senderId: userId,
+          name: name || userId,
+          message: firstMessage || '',
+          temperature: temp,
+          lastStage: stage,
+          symptom: symptom || ''
+        })
+      });
+      const newData = await newRes.json();
+      console.log('Sheet new lead:', newData.status);
+    }
+
   } catch (e) {
     console.error('Sheet error:', e.message);
   }
@@ -745,10 +792,31 @@ async function processMessage(senderId, text) {
 
   if (AI_MODE) {
     console.log(`[AI] ${senderId}: ${text}`);
+
+    // Init user profile if not exists
+    if (!userProfile[senderId]) userProfile[senderId] = {};
+
+    // Auto detect symptom from message and save
+    const detectedSymptom = detectSymptom(text);
+    if (detectedSymptom && !userProfile[senderId].symptom) {
+      userProfile[senderId].symptom = detectedSymptom;
+    }
+
+    // Detect payment intent — mark as hot
+    const isHot = text.toLowerCase().match(/payment|pay|kitna|price|cost|1299|shuru|yes|haan|bilkul|le lena|lena hai|kaise karu/);
+    const leadTemp = isHot ? '🔴 Hot' : '🟡 Warm';
+
     const reply = await getAIReply(senderId, text);
     if (reply) {
       await sendMessage(senderId, reply);
-      await updateLead(senderId, '🟡 Warm', 'ai_conversation', '');
+      await updateLead(
+        senderId,
+        leadTemp,
+        'ai_conversation',
+        userProfile[senderId].symptom || '',
+        userProfile[senderId].name || '',
+        text
+      );
     } else {
       console.log('AI failed — fallback rule based');
       await handleRuleBased(senderId, text);
