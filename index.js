@@ -796,7 +796,7 @@ async function processMessage(senderId, text) {
     const t = text.toLowerCase();
     let leadTemp = '🔵 Cold'; // default
 
-    const isHot = t.match(/payment|pay|1299|shuru karna|le lena|lena hai|kaise karu|buy|purchase|interested|haan shuru|bilkul shuru|yes shuru|abhi shuru/);
+    const isHot = t.match(/payment|pay|1299|shuru karte|shuru karna|shuru kar|le lena|lena hai|kaise karu|buy|purchase|interested|haan shuru|bilkul shuru|yes shuru|abhi shuru|karte hai|karna hai|ready|confirm|ok shuru|chalu karo|start/);
     const isWarm = t.match(/kitna|price|cost|details|batao|kya hoga|kaise|guarantee|sochna|more info|janna chahta/);
 
     if (isHot)       leadTemp = '🔴 Hot';
