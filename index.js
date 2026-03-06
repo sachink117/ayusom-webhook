@@ -778,7 +778,12 @@ async function processMessage(senderId, text) {
     console.log(`[AI] ${senderId}: ${text}`);
 
     // Init user profile if not exists
-    if (!userProfile[senderId]) userProfile[senderId] = {};
+    if (!userProfile[senderId]) userProfile[senderId] = { firstMessage: text };
+
+    // Save first message
+    if (!userProfile[senderId].firstMessage) {
+      userProfile[senderId].firstMessage = text;
+    }
 
     // Auto detect symptom from message and save
     const detectedSymptom = detectSymptom(text);
@@ -796,7 +801,7 @@ async function processMessage(senderId, text) {
     const t = text.toLowerCase();
     let leadTemp = '🔵 Cold'; // default
 
-    const isHot = t.match(/payment|pay|1299|shuru karte|shuru karna|shuru kar|le lena|lena hai|kaise karu|buy|purchase|interested|haan shuru|bilkul shuru|yes shuru|abhi shuru|karte hai|karna hai|ready|confirm|ok shuru|chalu karo|start/);
+    const isHot = t.match(/payment|pay|1299|shuru karte|shuru karna|shuru kar|le lena|lena hai|kaise karu|buy|purchase|interested|haan shuru|bilkul shuru|yes shuru|abhi shuru|karte hai|karna hai|ready|confirm|ok shuru|chalu karo|start|procedure|treat karte|treat krte|kaise treat|kab tak|kitne din|theek ho|sahi ho|guarantee|pakka|zaroor|zarur|bilkul|haan ji|ha ji|ok ji|okay/);
     const isWarm = t.match(/kitna|price|cost|details|batao|kya hoga|kaise|guarantee|sochna|more info|janna chahta/);
 
     if (isHot)       leadTemp = '🔴 Hot';
@@ -820,7 +825,7 @@ async function processMessage(senderId, text) {
         'ai_conversation',
         userProfile[senderId].symptom || '',
         userProfile[senderId].name   || '',
-        text
+        userProfile[senderId].firstMessage || text
       );
     } else {
       console.log('AI failed — fallback rule based');
@@ -896,7 +901,7 @@ app.listen(PORT, () => {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Ayusomam Herbals Bot — Running
 Port    : ${PORT}
-AI Mode : ${AI_MODE ? '✅ ON — AI Agent v4.0' : '❌ OFF — Rule Based'}
+AI Mode : ${AI_MODE ? '✅ ON — AI Agent v5.0' : '❌ OFF — Rule Based'}
 Rollback: Set AI_MODE = false
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   `);
