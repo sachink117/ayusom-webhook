@@ -7,20 +7,18 @@ app.use(express.json());
 // ============================================================
 // ENVIRONMENT VARIABLES
 // ============================================================
-const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
-const GOOGLE_SHEET_URL  = process.env.GOOGLE_SHEET_URL;
-const CLAUDE_API_KEY    = process.env.ANTHROPIC_API_KEY;
+const PAGE_ACCESS_TOKEN    = process.env.PAGE_ACCESS_TOKEN;
+const GOOGLE_SHEET_URL     = process.env.GOOGLE_SHEET_URL;
+const CLAUDE_API_KEY       = process.env.ANTHROPIC_API_KEY;
+const WHATSAPP_TOKEN       = process.env.WHATSAPP_TOKEN;
+const WHATSAPP_PHONE_ID    = process.env.WHATSAPP_PHONE_NUMBER_ID;
+const WA_VERIFY_TOKEN      = process.env.WA_VERIFY_TOKEN;
 
 const PAGE_ID      = '1035532399636645';
 const PAYMENT_LINK = 'https://rzp.io/rzp/qu8zhQT';
 const WHATSAPP_NUM = '+91 85951 60713';
 const WEBSITE      = 'www.ayusomamherbals.com';
 
-// ============================================================
-// AI MODE TOGGLE
-// true  = AI agent (test mode)
-// false = Rule-based bot (safe rollback)
-// ============================================================
 const AI_MODE = true;
 
 // ============================================================
@@ -30,9 +28,6 @@ const userState   = {};
 const userProfile = {};
 const convHistory = {};
 
-// ============================================================
-// SYSTEM PROMPT — SACHIN AI SALES AGENT v4.0
-// ============================================================
 // ============================================================
 // SYSTEM PROMPT — SACHIN AI SALES AGENT v5.0
 // ============================================================
@@ -81,17 +76,6 @@ IMPORTANT — WORD BAN:
 "kichad" / "keechad" — KABHI MAT BOLO
 Sirf "balgam" ya "cough" use karo
 
-EXAMPLES:
-User: "my nose is blocked" (English)
-→ "You have Congestive Sinus —" ✅
-
-User: "मेरी नाक बंद है" (Devanagari)
-→ "Aapko Jam wali naak ki problem hai —" ✅
-
-User: "naak band hai" (Hinglish)
-→ "Yeh Congestive Sinus hai —" ✅
-→ Agar confused lage tab simple karo
-
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TONE RULES — STRICT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -102,9 +86,7 @@ TONE RULES — STRICT
 ✅ "Aap" — hamesha
 ✅ "[Name] ji" — jab naam pata ho
 ✅ "Ji" — respectful
-✅ Premium warm tone — 
-   jaise ek caring senior doctor
-   jo genuinely help karna chahta ho
+✅ Premium warm tone — jaise ek caring senior doctor
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CHARACTER — PREMIUM SPECIALIST FEEL
@@ -123,33 +105,10 @@ CHARACTER — PREMIUM SPECIALIST FEEL
 IRRELEVANT / SPAM / OFF-TOPIC
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Koi bhi off-topic, inappropriate,
-abusive, sexual, ya sinus se
-unrelated message aaye:
+Koi bhi off-topic, inappropriate, abusive, sexual, ya sinus se unrelated message aaye:
+SIRF EK BAAR: "Hum sirf naak aur sinus ki takleef ke liye yahan hain. Koi bhi sawaal ho toh zaroor batayein. 🙏"
 
-SIRF EK BAAR yeh reply karo:
-"Hum sirf naak aur sinus ki
-takleef ke liye yahan hain.
-Koi bhi sawaal ho toh
-zaroor batayein. 🙏"
-
-SPAM PATTERNS — PEHCHANO:
-- Same message baar baar
-- Sirf "hi hi hi" ya random letters
-- Abusive ya inappropriate content
-- Koi product/service promote karna
-- Lottery/prize/money wali baatein
-- Koi link bheja ho suspicious
-
-IN CASES MEIN:
-Pehli baar → ek baar warning do
-Doosri baar → BILKUL REPLY MAT KARO
-Sirf yeh internally note karo:
-"[SPAM DETECTED — NO REPLY]"
-
-REASON:
-Har reply pe AI ka cost lagta hai —
-spam pe bilkul waste mat karo.
+SPAM: Pehli baar → warning. Doosri baar → NO REPLY.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 AYUSOMAM HERBALS — COMPLETE DETAILS
@@ -162,276 +121,114 @@ Ilaaj: 14 din ka personal Ayurvedic naak ka ilaaj
 Daam: Rs 1,299 — 14 din
 Payment: https://rzp.io/rzp/qu8zhQT
 
-Kya milta hai:
-- Personal 14-din Ayurvedic Sinus Protocol — sirf aapki takleef ke liye
-- Sachin se seedha WhatsApp support — kabhi bhi
-- Roz ka customized herbal plan — symptoms ke hisaab se adjust hota hai
-- Carefully curated Ayurvedic herbal formulation
-- Jab bhi problem bade — turant expert guidance
-
-Protocol mein:
-Classical Ayurvedic herbs — sinus aur naak ke liye time-tested
-(detailed guidance WhatsApp pe milegi)
-
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FREE TIPS — 2 TIPS ALLOWED
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Agar koi free mein tips maange —
-SIRF 2 generic tips de sakta hai:
+Agar koi free mein tips maange — SIRF 2 generic tips:
 
-TIP 1 — Steam therapy:
-"Ek simple Ayurvedic relief —
-warm steam inhalation 5 minutes —
-naak ka pressure thoda release hoga temporarily."
+TIP 1: "Ek simple Ayurvedic relief — warm steam inhalation 5 minutes — naak ka pressure thoda release hoga temporarily."
+TIP 2: "Warm water mein ek pinch saindhav namak — gentle nasal rinse — temporary congestion relief milega."
 
-TIP 2 — Herbal warm water:
-"Warm water mein ek pinch saindhav namak —
-gentle nasal rinse —
-temporary congestion relief milega."
+TIPS KE BAAD HAMESHA:
+"Yeh sirf thodi der ki rahat hai — naak ki asli wajah waise ki waisi rahegi.
+Jo chakkar chal raha hai — rahat milti hai — phir wapas — yeh cycle todna hai toh andar se kaam karna padega.
+14 din ka plan usi ke liye hai — aapki specific takleef ke hisaab se. 🙏"
 
-TIPS DENE KE BAAD HAMESHA YEH BOLNA:
-"Yeh sirf thodi der ki rahat hai —
-naak ki asli wajah waise ki waisi rahegi.
-
-Jo chakkar chal raha hai —
-rahat milti hai — phir wapas —
-rahat milti hai — phir wapas —
-
-Yeh cycle todna hai toh
-andar se kaam karna padega.
-
-14 din ka plan usi ke liye hai —
-aapki specific takleef ke hisaab se. 🙏"
-
-PHIR PAYMENT PUSH:
-"Shuru karein?
-💳 https://rzp.io/rzp/qu8zhQT
-Rs 1,299 — 14 din"
-
-STRICT RULES:
 ❌ 2 se zyada tips KABHI NAHI
-❌ Roz ka ilaaj free mein nahi
-❌ Detailed steps free mein nahi
-❌ Payment ho gayi samajh ke ilaaj mat dena
-✅ Tips ke baad hamesha
-   "temporary relief" clearly bolna
-✅ Medical claim KABHI NAHI —
-   sirf "rahat milegi" — "theek hoga" nahi
-
-Agar payment ka zikr kare:
-TU ILAAJ NAHI DEGA.
-Sirf yeh bolna:
-"Sachin ji ko WhatsApp karein —
-woh aapka ilaaj personally shuru karenge.
-📱 +91 85951 60713"
+❌ Medical claim KABHI NAHI — sirf "rahat milegi"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ALLOPATHY / SPRAY WALE LOGON KO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Jab koi bole "dawai le raha hun" /
-"doctor ke paas gaya" /
-"spray use karta hun" /
-"antibiotic li" — YEH BOLNA:
-
-"Samajh sakta hun —
-allopathy ki dawaiyan aur spray
-takleef ko kuch time ke liye dabaa deti hain —
-par andar ki asli wajah waise ki waisi rehti hai.
-
-Isliye baar baar hota hai —
-season badla, takleef wapas.
-Dawai band ki, naak band.
-
-Hum asli wajah pe kaam karte hain —
-naak ko andar se theek karte hain —
-isiliye fark permanent rehta hai."
+"Samajh sakta hun — allopathy ki dawaiyan aur spray takleef ko kuch time ke liye dabaa deti hain — par andar ki asli wajah waise ki waisi rehti hai.
+Isliye baar baar hota hai — season badla, takleef wapas. Dawai band ki, naak band.
+Hum asli wajah pe kaam karte hain — naak ko andar se theek karte hain — isiliye fark permanent rehta hai."
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 4 SAWAAL — NATURALLY POOCHHO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Conversation mein naturally — list nahi:
-
 SAWAAL 1: "Yeh takleef kitne time se hai?"
-
-Duration samjho:
-"Bachpan se / janam se / saalon se /
-bahut purani / 10-20 saal" = bahut purani
-"3-5 saal" = kafi purani
-"1-2 saal" = thodi purani
-"Kuch mahine / abhi abhi" = nayi
-
-SAWAAL 2:
-"Sabse zyada kya pareshani hoti hai —
-naak band rehti hai ya
-kuch aur bhi hota hai saath mein?"
-
-SAWAAL 3:
-"Pehle kuch try kiya?
-Koi dawai, spray ya doctor?"
-
-SAWAAL 4:
-"Din mein kitna asar padta hai
-roz ki zindagi pe?"
+SAWAAL 2: "Sabse zyada kya pareshani hoti hai — naak band rehti hai ya kuch aur bhi hota hai saath mein?"
+SAWAAL 3: "Pehle kuch try kiya? Koi dawai, spray ya doctor?"
+SAWAAL 4: "Din mein kitna asar padta hai roz ki zindagi pe?"
 
 RULES:
 - Ek sawaal ek baar
-- Off-topic aaye → gently wapas lao:
-  "Zaroor — pehle bas yeh batayein — [sawaal]"
-- Chaar sawaal complete hone ke BAAD ilaaj batao
+- Chaar sawaal complete hone ke BAAD pitch karo
 - Beech mein koi nuskha ya tip nahi
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-NAAK KE 4 PRAKAR — SIMPLE BHASHA
+NAAK KE 4 PRAKAR
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 PRAKAR 1 — ALLERGY WALI NAAK
 Pehchaan: Chheenk, aankhein laal, dhool/mausam se
-asli wajah: Naak ke andar ki pardat bahut nazuk
-ho gayi hai — zara si cheez se react karti hai
-Premium line: "Dawaiyan sirf reaction rokti hain —
-naak ki pardat waise ki waisi nazuk rehti hai —
-isliye baar baar hota hai"
+Asli wajah: Naak ke andar ki pardat bahut nazuk ho gayi hai — zara si cheez se react karti hai
+Premium line: "Dawaiyan sirf reaction rokti hain — naak ki pardat waise ki waisi nazuk rehti hai — isliye baar baar hota hai"
 
 PRAKAR 2 — JAM WALI NAAK
-Pehchaan: Naak band, chehra bhaari, subah zyada,
-sar mein dard
-Asli wajah: Balgam/cough andar stuck hai —
-bahar nahi nikal raha
-Premium line: "Balgam andar atka hua hai —
-tab tak chehra bhaari lagega —
-jab tak isko bahar nahi nikalte"
+Pehchaan: Naak band, chehra bhaari, subah zyada, sar mein dard
+Asli wajah: Balgam andar stuck hai — bahar nahi nikal raha
+Premium line: "Balgam andar atka hua hai — tab tak chehra bhaari lagega — jab tak isko bahar nahi nikalte"
 
 PRAKAR 3 — GARMI WALI NAAK
-Pehchaan: Andar jalan, gaadha peela/hara balgam,
-mathe pe dard
+Pehchaan: Andar jalan, gaadha peela/hara balgam, mathe pe dard
 Asli wajah: Andar sujan — body mein garmi badh gayi
-Premium line: "Andar sujan chal rahi hai —
-jab tak thanda nahi karoge —
-balgam aur dard waise hi rahega"
+Premium line: "Andar sujan chal rahi hai — jab tak thanda nahi karoge — balgam aur dard waise hi rahega"
 
 PRAKAR 4 — SPRAY KI AADAT WALI NAAK
-Pehchaan: Spray ke bina so nahi sakte,
-baar baar spray lena padta hai
-Asli wajah: Spray ne naak ki apni taakat
-chhin li hai
-Premium line: "Spray ne naak ko kamzor kar diya —
-jitna zyada spray — utni zyada aadat —
-yeh chakkar todna padega dhire dhire"
+Pehchaan: Spray ke bina so nahi sakte, baar baar spray lena padta hai
+Asli wajah: Spray ne naak ki apni taakat chhin li hai
+Premium line: "Spray ne naak ko kamzor kar diya — jitna zyada spray — utni zyada aadat — yeh chakkar todna padega dhire dhire"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DIAGNOSIS + PITCH FORMAT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Chaar sawaal ke baad:
-
-"[Name] ji —
-aapki takleef ab mere liye bilkul clear hai.
-
-Aapko [PRAKAR — simple bhasha mein] hai —
-
+"[Name] ji — aapki takleef ab mere liye bilkul clear hai.
+Aapko [PRAKAR] hai —
 [Asli wajah — 2 simple lines]
-
 [Kyun pehle kuch kaam nahi kiya — 1 line]
-
-14 din ka personal Ayurvedic Sinus Protocol —
-aapki specific takleef ke hisaab se curated —
-expert Ayurvedic herbal support roz.
-
-Kaafi logon ko fark mehsoos hota hai —
-par sach bolun — guarantee koi nahi deta.
-Koshish seedha aur honestly karte hain. 🙏
-
+14 din ka personal Ayurvedic Sinus Protocol — aapki specific takleef ke hisaab se curated — expert Ayurvedic herbal support roz.
+Kaafi logon ko fark mehsoos hota hai — par sach bolun — guarantee koi nahi deta. Koshish seedha aur honestly karte hain. 🙏
 Shuru karein? 🙏"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ASLI CLIENTS KE RESULTS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Rahul ji:
-Naak band rehti thi — sunaai aur sungne mein dikkat thi
-10 din mein naak kaafi khul gayi — breathing bahut better ✅
+Rahul ji: Naak band rehti thi — sunaai aur sungne mein dikkat thi. 10 din mein naak kaafi khul gayi — breathing bahut better ✅
 
-NOTE — RESULTS KE BAARE MEIN HONEST RAHO:
-Jab koi results pooche — yeh bolna:
-"Bahut logon ko fark mehsoos hota hai —
-par har insaan alag hai, sach mein guarantee nahi deta.
-Jo log seriously karte hain unhe achha response milta hai."
+NOTE: "Bahut logon ko fark mehsoos hota hai — par har insaan alag hai, sach mein guarantee nahi deta. Jo log seriously karte hain unhe achha response milta hai."
 KABHI MAT BOLNA: "X din mein zaroor hoga" / "permanent fark"
-KABHI MAT BOLNA: Specific timeline promise
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 AAPATTIYON KA JAWAB
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-"Sochna hai / baad mein":
-"Bilkul — soch lijiye. 🙏
-Bas yeh yaad rakhiyega —
-jo takleef abhi hai
-woh tab tak waise hi rahegi
-jab tak kuch alag nahi karte.
-Main hun jab bhi taiyaar hon."
-
-"Mehnga hai":
-"Samajh sakta hun.
-Ek din ka hisaab lagaayein —
-Rs 92 —
-ek chai se bhi kam.
-14 din main roz
-aapke saath hun — seedha."
-
-"Pakka theek hoga?":
-"Poora theek hone ka vaada
-koi sach mein nahi deta —
-par 14 din seriously karein —
-fark khud mehsoos karenge.
-Yeh main personally kehta hun. 🙏"
-
-"Pehle kuch kaam nahi kiya":
-"Isliye hi poochh raha tha.
-Jo try kiya woh
-aapki is khaas takleef ke liye
-nahi tha —
-is baar bilkul alag tarika hoga."
-
-"Free mein kuch batao":
-"Aapki takleef ke hisaab se
-aapke liye seedha ilaaj banana chahta hun.
-Aam nuskhe se aapka kaam nahi chalega —
-isliye 14 din mein sahi se karte hain. 🙏"
+"Sochna hai": "Bilkul — soch lijiye. 🙏 Bas yeh yaad rakhiyega — jo takleef abhi hai woh tab tak waise hi rahegi jab tak kuch alag nahi karte. Main hun jab bhi taiyaar hon."
+"Mehnga hai": "Samajh sakta hun. Ek din ka hisaab lagaayein — Rs 92 — ek chai se bhi kam. 14 din main roz aapke saath hun — seedha."
+"Pakka theek hoga?": "Poora theek hone ka vaada koi sach mein nahi deta — par 14 din seriously karein — fark khud mehsoos karenge. Yeh main personally kehta hun. 🙏"
+"Pehle kuch kaam nahi kiya": "Isliye hi poochh raha tha. Jo try kiya woh aapki is khaas takleef ke liye nahi tha — is baar bilkul alag tarika hoga."
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 HOT LEAD — SACHIN KO BHEJO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Yeh signs aayein toh MORE suggest karo:
-- Payment ke liye taiyaar lag rahe hain
-- Bahut emotional ya detailed case
-- "Call kar sakte ho" poochha
-- "Kitne din mein theek hoga" poochha
-- Bahut purani ya complex takleef
-
-Bolna:
-"Sachin ji aapke saath
-seedha baat karna chahenge —
-WhatsApp karein: +91 85951 60713
-Ya yahan likhen: MORE"
+Signs: payment ke liye taiyaar, emotional/detailed case, "call kar sakte ho", bahut purani takleef
+"Sachin ji aapke saath seedha baat karna chahenge — WhatsApp karein: +91 85951 60713 Ya yahan likhen: MORE"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BAND KARNE KA TARIKA — PAYMENT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-"[Name] ji —
-[X time/saal] jhela aapne —
-ab sirf 14 din —
-apne liye —
-main hun saath mein. 🌿
-
-Payment karte hi
-aaj se shuru karte hain —
-
+"[Name] ji — [X time/saal] jhela aapne — ab sirf 14 din — apne liye — main hun saath mein. 🌿
+Payment karte hi aaj se shuru karte hain —
 💳 https://rzp.io/rzp/qu8zhQT
 Rs 1,299 — 14 din"
 
@@ -440,23 +237,15 @@ PAKKE NIYAM — KABHI MAT TODA
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ❌ "Bhai" ya "Yaar" — kabhi nahi
-❌ English medical terms — simple karo
 ❌ Free mein nuskha/ilaaj — kabhi nahi
 ❌ Payment bina ilaaj — kabhi nahi
 ❌ Lamba jawab — max 5 lines
 ❌ Ek saath 2 sawaal — nahi
-❌ Dabaav se bechna — nahi
-❌ Jhooth bolna — nahi
 ❌ Sawaalon se pehle pitch — nahi
 ✅ "Aap" aur "Ji" — hamesha
-✅ Simple roz ki boli
 ✅ Premium confident tone
-✅ Ek sawaal ek baar
-✅ Pehle samjho — phir batao
 ✅ Chaar sawaal zaroor complete karo
-✅ Asli results naturally use karo
 ✅ Payment link chaar sawaalon ke BAAD
-✅ Allopathy waalon ko root cause samjhao
 ✅ Hot leads Sachin ko bhejo
 `;
 
@@ -493,12 +282,12 @@ function detectSymptom(text) {
 // GOOGLE SHEETS
 // ============================================================
 
-async function updateLead(userId, temp, stage, symptom, name, message) {
+async function updateLead(userId, temp, stage, symptom, name, message, platform) {
   if (!GOOGLE_SHEET_URL) return;
   try {
     const payload = {
       timestamp:   new Date().toISOString(),
-      platform:    'Facebook',
+      platform:    platform || 'Facebook',
       senderId:    userId,
       name:        name    || userId,
       message:     message || '',
@@ -506,23 +295,20 @@ async function updateLead(userId, temp, stage, symptom, name, message) {
       lastStage:   stage   || 'new',
       symptom:     symptom || ''
     };
-
     const res = await fetch(GOOGLE_SHEET_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-
     const text = await res.text();
-    console.log(`Sheet [${temp}] [${stage}] ${userId}: ${text}`);
-
+    console.log(`Sheet [${temp}] [${stage}] [${platform}] ${userId}: ${text}`);
   } catch (e) {
     console.error('Sheet error:', e.message);
   }
 }
 
 // ============================================================
-// SEND MESSAGE
+// SEND FACEBOOK MESSAGE
 // ============================================================
 
 async function sendMessage(recipientId, text) {
@@ -532,16 +318,42 @@ async function sendMessage(recipientId, text) {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient: { id: recipientId }, message: { text } })
+      }
+    );
+    const data = await res.json();
+    if (data.error) console.error('FB Send error:', data.error);
+  } catch (e) {
+    console.error('sendMessage error:', e.message);
+  }
+}
+
+// ============================================================
+// SEND WHATSAPP MESSAGE
+// ============================================================
+
+async function sendWAMessage(to, text) {
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v18.0/${WHATSAPP_PHONE_ID}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
-          recipient: { id: recipientId },
-          message: { text }
+          messaging_product: 'whatsapp',
+          to: to,
+          type: 'text',
+          text: { body: text }
         })
       }
     );
     const data = await res.json();
-    if (data.error) console.error('Send error:', data.error);
+    if (data.error) console.error('WA Send error:', data.error);
   } catch (e) {
-    console.error('sendMessage error:', e.message);
+    console.error('sendWAMessage error:', e.message);
   }
 }
 
@@ -551,10 +363,7 @@ async function sendMessage(recipientId, text) {
 
 async function getAIReply(userId, userMessage) {
   if (!convHistory[userId]) convHistory[userId] = [];
-
   convHistory[userId].push({ role: 'user', content: userMessage });
-
-  // Keep last 16 messages (8 turns)
   const history = convHistory[userId].slice(-16);
 
   try {
@@ -572,14 +381,11 @@ async function getAIReply(userId, userMessage) {
         messages: history
       })
     });
-
     const data = await res.json();
     if (data.error) { console.error('Claude error:', data.error); return null; }
-
     const reply = data.content[0].text;
     convHistory[userId].push({ role: 'assistant', content: reply });
     return reply;
-
   } catch (e) {
     console.error('AI error:', e.message);
     return null;
@@ -587,18 +393,17 @@ async function getAIReply(userId, userMessage) {
 }
 
 // ============================================================
-// RULE-BASED FLOW — FALLBACK (AI_MODE = false)
+// RULE-BASED FLOW — FALLBACK
 // ============================================================
 
-async function handleRuleBased(senderId, text) {
+async function handleRuleBased(senderId, text, sendFn) {
   const state = userState[senderId] || 'new';
   if (state === 'human_takeover') return;
 
-  // NEW
   if (state === 'new') {
     userState[senderId] = 'q1_duration';
-    await updateLead(senderId, '🟡 Warm', 'assessment_started', '');
-    await sendMessage(senderId,
+    await updateLead(senderId, '🟡 Warm', 'assessment_started', '', '', '', 'Facebook');
+    await sendFn(senderId,
 `Namaste ji! 🙏 Ayusomam Herbals mein swagat hai.
 
 Aapka sinus kitne time se hai?
@@ -612,19 +417,15 @@ Number ya text mein reply karein.`);
     return;
   }
 
-  // Q1
   if (state === 'q1_duration') {
     const num = extractFirstNumber(text);
     const detected = detectDuration(text);
     const ans = detected || (num === 1 ? 'short' : num === 2 ? 'medium' : num >= 3 ? 'long' : null);
-    if (!ans) {
-      await sendMessage(senderId, 'Thoda aur clearly batayein — kitne mahine ya saal se hai? 🙏');
-      return;
-    }
+    if (!ans) { await sendFn(senderId, 'Thoda aur clearly batayein — kitne mahine ya saal se hai? 🙏'); return; }
     if (!userProfile[senderId]) userProfile[senderId] = {};
     userProfile[senderId].duration = ans;
     userState[senderId] = 'q2_symptom';
-    await sendMessage(senderId,
+    await sendFn(senderId,
 `Samajh gaya. 🙏
 
 Main problem kya hai?
@@ -638,19 +439,15 @@ Number ya text mein reply karein.`);
     return;
   }
 
-  // Q2
   if (state === 'q2_symptom') {
     const num = extractFirstNumber(text);
     const detected = detectSymptom(text);
     const map = { 1: 'congestive', 2: 'allergic', 3: 'heat', 4: 'dependency' };
     const ans = detected || map[num] || null;
-    if (!ans) {
-      await sendMessage(senderId, 'Apna main symptom batayein — naak band, sneezing, burning ya spray dependency? 🙏');
-      return;
-    }
+    if (!ans) { await sendFn(senderId, 'Apna main symptom batayein — naak band, sneezing, burning ya spray dependency? 🙏'); return; }
     userProfile[senderId].symptom = ans;
     userState[senderId] = 'q3_tried';
-    await sendMessage(senderId,
+    await sendFn(senderId,
 `Theek hai. 🙏
 
 Pehle kuch try kiya?
@@ -664,17 +461,13 @@ Number ya text mein reply karein.`);
     return;
   }
 
-  // Q3
   if (state === 'q3_tried') {
     const num = extractFirstNumber(text);
-    if (!num || num < 1 || num > 4) {
-      await sendMessage(senderId, '1 se 4 ke beech number reply karein 🙏');
-      return;
-    }
+    if (!num || num < 1 || num > 4) { await sendFn(senderId, '1 se 4 ke beech number reply karein 🙏'); return; }
     const map = { 1: 'kuch nahi', 2: 'allopathy', 3: 'nasal spray', 4: 'sab try kiya' };
     userProfile[senderId].tried = map[num];
     userState[senderId] = 'q4_severity';
-    await sendMessage(senderId,
+    await sendFn(senderId,
 `Aur ek sawaal —
 
 Din mein kitna affect karta hai?
@@ -687,40 +480,32 @@ Number reply karein.`);
     return;
   }
 
-  // Q4
   if (state === 'q4_severity') {
     const num = extractFirstNumber(text);
-    if (!num || num < 1 || num > 3) {
-      await sendMessage(senderId, '1, 2 ya 3 reply karein 🙏');
-      return;
-    }
+    if (!num || num < 1 || num > 3) { await sendFn(senderId, '1, 2 ya 3 reply karein 🙏'); return; }
     const sevMap = { 1: 'mild', 2: 'moderate', 3: 'severe' };
     userProfile[senderId].severity = sevMap[num];
     const type = userProfile[senderId].symptom;
-    await updateLead(senderId, '🔴 Hot', 'assessment_complete', type);
+    await updateLead(senderId, '🔴 Hot', 'assessment_complete', type, '', '', 'Facebook');
     userState[senderId] = 'pitched';
 
     const pitches = {
-      allergic: `📋 Aapka Sinus Type: ALLERGIC SINUS 🌿\n\nAapki naak ki lining oversensitive ho gayi hai — isliye dust, mausam, pollution se trigger hota hai. Dawaiyan sirf reaction rokti hain — root cause waise ka waisa rehta hai.\n\n14 din ka Ayurvedic protocol naak ki lining ko andar se soothe karta hai — triggers pe reaction dhire dhire kam hone lagta hai.\n\nBahut logon ko clearly fark mehsoos hota hai — honestly kehta hun, guaranteed result nahi deta. Jo seriously karte hain unhe acha response milta hai. 🙏\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
-
-      congestive: `📋 Aapka Sinus Type: CONGESTIVE SINUS 🔴\n\nBalgam andar stuck hai — drain nahi ho raha. Isliye chehra bhaari aur subah naak band hoti hai.\n\n14 din ka Ayurvedic protocol balgam ko drain karne mein aur naak ki congestion kam karne mein madad karta hai.\n\nBahut logon ko clearly fark mehsoos hota hai — honestly kehta hun, guaranteed result nahi deta. Jo seriously karte hain unhe acha response milta hai. 🙏\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
-
-      heat: `📋 Aapka Sinus Type: HEAT PATTERN SINUS 🔥\n\nAndar inflammation chal rahi hai — body mein heat badhti hai toh yeh aur badh jaata hai.\n\n14 din ka Ayurvedic cooling protocol andar ki sujan aur jalan ko address karta hai — balgam thin hota hai aur drain hota hai.\n\nBahut logon ko clearly fark mehsoos hota hai — honestly kehta hun, guaranteed result nahi deta. Jo seriously karte hain unhe acha response milta hai. 🙏\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
-
-      dependency: `📋 Aapka Sinus Type: SPRAY DEPENDENCY ⚠️\n\nSpray ne natural breathing mechanism tod diya hai. Jitna zyada spray — utna zyada dependency.\n\n14 din ka Ayurvedic protocol naak ki apni natural breathing capacity ko slowly restore karne mein madad karta hai.\n\nBahut logon ko clearly fark mehsoos hota hai — honestly kehta hun, guaranteed result nahi deta. Jo seriously karte hain unhe acha response milta hai. 🙏\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`
+      allergic:   `📋 Aapka Sinus Type: ALLERGIC SINUS 🌿\n\nAapki naak ki lining oversensitive ho gayi hai — isliye dust, mausam, pollution se trigger hota hai. Dawaiyan sirf reaction rokti hain — root cause waise ka waisa rehta hai.\n\n14 din ka Ayurvedic protocol naak ki lining ko andar se soothe karta hai.\n\nKaafi logon ko fark mehsoos hota hai — honestly kehta hun, guaranteed result nahi deta. 🙏\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
+      congestive: `📋 Aapka Sinus Type: CONGESTIVE SINUS 🔴\n\nBalgam andar stuck hai — drain nahi ho raha. Isliye chehra bhaari aur subah naak band hoti hai.\n\n14 din ka Ayurvedic protocol balgam ko drain karne mein madad karta hai.\n\nKaafi logon ko fark mehsoos hota hai — honestly kehta hun, guaranteed result nahi deta. 🙏\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
+      heat:       `📋 Aapka Sinus Type: HEAT PATTERN SINUS 🔥\n\nAndar inflammation chal rahi hai — body mein heat badhti hai toh aur badh jaata hai.\n\n14 din ka Ayurvedic cooling protocol andar ki sujan ko address karta hai.\n\nKaafi logon ko fark mehsoos hota hai — honestly kehta hun, guaranteed result nahi deta. 🙏\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
+      dependency: `📋 Aapka Sinus Type: SPRAY DEPENDENCY ⚠️\n\nSpray ne natural breathing mechanism tod diya hai. Jitna zyada spray — utna zyada dependency.\n\n14 din ka Ayurvedic protocol naak ki natural breathing capacity ko slowly restore karne mein madad karta hai.\n\nKaafi logon ko fark mehsoos hota hai — honestly kehta hun, guaranteed result nahi deta. 🙏\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`
     };
 
-    await sendMessage(senderId, pitches[type] || pitches['congestive']);
+    await sendFn(senderId, pitches[type] || pitches['congestive']);
     return;
   }
 
-  // PITCHED
   if (state === 'pitched') {
     const t = text.toLowerCase().trim();
     if (['yes','ha','haan','okay','ok','hnji','ji','haan ji','bilkul'].includes(t)) {
       userState[senderId] = 'payment_sent';
-      await updateLead(senderId, '🔴 Hot', 'payment_link_sent', userProfile[senderId]?.symptom);
-      await sendMessage(senderId,
+      await updateLead(senderId, '🔴 Hot', 'payment_link_sent', userProfile[senderId]?.symptom, '', '', 'Facebook');
+      await sendFn(senderId,
 `Bahut achha! 🙏
 
 💳 ${PAYMENT_LINK}
@@ -741,121 +526,79 @@ Ayusomam Herbals 🌿`);
     }
     if (t === 'more') {
       userState[senderId] = 'human_takeover';
-      await updateLead(senderId, '🔴 Hot', 'requested_specialist', userProfile[senderId]?.symptom);
-      await sendMessage(senderId,
-`Bilkul! 🙏
-
-Sachin ji aapke saath personally baat karenge.
-Thoda wait karein — ya seedha WhatsApp karein:
-📱 ${WHATSAPP_NUM}
-
-Ayusomam Herbals 🌿`);
+      await updateLead(senderId, '🔴 Hot', 'requested_specialist', userProfile[senderId]?.symptom, '', '', 'Facebook');
+      await sendFn(senderId, `Bilkul! 🙏\n\nSachin ji aapke saath personally baat karenge.\nThoda wait karein — ya seedha WhatsApp karein:\n📱 ${WHATSAPP_NUM}\n\nAyusomam Herbals 🌿`);
       return;
     }
-    await sendMessage(senderId,
-`Koi bhi sawaal ho — hum yahan hain. 🙏
-
-Shuru karne ke liye: YES
-Specialist se baat ke liye: MORE
-
-🌐 ${WEBSITE}`);
+    await sendFn(senderId, `Koi bhi sawaal ho — hum yahan hain. 🙏\n\nShuru karne ke liye: YES\nSpecialist se baat ke liye: MORE\n\n🌐 ${WEBSITE}`);
     return;
   }
 
-  // PAYMENT SENT / DONE
   if (state === 'payment_sent' || state === 'done') {
-    await sendMessage(senderId,
-`Kisi bhi madad ke liye:
-📱 ${WHATSAPP_NUM}
-
-Ayusomam Herbals 🌿`);
+    await sendFn(senderId, `Kisi bhi madad ke liye:\n📱 ${WHATSAPP_NUM}\n\nAyusomam Herbals 🌿`);
     return;
   }
 }
 
 // ============================================================
-// MAIN PROCESSOR
+// MAIN PROCESSOR — FACEBOOK + WHATSAPP
 // ============================================================
 
-async function processMessage(senderId, text) {
+async function processMessage(senderId, text, sendFn, platform) {
   if (userState[senderId] === 'human_takeover') {
     console.log(`SILENT — human takeover: ${senderId}`);
     return;
   }
 
   if (AI_MODE) {
-    console.log(`[AI] ${senderId}: ${text}`);
+    console.log(`[AI][${platform}] ${senderId}: ${text}`);
 
-    // Init user profile if not exists
     if (!userProfile[senderId]) userProfile[senderId] = { firstMessage: text };
+    if (!userProfile[senderId].firstMessage) userProfile[senderId].firstMessage = text;
 
-    // Save first message
-    if (!userProfile[senderId].firstMessage) {
-      userProfile[senderId].firstMessage = text;
-    }
-
-    // Auto detect symptom from message and save
     const detectedSymptom = detectSymptom(text);
-    if (detectedSymptom && !userProfile[senderId].symptom) {
-      userProfile[senderId].symptom = detectedSymptom;
-    }
+    if (detectedSymptom && !userProfile[senderId].symptom) userProfile[senderId].symptom = detectedSymptom;
 
-    // Auto detect duration
     const detectedDuration = detectDuration(text);
-    if (detectedDuration && !userProfile[senderId].duration) {
-      userProfile[senderId].duration = detectedDuration;
-    }
+    if (detectedDuration && !userProfile[senderId].duration) userProfile[senderId].duration = detectedDuration;
 
-    // Temperature logic — smarter detection
     const t = text.toLowerCase();
-    let leadTemp = '🔵 Cold'; // default
-
+    let leadTemp = '🟡 Warm';
     const isHot = t.match(/payment|pay|1299|shuru karte|shuru karna|shuru kar|le lena|lena hai|kaise karu|buy|purchase|interested|haan shuru|bilkul shuru|yes shuru|abhi shuru|karte hai|karna hai|ready|confirm|ok shuru|chalu karo|start|procedure|treat karte|treat krte|kaise treat|kab tak|kitne din|theek ho|sahi ho|guarantee|pakka|zaroor|zarur|bilkul|haan ji|ha ji|ok ji|okay/);
-    const isWarm = t.match(/kitna|price|cost|details|batao|kya hoga|kaise|guarantee|sochna|more info|janna chahta/);
+    if (isHot) leadTemp = '🔴 Hot';
 
-    if (isHot)       leadTemp = '🔴 Hot';
-    else if (isWarm) leadTemp = '🟡 Warm';
-    else             leadTemp = '🟡 Warm'; // AI conversation = at least warm
-
-    // Save temperature in profile — only upgrade never downgrade
     const tempOrder = { '🔵 Cold': 0, '🟡 Warm': 1, '🔴 Hot': 2 };
     const currentTemp = userProfile[senderId].temperature || '🔵 Cold';
-    if ((tempOrder[leadTemp] || 0) > (tempOrder[currentTemp] || 0)) {
-      userProfile[senderId].temperature = leadTemp;
-    }
+    if ((tempOrder[leadTemp] || 0) > (tempOrder[currentTemp] || 0)) userProfile[senderId].temperature = leadTemp;
     const finalTemp = userProfile[senderId].temperature || leadTemp;
 
     const reply = await getAIReply(senderId, text);
     if (reply) {
-      await sendMessage(senderId, reply);
+      await sendFn(senderId, reply);
       await updateLead(
-        senderId,
-        finalTemp,
-        'ai_conversation',
+        senderId, finalTemp, 'ai_conversation',
         userProfile[senderId].symptom || '',
-        userProfile[senderId].name   || '',
-        userProfile[senderId].firstMessage || text
+        userProfile[senderId].name    || '',
+        userProfile[senderId].firstMessage || text,
+        platform
       );
     } else {
       console.log('AI failed — fallback rule based');
-      await handleRuleBased(senderId, text);
+      await handleRuleBased(senderId, text, sendFn);
     }
   } else {
-    console.log(`[RULE] ${senderId}: ${text}`);
-    await handleRuleBased(senderId, text);
+    console.log(`[RULE][${platform}] ${senderId}: ${text}`);
+    await handleRuleBased(senderId, text, sendFn);
   }
 }
 
 // ============================================================
-// WEBHOOK
+// FACEBOOK WEBHOOK
 // ============================================================
 
 app.get('/webhook', (req, res) => {
   const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'ayusomam_verify';
-  if (
-    req.query['hub.mode'] === 'subscribe' &&
-    req.query['hub.verify_token'] === VERIFY_TOKEN
-  ) {
+  if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === VERIFY_TOKEN) {
     res.status(200).send(req.query['hub.challenge']);
   } else {
     res.sendStatus(403);
@@ -864,12 +607,11 @@ app.get('/webhook', (req, res) => {
 
 app.post('/webhook', async (req, res) => {
   const body = req.body;
-
   if (body.object === 'page') {
     for (const entry of body.entry) {
       for (const msg of entry.messaging) {
 
-        // Page sending — human takeover
+        // Human takeover logic
         if (msg.sender.id === PAGE_ID) {
           const recipientId = msg.recipient?.id;
           if (recipientId && recipientId !== PAGE_ID) {
@@ -891,13 +633,77 @@ app.post('/webhook', async (req, res) => {
         const text = msg.message?.text?.trim();
         if (!senderId || !text) continue;
 
-        console.log(`MSG ${senderId}: ${text}`);
-        await processMessage(senderId, text);
+        console.log(`FB MSG ${senderId}: ${text}`);
+        await processMessage(senderId, text, sendMessage, 'Facebook');
       }
     }
   }
-
   res.status(200).send('EVENT_RECEIVED');
+});
+
+// ============================================================
+// WHATSAPP WEBHOOK
+// ============================================================
+
+app.get('/whatsapp', (req, res) => {
+  const mode      = req.query['hub.mode'];
+  const token     = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  console.log(`WA verify: mode=${mode} token=${token}`);
+  if (mode === 'subscribe' && token === WA_VERIFY_TOKEN) {
+    console.log('WA webhook verified ✅');
+    res.status(200).send(challenge);
+  } else {
+    res.sendStatus(403);
+  }
+});
+
+app.post('/whatsapp', async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const body = req.body;
+    if (body.object !== 'whatsapp_business_account') return;
+
+    for (const entry of body.entry || []) {
+      for (const change of entry.changes || []) {
+        const value = change.value;
+        if (!value.messages) continue;
+
+        for (const msg of value.messages) {
+          if (msg.type !== 'text') continue;
+
+          const from    = msg.from;
+          const text    = msg.text?.body?.trim();
+          if (!from || !text) continue;
+
+          console.log(`WA MSG ${from}: ${text}`);
+          await processMessage(from, text, sendWAMessage, 'WhatsApp');
+        }
+      }
+    }
+  } catch (e) {
+    console.error('WA webhook error:', e.message);
+  }
+});
+
+// ============================================================
+// BOT CONTROL — Human Takeover API
+// ============================================================
+
+app.post('/bot-control', (req, res) => {
+  const { userId, action } = req.body;
+  if (!userId || !action) return res.status(400).json({ error: 'userId and action required' });
+
+  if (action === 'BOT_OFF') {
+    userState[userId] = 'human_takeover';
+    res.json({ success: true, message: `Bot OFF for ${userId}` });
+  } else if (action === 'BOT_ON') {
+    delete userState[userId];
+    convHistory[userId] = [];
+    res.json({ success: true, message: `Bot ON for ${userId}` });
+  } else {
+    res.status(400).json({ error: 'action must be BOT_ON or BOT_OFF' });
+  }
 });
 
 // ============================================================
@@ -911,7 +717,8 @@ app.listen(PORT, () => {
 Ayusomam Herbals Bot — Running
 Port    : ${PORT}
 AI Mode : ${AI_MODE ? '✅ ON — AI Agent v5.0' : '❌ OFF — Rule Based'}
-Rollback: Set AI_MODE = false
+Facebook: /webhook
+WhatsApp: /whatsapp
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   `);
 });
