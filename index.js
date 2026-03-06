@@ -72,10 +72,14 @@ SIMPLE REPLACEMENTS (sirf zarurat pe):
 "Heat Pattern Sinus" → "Garmi wali naak"
 "Spray Dependency" → "Spray ki aadat"
 "Inflammation" → "Andar sujan"
-"Mucus" → "Kichad / balgam"
+"Mucus" → "balgam/cough"
 "Protocol" → "Ilaaj ka tarika"
 "Chronic" → "Purani"
 "Symptoms" → "Takleef"
+
+IMPORTANT — WORD BAN:
+"kichad" / "keechad" — KABHI MAT BOLO
+Sirf "balgam" ya "cough" use karo
 
 EXAMPLES:
 User: "my nose is blocked" (English)
@@ -294,19 +298,19 @@ isliye baar baar hota hai"
 PRAKAR 2 — JAM WALI NAAK
 Pehchaan: Naak band, chehra bhaari, subah zyada,
 sar mein dard
-Asli wajah: Naak ka kichad andar jam gaya hai —
+Asli wajah: Balgam/cough andar stuck hai —
 bahar nahi nikal raha
-Premium line: "Kichad andar atka hua hai —
+Premium line: "Balgam andar atka hua hai —
 tab tak chehra bhaari lagega —
 jab tak isko bahar nahi nikalte"
 
 PRAKAR 3 — GARMI WALI NAAK
-Pehchaan: Andar jalan, gaadha peela/hara kichad,
+Pehchaan: Andar jalan, gaadha peela/hara balgam,
 mathe pe dard
 Asli wajah: Andar sujan — body mein garmi badh gayi
-Premium line: "Andar aag lagi hui hai —
+Premium line: "Andar sujan chal rahi hai —
 jab tak thanda nahi karoge —
-kichad aur dard waise hi rahega"
+balgam aur dard waise hi rahega"
 
 PRAKAR 4 — SPRAY KI AADAT WALI NAAK
 Pehchaan: Spray ke bina so nahi sakte,
@@ -332,12 +336,13 @@ Aapko [PRAKAR — simple bhasha mein] hai —
 
 [Kyun pehle kuch kaam nahi kiya — 1 line]
 
-14 din mein:
-Pehle 3 din: [kya hoga — simple]
-Agli hafta: [kya hoga — simple]
-Aakhri hafta: [kya hoga — simple]
+14 din ka protocol aapki specific takleef ke
+hisaab se banaya jaata hai —
+roz subah sirf ghar ki cheezein.
 
-[Ek asli client ka result — jo similar tha]
+Kaafi logon ko fark mehsoos hota hai —
+par sach bolun — guarantee koi nahi deta.
+Koshish seedha aur honestly karte hain. 🙏
 
 Shuru karein? 🙏"
 
@@ -349,9 +354,13 @@ Rahul ji:
 Naak band rehti thi — sunaai aur sungne mein dikkat thi
 10 din mein naak kaafi khul gayi — breathing bahut better ✅
 
-Shikha ji:
-5 saal se nasal spray ke bina so nahi sakti thi
-14 din baad spray ki zaroorat hi nahi rahi ✅
+NOTE — RESULTS KE BAARE MEIN HONEST RAHO:
+Jab koi results pooche — yeh bolna:
+"Bahut logon ko fark mehsoos hota hai —
+par har insaan alag hai, sach mein guarantee nahi deta.
+Jo log seriously karte hain unhe achha response milta hai."
+KABHI MAT BOLNA: "X din mein zaroor hoga" / "permanent fark"
+KABHI MAT BOLNA: Specific timeline promise
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 AAPATTIYON KA JAWAB
@@ -692,13 +701,13 @@ Number reply karein.`);
     userState[senderId] = 'pitched';
 
     const pitches = {
-      allergic: `📋 Aapka Sinus Type: ALLERGIC SINUS 🌿\n\nAapki naak ki lining oversensitive ho gayi hai — isliye dust, mausam, pollution se trigger hota hai. Dawaiyan sirf reaction rokti hain — root cause waise ka waisa rehta hai.\n\n14 din mein:\n📅 Din 1-3: Lining soothing — sneezing kam hogi\n📅 Din 4-7: Immune response normalize hoga\n📅 Din 8-14: Triggers pe reaction kam hoga\n\n⭐ Rahul ji — naak band thi, sunaai mushkil — 10 din mein breathing kaafi better ho gayi ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
+      allergic: `📋 Aapka Sinus Type: ALLERGIC SINUS 🌿\n\nAapki naak ki lining oversensitive ho gayi hai — isliye dust, mausam, pollution se trigger hota hai. Dawaiyan sirf reaction rokti hain — root cause waise ka waisa rehta hai.\n\n14 din ka Ayurvedic protocol naak ki lining ko andar se soothe karta hai — triggers pe reaction dhire dhire kam hone lagta hai.\n\nBahut logon ko clearly fark mehsoos hota hai — honestly kehta hun, guaranteed result nahi deta. Jo seriously karte hain unhe acha response milta hai. 🙏\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
 
-      congestive: `📋 Aapka Sinus Type: CONGESTIVE SINUS 🔴\n\nMucus andar stuck hai — drain nahi ho raha. Isliye chehra bhaari aur subah naak band hoti hai.\n\n14 din mein:\n📅 Din 1-3: Pressure release — heaviness kam\n📅 Din 4-7: Drainage improve hogi\n📅 Din 8-14: Subah uthte hi naak khuli milegi\n\n⭐ Shikha ji — 5 saal spray dependent — 14 din baad spray ki zaroorat nahi rahi ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
+      congestive: `📋 Aapka Sinus Type: CONGESTIVE SINUS 🔴\n\nBalgam andar stuck hai — drain nahi ho raha. Isliye chehra bhaari aur subah naak band hoti hai.\n\n14 din ka Ayurvedic protocol balgam ko drain karne mein aur naak ki congestion kam karne mein madad karta hai.\n\nBahut logon ko clearly fark mehsoos hota hai — honestly kehta hun, guaranteed result nahi deta. Jo seriously karte hain unhe acha response milta hai. 🙏\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
 
-      heat: `📋 Aapka Sinus Type: HEAT PATTERN SINUS 🔥\n\nAndar inflammation chal rahi hai — body mein heat badhti hai toh yeh aur badh jaata hai.\n\n14 din mein:\n📅 Din 1-3: Cooling protocol — burning kam hogi\n📅 Din 4-7: Mucus thin hoga — drain hoga\n📅 Din 8-14: Headache frequency reduce hogi\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
+      heat: `📋 Aapka Sinus Type: HEAT PATTERN SINUS 🔥\n\nAndar inflammation chal rahi hai — body mein heat badhti hai toh yeh aur badh jaata hai.\n\n14 din ka Ayurvedic cooling protocol andar ki sujan aur jalan ko address karta hai — balgam thin hota hai aur drain hota hai.\n\nBahut logon ko clearly fark mehsoos hota hai — honestly kehta hun, guaranteed result nahi deta. Jo seriously karte hain unhe acha response milta hai. 🙏\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
 
-      dependency: `📋 Aapka Sinus Type: SPRAY DEPENDENCY ⚠️\n\nSpray ne natural breathing mechanism tod diya hai. Jitna zyada spray — utna zyada dependency.\n\n14 din mein:\n📅 Din 1-3: Natural breathing restore shuru\n📅 Din 4-7: Spray dependency gradually kam\n📅 Din 8-14: Bina spray breathe karna possible\n\n⭐ Shikha ji — 5 saal nasal spray — 14 din baad spray ki zaroorat nahi rahi ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`
+      dependency: `📋 Aapka Sinus Type: SPRAY DEPENDENCY ⚠️\n\nSpray ne natural breathing mechanism tod diya hai. Jitna zyada spray — utna zyada dependency.\n\n14 din ka Ayurvedic protocol naak ki apni natural breathing capacity ko slowly restore karne mein madad karta hai.\n\nBahut logon ko clearly fark mehsoos hota hai — honestly kehta hun, guaranteed result nahi deta. Jo seriously karte hain unhe acha response milta hai. 🙏\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`
     };
 
     await sendMessage(senderId, pitches[type] || pitches['congestive']);
