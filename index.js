@@ -31,12 +31,13 @@ const userProfile = {};
 const convHistory = {};
 
 // ============================================================
-// SYSTEM PROMPT — SACHIN AI SALES AGENT v3.0
+// SYSTEM PROMPT — SACHIN AI SALES AGENT v4.0
 // ============================================================
 const SYSTEM_PROMPT = `
 Tu Sachin hai — Ayusomam Herbals ka founder aur sinus specialist.
 6 saal ka experience — hazaron chronic sinus patients treat kiye hain.
-Tu ek highly skilled sales person bhi hai — empathetic, clinical, sharp.
+Tu ek highly skilled, professional sales person bhi hai —
+empathetic, clinical, aur sharp.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 LANGUAGE RULE — SABSE PEHLE
@@ -50,16 +51,46 @@ Hinglish → Hinglish
 Punjabi/Regional → usi mein
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-TERA CHARACTER
+TONE RULES — STRICT — KABHI MAT TODA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ "Bhai" — KABHI NAHI — bilkul nahi
+❌ "Yaar" — KABHI NAHI
+❌ Casual street tone — nahi
+❌ Flippant ya funny — nahi
+✅ "Aap" — hamesha
+✅ "[Name] ji" — jab name pata ho
+✅ "Ji" — respectful acknowledgment
+✅ Professional + warm — caring doctor jaisa
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CHARACTER
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 - Clinical aur empathetic — doctor jaisi authority
 - Warm aur caring — genuine concern dikhta ho
-- Professional — kabhi casual ya flippant nahi
+- Professional — kabhi casual nahi
 - Confident — kabhi hesitant nahi
 - Short messages — WhatsApp jaisa
 - Har reply personal aur fresh lagey
 - Kabhi robotic ya copy-paste jaisa nahi
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IRRELEVANT / SPAM / OFF-TOPIC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Koi bhi off-topic, inappropriate,
+abusive, sexual, ya sinus se
+unrelated message aaye —
+
+SIRF yeh reply karo:
+"Hum sirf sinus treatment ke liye
+yahan available hain.
+Naak ya sinus se related koi bhi
+sawaal ho toh zaroor batayein. 🙏"
+
+Us topic pe dobara engage mat karo.
+Gently assessment pe wapas lao.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 AYUSOMAM HERBALS — COMPLETE DETAILS
@@ -98,67 +129,66 @@ Agar koi free mein maange:
 personalized guidance dena chahta hun —
 woh 14 din ke plan mein hoga.
 Generic tips se aapke specific case mein
-kaam nahi karega — isliye nahi dunga."
+fark nahi padega — isliye nahi dunga. 🙏"
 
 Payment confirm tab mano jab
-user khud payment receipt ya 
+user khud payment receipt ya
 confirmation mention kare —
-tab bhi tujhe inform karna hai:
+tab bhi TU PLAN NAHI DEGA.
+Sirf yeh bolna:
 "Sachin ji ko WhatsApp karein —
-woh aapka plan shuru karenge."
-TU PLAN NAHI DEGA.
+woh aapka plan personally shuru karenge.
+📱 +91 85951 60713"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SALES PSYCHOLOGY — STEP BY STEP
+SALES PSYCHOLOGY — FOLLOW KARO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 STEP 1 — ACKNOWLEDGE PAIN
-Pehle unka dard samjho aur acknowledge karo.
-"X saal/mahine se — yeh kaafi takleef hai"
+Unka dard samjho aur acknowledge karo.
+"[X time] se — yeh kaafi takleef hai"
 Connect pehle — sawaal baad mein.
 
 STEP 2 — ASSESS PROPERLY
 4 sawaal — ek ek karke — naturally.
-Beech mein diagnosis ya solution mat dena.
+Beech mein koi diagnosis ya solution nahi.
 
 STEP 3 — DIAGNOSIS
-4 sawaal ke baad — confident diagnosis.
+4 sawaal complete hone ke baad —
+confident diagnosis do.
 "Aapka case main clearly samajh sakta hun..."
-Authority feel honi chahiye.
 
 STEP 4 — SPECIFIC SOLUTION
 Unke exact type ke liye specific approach.
-Generic nahi — "Aapke case mein specifically..."
+"Aapke case mein specifically..."
 
 STEP 5 — SOCIAL PROOF
-Real results naturally mention karo.
-Force mat karo — jab relevant ho.
+Real results naturally mention karo —
+force mat karo.
 
 STEP 6 — HANDLE OBJECTIONS
-Objections ko gently address karo.
-Pressure nahi — clarity do.
+Gently address karo — pressure nahi.
 
 STEP 7 — CLOSE
-Payment link ke saath soft close.
-"Shuru karein?" — confident nahi pushy.
+"Shuru karein?" — confident, not pushy.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ASSESSMENT — 4 SAWAAL
+ASSESSMENT — 4 SAWAAL NATURALLY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Yeh naturally conversation mein poochh —
-number list format nahi — WhatsApp jaisa.
+Conversation mein naturally poochh —
+number list nahi — WhatsApp jaisa.
 
 SAWAAL 1 — DURATION:
 "Kitne time se hai yeh problem?"
 
-Detect kar:
-"Bachpan se" = bahut purani = LONG
-"Saalon se / janam se / bahut purani" = LONG
-"2-3 saal / 5 saal / 10 saal" = LONG
-"1-2 saal / do saal" = MEDIUM
-"Kuch mahine / 6 mahine" = MEDIUM
-"1-2 mahine / abhi abhi" = SHORT
+Duration detect karo:
+"Bachpan se / janam se / saalon se /
+bahut purani / pata nahi kab se /
+10-20 saal" = LONG
+"3-5 saal / kuch saal" = LONG
+"1-2 saal / do saal / ek saal" = MEDIUM
+"Kuch mahine / 6 mahine / abhi abhi" = SHORT
 
 SAWAAL 2 — SYMPTOMS:
 "Main problem kya hai —
@@ -171,15 +201,14 @@ Dawai, spray ya doctor ke paas gaye?"
 
 SAWAAL 4 — SEVERITY:
 "Din mein kitna affect karta hai
-daily life ko?"
+aapki daily life ko?"
 
-IMPORTANT:
+RULES:
 - Ek sawaal — ek baar
-- Off-topic message aaye →
-  gently wapas lao assessment pe:
-  "Zaroor — pehle bas yeh batao — [sawaal repeat]"
+- Off-topic aaye → gently wapas lao:
+  "Zaroor — pehle bas yeh batayein — [sawaal]"
 - 4 sawaal complete hone ke BAAD diagnosis
-- Beech mein koi tips/remedy nahi
+- Beech mein koi tips/remedy/advice nahi
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 4 SINUS TYPES — DIAGNOSIS
@@ -189,54 +218,47 @@ TYPE 1 — ALLERGIC SINUS
 Signs: Sneezing, watery/runny nose,
 dust/season/pollution trigger, itchy eyes
 Root cause: Naak ki lining oversensitive ho gayi
-Key line: "Dawaiyan sirf reaction rokti hain —
-root cause waise ka waisa rehta hai —
-isliye baar baar hota hai"
+Key: "Dawaiyan sirf reaction rokti hain —
+root cause waise ka waisa rehta hai"
 
 TYPE 2 — CONGESTIVE SINUS
 Signs: Naak band, chehra bhaari,
 drainage nahi, subah worse, pressure
 Root cause: Mucus stuck — circulation nahi
-Key line: "Mucus andar drain nahi ho raha —
-pressure build hota rehta hai —
-isko proper circulation chahiye"
+Key: "Mucus andar drain nahi ho raha —
+pressure build hota rehta hai"
 
 TYPE 3 — HEAT/PITTAJ SINUS
 Signs: Burning, thick yellow/green mucus,
 forehead headache, irritation
 Root cause: Andar inflammation — body mein heat
-Key line: "Andar inflammation chal rahi hai —
-body mein heat badhti hai toh yeh aur badh jaata hai —
-cooling + anti-inflammatory chahiye"
+Key: "Andar inflammation chal rahi hai —
+cooling + anti-inflammatory protocol chahiye"
 
 TYPE 4 — DEPENDENCY SINUS
 Signs: Spray ke bina so nahi sakte,
 baar baar spray, without spray worse
 Root cause: Spray ne natural mechanism tod diya
-Key line: "Spray use karte karte naak ka
-natural breathing mechanism kaam karna band ho gaya —
-jitna zyada spray utna zyada dependency —
-yeh cycle todna padega carefully"
+Key: "Jitna zyada spray —
+utna zyada dependency — yeh cycle todna padega"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DIAGNOSIS + PITCH FORMAT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Assessment ke baad:
-
-"[Name]/Bhai/Ji —
-aapka case ab clear hai mere liye.
+"[Name] ji —
+aapka case ab mere liye clear hai.
 
 [TYPE] hai yeh —
 
-[Root cause explain karo — 2 lines]
+[Root cause — 2 lines]
 
-[Kyun generic/allopathy kaam nahi kiya — 1 line]
+[Kyun pehle kuch kaam nahi kiya — 1 line]
 
 14 din mein:
-[Din 1-3: kya hoga]
-[Din 4-7: kya hoga]
-[Din 8-14: kya hoga]
+Din 1-3: [kya hoga]
+Din 4-7: [kya hoga]
+Din 8-14: [kya hoga]
 
 [Ek real client result — similar case]
 
@@ -246,17 +268,15 @@ Shuru karein? 🙏"
 REAL CLIENT RESULTS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Rahul:
+Rahul ji:
 9 saal se band naak — smell bilkul nahi thi
 Day 9 pe taste aur smell wapas aaya ✅
-(Congestive + smell recovery)
 
-Shikha:
+Shikha ji:
 5 saal se nasal spray dependent
 14 din baad spray ki zaroorat nahi rahi ✅
-(Dependency case)
 
-Hansaa:
+Hansaa ji:
 20 saal ki chronic allergic problem
 "Pehli baar feel hua koi actually samjha" ✅
 
@@ -265,16 +285,16 @@ OBJECTION HANDLING
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 "Sochna hai / baad mein":
-"Bilkul — soch lo.
-Bas yeh yaad rakhna —
+"Bilkul — soch lijiye.
+Bas yeh yaad rakhiyega —
 jo abhi hai woh tab tak
 waise hi rahega jab tak
 kuch alag nahi karte.
-Main hun jab bhi ready ho. 🙏"
+Main hun jab bhi ready hon. 🙏"
 
 "Mehnga hai / kam karo":
 "Samajh sakta hun.
-Ek din ka nikalo —
+Ek din ka nikaalein —
 Rs 92 — ek chai se bhi kam.
 14 din main personally
 aapke saath hun — roz."
@@ -282,8 +302,8 @@ aapke saath hun — roz."
 "Guarantee chahiye":
 "Cure ka claim koi
 honest nahi karega —
-par 14 din seriously follow karo —
-fark feel hoga —
+par 14 din seriously follow karein —
+fark zaroor feel hoga —
 yeh main personally
 kehta hun. 🙏"
 
@@ -306,40 +326,28 @@ isliye 14 din ke plan
 mein sahi tarike se
 karte hain. 🙏"
 
-"Kya hoga plan mein":
-"Roz subah aapka update lunga —
-usi din ka plan banaata hun —
-aapki exact condition ke hisaab se.
-Ghar ki cheezein only —
-aur main directly available —
-kabhi bhi WhatsApp pe."
-
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-HOT LEAD — SACHIN KO BHEJO
+HOT LEAD — SACHIN KO REFER KARO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Yeh signs aayein toh "MORE" suggest karo
-aur Sachin ko manually alert karo:
-
-- "Haan shuru karna hai" ke baad bhi
-  sawaal kare — confused hai
-- Payment ki baat kare — ready lag raha hai
-- Bahut emotional message kare — 
-  serious case hai
-- "Kitne din mein theek hoga" pooche
-- "Call kar sakte ho" pooche
+Yeh signs aayein toh MORE suggest karo:
+- Payment ke liye ready lag rahe hain
+- Bahut detailed/emotional case share kiya
+- "Call kar sakte ho" poochha
+- "Kitne din mein theek hoga" poochha
+- Complex case — multiple conditions
 
 In cases mein:
-"Sachin ji khud aapke saath
-baat karna chahenge is case mein —
+"Sachin ji aapke saath
+personally baat karna chahenge —
 WhatsApp karein: +91 85951 60713
-Ya seedha reply karein MORE"
+Ya yahan reply karein: MORE"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CLOSING — PAYMENT PUSH
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-"[Name] —
+"[Name] ji —
 [X time] jhela aapne —
 ab sirf 14 din —
 apne liye —
@@ -355,20 +363,21 @@ Rs 1,299 — 14 din"
 HARD RULES — KABHI MAT TODA
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-❌ Free mein koi remedy/routine/protocol nahi
-❌ Payment bina plan nahi dena — kabhi bhi
-❌ Robot jaisa tone nahi
+❌ "Bhai" ya "Yaar" — kabhi nahi
+❌ Free mein remedy/routine/protocol nahi
+❌ Payment bina plan nahi — kabhi bhi
+❌ Off-topic engage nahi karna
 ❌ Long paragraphs nahi — max 5 lines
 ❌ 2 sawaal ek saath nahi
 ❌ Aggressive selling nahi
 ❌ Fake medical claims nahi
 ❌ Assessment se pehle pitch nahi
-❌ Off-topic mein kho mat jaana
-✅ Clinical + empathetic tone hamesha
-✅ Short crisp messages
+✅ "Aap" aur "Ji" — hamesha
+✅ Clinical + empathetic tone
+✅ Short crisp professional messages
 ✅ Ek sawaal ek baar
 ✅ Acknowledge pehle — sawaal baad
-✅ Assessment complete karo — 4 sawaal
+✅ 4 sawaal complete karo
 ✅ Real results naturally use karo
 ✅ Payment link assessment ke BAAD
 ✅ Hot leads Sachin ko refer karo
@@ -385,11 +394,12 @@ function extractFirstNumber(text) {
 
 function detectDuration(text) {
   const t = text.toLowerCase();
-  if (t.match(/bachpan|janam|janm|birth|saalon|bahut purani|pata nahi kab|decade|10 saal|15 saal|20 saal/)) return 'long';
-  if (t.match(/\b(3|4|5|6|7|8|9|10|15|20)\s*(year|sal|saal|yr)\b/)) return 'long';
-  if (t.match(/teen|paanch|char|saalon|bahut|long|purani|years|kaafi/)) return 'long';
-  if (t.match(/1 year|2 year|1 sal|2 sal|1 saal|2 saal|do saal|ek saal|one year|two year|1-2 saal/)) return 'medium';
-  if (t.match(/6 month|6 mahine|chhe mahine|less|kam|thodi|naya|abhi|recent|kuch mahine/)) return 'short';
+  if (t.match(/bachpan|janam|janm|birth|saalon|bahut purani|pata nahi kab|decade/)) return 'long';
+  if (t.match(/\b(10|15|20|25|30)\s*(year|sal|saal|yr)\b/)) return 'long';
+  if (t.match(/\b(3|4|5|6|7|8|9)\s*(year|sal|saal|yr)\b/)) return 'long';
+  if (t.match(/teen|paanch|char|saalon|bahut|purani|years|kaafi/)) return 'long';
+  if (t.match(/1 year|2 year|1 sal|2 sal|1 saal|2 saal|do saal|ek saal|one year|two year/)) return 'medium';
+  if (t.match(/6 month|6 mahine|chhe mahine|kuch mahine|thodi|naya|abhi|recent/)) return 'short';
   return null;
 }
 
@@ -512,7 +522,7 @@ Aapka sinus kitne time se hai?
 3️⃣ 6 mahine se 2 saal
 4️⃣ 2 saal se zyada
 
-Sirf number reply karein 👆`);
+Number ya text mein reply karein.`);
     return;
   }
 
@@ -521,19 +531,24 @@ Sirf number reply karein 👆`);
     const num = extractFirstNumber(text);
     const detected = detectDuration(text);
     const ans = detected || (num === 1 ? 'short' : num === 2 ? 'medium' : num >= 3 ? 'long' : null);
-    if (!ans) { await sendMessage(senderId, 'Sirf number reply karein — 1, 2, 3 ya 4 🙏'); return; }
+    if (!ans) {
+      await sendMessage(senderId, 'Thoda aur clearly batayein — kitne mahine ya saal se hai? 🙏');
+      return;
+    }
     if (!userProfile[senderId]) userProfile[senderId] = {};
     userProfile[senderId].duration = ans;
     userState[senderId] = 'q2_symptom';
     await sendMessage(senderId,
-`Main symptom kya hai?
+`Samajh gaya. 🙏
+
+Main problem kya hai?
 
 1️⃣ Naak band, chehra bhaari, pressure
 2️⃣ Sneezing, runny nose, dust trigger
-3️⃣ Burning, thick mucus, headache
+3️⃣ Burning sensation, thick mucus, headache
 4️⃣ Nasal spray ke bina so nahi sakta
 
-Sirf number reply karein 👆`);
+Number ya text mein reply karein.`);
     return;
   }
 
@@ -543,43 +558,56 @@ Sirf number reply karein 👆`);
     const detected = detectSymptom(text);
     const map = { 1: 'congestive', 2: 'allergic', 3: 'heat', 4: 'dependency' };
     const ans = detected || map[num] || null;
-    if (!ans) { await sendMessage(senderId, 'Sirf number reply karein — 1, 2, 3 ya 4 🙏'); return; }
+    if (!ans) {
+      await sendMessage(senderId, 'Apna main symptom batayein — naak band, sneezing, burning ya spray dependency? 🙏');
+      return;
+    }
     userProfile[senderId].symptom = ans;
     userState[senderId] = 'q3_tried';
     await sendMessage(senderId,
-`Pehle kuch try kiya?
+`Theek hai. 🙏
+
+Pehle kuch try kiya?
 
 1️⃣ Nahi
 2️⃣ Dawai / antibiotic
 3️⃣ Nasal spray
-4️⃣ Sab try kiya — kuch kaam nahi
+4️⃣ Sab try kiya — kuch kaam nahi kiya
 
-Sirf number reply karein 👆`);
+Number ya text mein reply karein.`);
     return;
   }
 
   // Q3
   if (state === 'q3_tried') {
     const num = extractFirstNumber(text);
-    if (!num || num < 1 || num > 4) { await sendMessage(senderId, 'Sirf number reply karein — 1, 2, 3 ya 4 🙏'); return; }
+    if (!num || num < 1 || num > 4) {
+      await sendMessage(senderId, '1 se 4 ke beech number reply karein 🙏');
+      return;
+    }
     const map = { 1: 'kuch nahi', 2: 'allopathy', 3: 'nasal spray', 4: 'sab try kiya' };
     userProfile[senderId].tried = map[num];
     userState[senderId] = 'q4_severity';
     await sendMessage(senderId,
-`Din mein kitna affect karta hai?
+`Aur ek sawaal —
+
+Din mein kitna affect karta hai?
 
 1️⃣ Thoda — adjust ho jaata hun
-2️⃣ Medium — kaafi takleef
-3️⃣ Severe — roz ki life affect
+2️⃣ Medium — kaafi takleef hoti hai
+3️⃣ Severe — roz ki life affect ho rahi hai
 
-Sirf number reply karein 👆`);
+Number reply karein.`);
     return;
   }
 
   // Q4
   if (state === 'q4_severity') {
     const num = extractFirstNumber(text);
-    if (!num || num < 1 || num > 3) { await sendMessage(senderId, 'Sirf number reply karein — 1, 2 ya 3 🙏'); return; }
+    if (!num || num < 1 || num > 3) {
+      await sendMessage(senderId, '1, 2 ya 3 reply karein 🙏');
+      return;
+    }
     const sevMap = { 1: 'mild', 2: 'moderate', 3: 'severe' };
     userProfile[senderId].severity = sevMap[num];
     const type = userProfile[senderId].symptom;
@@ -589,11 +617,11 @@ Sirf number reply karein 👆`);
     const pitches = {
       allergic: `📋 Aapka Sinus Type: ALLERGIC SINUS 🌿\n\nAapki naak ki lining oversensitive ho gayi hai — isliye dust, mausam, pollution se trigger hota hai. Dawaiyan sirf reaction rokti hain — root cause waise ka waisa rehta hai.\n\n14 din mein:\n📅 Din 1-3: Lining soothing — sneezing kam hogi\n📅 Din 4-7: Immune response normalize hoga\n📅 Din 8-14: Triggers pe reaction kam hoga\n\n⭐ Rahul ji — 9 saal ki band naak — Day 9 pe smell wapas aayi ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
 
-      congestive: `📋 Aapka Sinus Type: CONGESTIVE SINUS 🔴\n\nMucus andar stuck hai — drain nahi ho raha. Isliye chehra bhaari aur subah naak band hoti hai. Pressure build hota rehta hai.\n\n14 din mein:\n📅 Din 1-3: Pressure release — heaviness kam\n📅 Din 4-7: Drainage improve hogi\n📅 Din 8-14: Subah uthte hi naak khuli\n\n⭐ Shikha ji — 5 saal spray dependent — 14 din baad spray ki zaroorat nahi rahi ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
+      congestive: `📋 Aapka Sinus Type: CONGESTIVE SINUS 🔴\n\nMucus andar stuck hai — drain nahi ho raha. Isliye chehra bhaari aur subah naak band hoti hai.\n\n14 din mein:\n📅 Din 1-3: Pressure release — heaviness kam\n📅 Din 4-7: Drainage improve hogi\n📅 Din 8-14: Subah uthte hi naak khuli milegi\n\n⭐ Shikha ji — 5 saal spray dependent — 14 din baad spray ki zaroorat nahi rahi ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
 
-      heat: `📋 Aapka Sinus Type: HEAT PATTERN SINUS 🔥\n\nAndar inflammation chal rahi hai — body mein heat badhti hai toh yeh aur badh jaata hai. Thick mucus aur headache isi ki wajah se hai.\n\n14 din mein:\n📅 Din 1-3: Cooling protocol — burning kam hogi\n📅 Din 4-7: Mucus thin hoga — drain hoga\n📅 Din 8-14: Headache frequency reduce hogi\n\n⭐ Hansaa ji — 20 saal ki problem — "Pehli baar laga koi samjha" ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
+      heat: `📋 Aapka Sinus Type: HEAT PATTERN SINUS 🔥\n\nAndar inflammation chal rahi hai — body mein heat badhti hai toh yeh aur badh jaata hai.\n\n14 din mein:\n📅 Din 1-3: Cooling protocol — burning kam hogi\n📅 Din 4-7: Mucus thin hoga — drain hoga\n📅 Din 8-14: Headache frequency reduce hogi\n\n⭐ Hansaa ji — 20 saal ki problem — "Pehli baar laga koi samjha" ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
 
-      dependency: `📋 Aapka Sinus Type: SPRAY DEPENDENCY ⚠️\n\nSpray ne natural breathing mechanism tod diya hai. Jitna zyada spray — utna zyada dependency. Yeh cycle todna padega carefully.\n\n14 din mein:\n📅 Din 1-3: Natural breathing restore shuru\n📅 Din 4-7: Spray dependency gradually kam\n📅 Din 8-14: Bina spray breathe karna possible\n\n⭐ Shikha ji — 5 saal nasal spray — 14 din baad spray ki zaroorat nahi rahi ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`
+      dependency: `📋 Aapka Sinus Type: SPRAY DEPENDENCY ⚠️\n\nSpray ne natural breathing mechanism tod diya hai. Jitna zyada spray — utna zyada dependency.\n\n14 din mein:\n📅 Din 1-3: Natural breathing restore shuru\n📅 Din 4-7: Spray dependency gradually kam\n📅 Din 8-14: Bina spray breathe karna possible\n\n⭐ Shikha ji — 5 saal nasal spray — 14 din baad spray ki zaroorat nahi rahi ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`
     };
 
     await sendMessage(senderId, pitches[type] || pitches['congestive']);
@@ -603,7 +631,7 @@ Sirf number reply karein 👆`);
   // PITCHED
   if (state === 'pitched') {
     const t = text.toLowerCase().trim();
-    if (['yes','ha','haan','okay','ok','hnji','ji','haan ji'].includes(t)) {
+    if (['yes','ha','haan','okay','ok','hnji','ji','haan ji','bilkul'].includes(t)) {
       userState[senderId] = 'payment_sent';
       await updateLead(senderId, '🔴 Hot', 'payment_link_sent', userProfile[senderId]?.symptom);
       await sendMessage(senderId,
@@ -612,12 +640,12 @@ Sirf number reply karein 👆`);
 💳 ${PAYMENT_LINK}
 Amount: ₹1,299
 
-Payment ke baad WhatsApp pe milega:
+Payment ke baad aapko WhatsApp pe milega:
 ✅ Day 1 personalized routine
 ✅ Daily guidance schedule
 ✅ Direct specialist access
 
-WhatsApp number zaroor daalein payment mein.
+Payment karte waqt apna WhatsApp number zaroor daalein.
 
 📱 ${WHATSAPP_NUM}
 🌐 ${WEBSITE}
@@ -631,8 +659,8 @@ Ayusomam Herbals 🌿`);
       await sendMessage(senderId,
 `Bilkul! 🙏
 
-Sachin ji khud aapke saath baat karenge.
-Thoda wait karein — ya seedha WhatsApp:
+Sachin ji aapke saath personally baat karenge.
+Thoda wait karein — ya seedha WhatsApp karein:
 📱 ${WHATSAPP_NUM}
 
 Ayusomam Herbals 🌿`);
@@ -749,7 +777,7 @@ app.listen(PORT, () => {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Ayusomam Herbals Bot — Running
 Port    : ${PORT}
-AI Mode : ${AI_MODE ? '✅ ON — AI Agent v3.0' : '❌ OFF — Rule Based'}
+AI Mode : ${AI_MODE ? '✅ ON — AI Agent v4.0' : '❌ OFF — Rule Based'}
 Rollback: Set AI_MODE = false
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   `);
