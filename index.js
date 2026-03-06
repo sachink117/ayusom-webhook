@@ -484,18 +484,18 @@ function detectSymptom(text) {
 // GOOGLE SHEETS
 // ============================================================
 
-async function updateLead(userId, temp, stage, symptom, name, firstMessage) {
+async function updateLead(userId, temp, stage, symptom, name, message) {
   if (!GOOGLE_SHEET_URL) return;
   try {
     const payload = {
-      timestamp: new Date().toISOString(),
-      platform: 'Facebook',
-      senderId: userId,
-      name: name || userId,
-      message: firstMessage || '',
-      temperature: temp,
-      lastStage: stage,
-      symptom: symptom || ''
+      timestamp:   new Date().toISOString(),
+      platform:    'Facebook',
+      senderId:    userId,
+      name:        name    || userId,
+      message:     message || '',
+      temperature: temp    || '🔵 Cold',
+      lastStage:   stage   || 'new',
+      symptom:     symptom || ''
     };
 
     const res = await fetch(GOOGLE_SHEET_URL, {
@@ -505,7 +505,7 @@ async function updateLead(userId, temp, stage, symptom, name, firstMessage) {
     });
 
     const text = await res.text();
-    console.log(`Sheet [${stage}] ${userId}: ${text}`);
+    console.log(`Sheet [${temp}] [${stage}] ${userId}: ${text}`);
 
   } catch (e) {
     console.error('Sheet error:', e.message);
@@ -786,19 +786,40 @@ async function processMessage(senderId, text) {
       userProfile[senderId].symptom = detectedSymptom;
     }
 
-    // Detect payment intent — mark as hot
-    const isHot = text.toLowerCase().match(/payment|pay|kitna|price|cost|1299|shuru|yes|haan|bilkul|le lena|lena hai|kaise karu/);
-    const leadTemp = isHot ? '🔴 Hot' : '🟡 Warm';
+    // Auto detect duration
+    const detectedDuration = detectDuration(text);
+    if (detectedDuration && !userProfile[senderId].duration) {
+      userProfile[senderId].duration = detectedDuration;
+    }
+
+    // Temperature logic — smarter detection
+    const t = text.toLowerCase();
+    let leadTemp = '🔵 Cold'; // default
+
+    const isHot = t.match(/payment|pay|1299|shuru karna|le lena|lena hai|kaise karu|buy|purchase|interested|haan shuru|bilkul shuru|yes shuru|abhi shuru/);
+    const isWarm = t.match(/kitna|price|cost|details|batao|kya hoga|kaise|guarantee|sochna|more info|janna chahta/);
+
+    if (isHot)       leadTemp = '🔴 Hot';
+    else if (isWarm) leadTemp = '🟡 Warm';
+    else             leadTemp = '🟡 Warm'; // AI conversation = at least warm
+
+    // Save temperature in profile — only upgrade never downgrade
+    const tempOrder = { '🔵 Cold': 0, '🟡 Warm': 1, '🔴 Hot': 2 };
+    const currentTemp = userProfile[senderId].temperature || '🔵 Cold';
+    if ((tempOrder[leadTemp] || 0) > (tempOrder[currentTemp] || 0)) {
+      userProfile[senderId].temperature = leadTemp;
+    }
+    const finalTemp = userProfile[senderId].temperature || leadTemp;
 
     const reply = await getAIReply(senderId, text);
     if (reply) {
       await sendMessage(senderId, reply);
       await updateLead(
         senderId,
-        leadTemp,
+        finalTemp,
         'ai_conversation',
         userProfile[senderId].symptom || '',
-        userProfile[senderId].name || '',
+        userProfile[senderId].name   || '',
         text
       );
     } else {
