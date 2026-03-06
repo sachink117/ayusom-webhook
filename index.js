@@ -346,11 +346,11 @@ ASLI CLIENTS KE RESULTS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Rahul ji:
-9 saal se naak band thi — smell bilkul nahi tha
-9ve din pe khushbu aur taste wapas aaya ✅
+Naak band rehti thi — sunaai aur sungne mein dikkat thi
+10 din mein naak kaafi khul gayi — breathing bahut better ✅
 
 Shikha ji:
-5 saal se spray ke bina so nahi sakti thi
+5 saal se nasal spray ke bina so nahi sakti thi
 14 din baad spray ki zaroorat hi nahi rahi ✅
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -487,41 +487,25 @@ function detectSymptom(text) {
 async function updateLead(userId, temp, stage, symptom, name, firstMessage) {
   if (!GOOGLE_SHEET_URL) return;
   try {
-    // Step 1 — Try to update existing lead
-    const updateRes = await fetch(GOOGLE_SHEET_URL, {
+    const payload = {
+      timestamp: new Date().toISOString(),
+      platform: 'Facebook',
+      senderId: userId,
+      name: name || userId,
+      message: firstMessage || '',
+      temperature: temp,
+      lastStage: stage,
+      symptom: symptom || ''
+    };
+
+    const res = await fetch(GOOGLE_SHEET_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        update: true,
-        senderId: userId,
-        temperature: temp,
-        lastStage: stage,
-        symptom: symptom || ''
-      })
+      body: JSON.stringify(payload)
     });
 
-    const updateData = await updateRes.json();
-    console.log('Sheet update response:', updateData.status);
-
-    // Step 2 — Agar new lead hai — new row add karo
-    if (updateData.status !== 'updated') {
-      const newRes = await fetch(GOOGLE_SHEET_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          timestamp: new Date().toISOString(),
-          platform: 'Facebook',
-          senderId: userId,
-          name: name || userId,
-          message: firstMessage || '',
-          temperature: temp,
-          lastStage: stage,
-          symptom: symptom || ''
-        })
-      });
-      const newData = await newRes.json();
-      console.log('Sheet new lead:', newData.status);
-    }
+    const text = await res.text();
+    console.log(`Sheet [${stage}] ${userId}: ${text}`);
 
   } catch (e) {
     console.error('Sheet error:', e.message);
@@ -708,7 +692,7 @@ Number reply karein.`);
     userState[senderId] = 'pitched';
 
     const pitches = {
-      allergic: `📋 Aapka Sinus Type: ALLERGIC SINUS 🌿\n\nAapki naak ki lining oversensitive ho gayi hai — isliye dust, mausam, pollution se trigger hota hai. Dawaiyan sirf reaction rokti hain — root cause waise ka waisa rehta hai.\n\n14 din mein:\n📅 Din 1-3: Lining soothing — sneezing kam hogi\n📅 Din 4-7: Immune response normalize hoga\n📅 Din 8-14: Triggers pe reaction kam hoga\n\n⭐ Rahul ji — 9 saal ki band naak — Day 9 pe smell wapas aayi ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
+      allergic: `📋 Aapka Sinus Type: ALLERGIC SINUS 🌿\n\nAapki naak ki lining oversensitive ho gayi hai — isliye dust, mausam, pollution se trigger hota hai. Dawaiyan sirf reaction rokti hain — root cause waise ka waisa rehta hai.\n\n14 din mein:\n📅 Din 1-3: Lining soothing — sneezing kam hogi\n📅 Din 4-7: Immune response normalize hoga\n📅 Din 8-14: Triggers pe reaction kam hoga\n\n⭐ Rahul ji — naak band thi, sunaai mushkil — 10 din mein breathing kaafi better ho gayi ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
 
       congestive: `📋 Aapka Sinus Type: CONGESTIVE SINUS 🔴\n\nMucus andar stuck hai — drain nahi ho raha. Isliye chehra bhaari aur subah naak band hoti hai.\n\n14 din mein:\n📅 Din 1-3: Pressure release — heaviness kam\n📅 Din 4-7: Drainage improve hogi\n📅 Din 8-14: Subah uthte hi naak khuli milegi\n\n⭐ Shikha ji — 5 saal spray dependent — 14 din baad spray ki zaroorat nahi rahi ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
 
