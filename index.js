@@ -331,10 +331,6 @@ Shikha ji:
 5 saal se spray ke bina so nahi sakti thi
 14 din baad spray ki zaroorat hi nahi rahi ✅
 
-Hansaa ji:
-20 saal ki purani takleef
-"Pehli baar laga koi sach mein samjha" ✅
-
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 AAPATTIYON KA JAWAB
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -669,7 +665,7 @@ Number reply karein.`);
 
       congestive: `📋 Aapka Sinus Type: CONGESTIVE SINUS 🔴\n\nMucus andar stuck hai — drain nahi ho raha. Isliye chehra bhaari aur subah naak band hoti hai.\n\n14 din mein:\n📅 Din 1-3: Pressure release — heaviness kam\n📅 Din 4-7: Drainage improve hogi\n📅 Din 8-14: Subah uthte hi naak khuli milegi\n\n⭐ Shikha ji — 5 saal spray dependent — 14 din baad spray ki zaroorat nahi rahi ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
 
-      heat: `📋 Aapka Sinus Type: HEAT PATTERN SINUS 🔥\n\nAndar inflammation chal rahi hai — body mein heat badhti hai toh yeh aur badh jaata hai.\n\n14 din mein:\n📅 Din 1-3: Cooling protocol — burning kam hogi\n📅 Din 4-7: Mucus thin hoga — drain hoga\n📅 Din 8-14: Headache frequency reduce hogi\n\n⭐ Hansaa ji — 20 saal ki problem — "Pehli baar laga koi samjha" ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
+      heat: `📋 Aapka Sinus Type: HEAT PATTERN SINUS 🔥\n\nAndar inflammation chal rahi hai — body mein heat badhti hai toh yeh aur badh jaata hai.\n\n14 din mein:\n📅 Din 1-3: Cooling protocol — burning kam hogi\n📅 Din 4-7: Mucus thin hoga — drain hoga\n📅 Din 8-14: Headache frequency reduce hogi\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`,
 
       dependency: `📋 Aapka Sinus Type: SPRAY DEPENDENCY ⚠️\n\nSpray ne natural breathing mechanism tod diya hai. Jitna zyada spray — utna zyada dependency.\n\n14 din mein:\n📅 Din 1-3: Natural breathing restore shuru\n📅 Din 4-7: Spray dependency gradually kam\n📅 Din 8-14: Bina spray breathe karna possible\n\n⭐ Shikha ji — 5 saal nasal spray — 14 din baad spray ki zaroorat nahi rahi ✅\n\n━━━━━━━━━━━━━━━━━━━━\nInvestment: ₹1,299 — 14 din\n━━━━━━━━━━━━━━━━━━━━\n\nShuru karein? Reply YES 🙏\nDetails ke liye MORE type karein\n\n💳 ${PAYMENT_LINK}`
     };
