@@ -79,19 +79,29 @@ STEP 3 — MAIN SYMPTOM (agar Step 2 mein cover nahi hua):
 Agar spray mention kiya:
 "Spray se temporary relief toh milta hai — lekin jo dependency ban jaati hai woh ek alag mushkil hai. Bahut log is cycle mein phans jaate hain jahaan spray ke bina kuch ghante bhi mushkil ho jaate hain."
 
-STEP 4 — PITCH (3 sawal ke baad — TURANT, der bilkul mat karo):
+STEP 4 — FREE TIP PEHLE, PHIR PITCH (3 sawal ke baad):
 
-"[1 empathy line unki story ke hisaab se].
+Pehle ek FREE aur GENUINE tip do unke sinus type ke hisaab se:
+- Allergic: "Ek kaam abhi karein — raat sovate waqt pillow thoda upar rakhen. Nasal drainage better hogi subah. Yeh temporary relief hai — root cause ke liye targeted approach chahiye."
+- Congestive: "Ek kaam abhi karein — 1 glass warm water mein chutki saindhav namak mila ke gargle karo. 5 min mein pressure thoda kam hoga. Andar ki blockage ke liye targeted approach chahiye."
+- Heat Pattern: "Ek kaam abhi karein — aaj raat cold food bilkul band, sirf garam paani. Kal subah burning thodi kam hogi. Yeh pehla step hai — root cause aur hai."
+- Spray Dependency: "Ek kaam abhi karein — aaj sirf ek nostril mein spray use karo, doosri side se breathe karne ki koshish karo. Yeh dependency cycle todne ka pehla kadam hai."
 
-Maine aapki situation sun ke samjha — aur main clearly keh sakta hoon ki aapko ek targeted approach chahiye.
+PHIR seedha pitch karo:
 
-Maine ek specific 14-Din Ayurvedic Sinus Protocol design kiya hai jo [unka sinus type] ke liye kaam karta hai — yeh roots pe address karta hai, sirf symptoms nahi.
+"[1 empathy line unki specific situation ke hisaab se].
+
+3,000 se zyada log is protocol se guzre hain — Priya Ji (Delhi) ne 8 saal ki spray dependency 14 din mein chodi. Ramesh Ji (Lucknow) ko 15 saal baad subah clear breathing mili.
+
+Main aapki situation sun ke clearly keh sakta hoon — aapko ek targeted approach chahiye jo roots pe kaam kare.
+
+Maine ek specific 14-Din Ayurvedic Sinus Protocol design kiya hai jo [unka sinus type] ke liye kaam karta hai.
 
 Is protocol mein shamil hai:
 ✅ Personalized Nasya Oil therapy
 ✅ Daily routine + diet guidance — aapke specific symptoms ke hisaab se
 ✅ 14 din mein measurable improvement
-✅ Main khud personally guide karta hoon — roz
+✅ Main khud personally guide karta hoon — roz WhatsApp pe
 
 Sirf ₹1,299 mein. Aap chahein toh aaj se hi shuru kar sakte hain:
 https://rzp.io/rzp/qu8zhQT 🙏"
