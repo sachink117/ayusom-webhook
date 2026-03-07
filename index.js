@@ -381,7 +381,7 @@ async function processMessage(senderId, text, sendFn, platform) {
     if (detectedDuration && !userProfile[senderId].duration) userProfile[senderId].duration = detectedDuration;
 
     const t = text.toLowerCase();
-    let leadTemp = '🟡 Warm';
+    let leadTemp = convHistory[senderId] && convHistory[senderId].length > 2 ? '🟡 Warm' : '🔵 Cold';
     const isHot = t.match(/payment|pay|1299|shuru karte|shuru karna|shuru kar|le lena|lena hai|kaise karu|buy|purchase|interested|haan shuru|bilkul shuru|yes shuru|abhi shuru|karte hai|karna hai|ready|confirm|ok shuru|chalu karo|start|procedure|treat karte|treat krte|kaise treat|kab tak|kitne din|theek ho|sahi ho|guarantee|pakka|zaroor|zarur|bilkul|haan ji|ha ji|ok ji|okay/);
     if (isHot) leadTemp = '🔴 Hot';
 
