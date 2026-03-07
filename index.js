@@ -400,6 +400,25 @@ async function processMessage(senderId, text, sendFn, platform) {
     if ((tempOrder[leadTemp] || 0) > (tempOrder[currentTemp] || 0)) userProfile[senderId].temperature = leadTemp;
     const finalTemp = userProfile[senderId].temperature || leadTemp;
 
+    // ============================================================
+    // PAYMENT CLOSING SCRIPT — Direct intercept (no AI)
+    // ============================================================
+    const isPaymentQuery = t.match(/payment|pay kar|kaise karu|kaise karen|kaise kare|kitna hai|price|cost|1299|kitne ka|buy karna|kharidna|kharidu|le sakta|le sakti|lena hai|lena chahta|lena chahti|order karna|link bhejo|link do|abhi lena|abhi karna|kab tak milega|kaise milega|upi|gpay|phonepe|paytm/);
+    
+    if (isPaymentQuery) {
+      await updateLead(senderId, '🔴 Hot', 'payment_query', userProfile[senderId]?.symptom || '', userProfile[senderId]?.name || '', text, platform);
+      await sendFn(senderId,
+        `Bilkul Ji! 🙏 Payment bahut simple hai —\n\n` +
+        `1️⃣ Neeche diye link pe click karein\n` +
+        `2️⃣ UPI / Card / Net Banking — jo bhi easy ho\n` +
+        `3️⃣ Payment ke baad screenshot ya confirmation yahan bhejein\n\n` +
+        `👉 ${PAYMENT_LINK}\n\n` +
+        `Amount: ₹1,299 — 14-Din Personalized Protocol\n\n` +
+        `Payment hote hi main personally aapka Day 1 routine bhejunga. Koi bhi doubt ho — seedha poochein, main hoon yahan. 🌿`
+      );
+      return;
+    }
+
     const reply = await getAIReply(senderId, text);
     if (reply) {
       await sendFn(senderId, reply);
