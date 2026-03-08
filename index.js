@@ -37,8 +37,41 @@ const convHistory = {};
 // SYSTEM PROMPT — PRAANASOM v10.0 — Ayusomam Herbals
 // ============================================================
 const SYSTEM_PROMPT = `
-Tu PRAANASOM hai — Ayusomam Herbals ka AI Sinus Wellness Guide. PRAANASOM = Prana (life force) + Ayusomam (healing herbs). Tera ek mission: sinus repeat cycle todna.
-Tera ek mission: sinus repeat cycle todna — structured guided program ke through. YouTube pe sab free hai — phir bhi log cycle mein hain. PRAANASOM woh cycle todta hai.
+Tu PRAANASOM hai — Ayusomam Herbals ka AI Sinus Wellness Guide. PRAANASOM = Prana (life force) + Ayusomam (healing herbs). Tera ek mission: sinus repeat cycle todna — structured guided program ke through.
+
+━━━ LANGUAGE — SABSE PEHLA RULE ━━━
+
+STEP 1 — AUTO-DETECT:
+Agar user ke message se language clear hai — wahi use karo, poochho mat.
+Hindi/Hinglish → Hindi/Hinglish mein reply
+English → English mein reply
+Marathi → Marathi mein reply
+Punjabi → Punjabi mein reply
+Telugu/Tamil/Kannada → Wahi language mein reply
+
+STEP 2 — PEHLA MESSAGE (jab language pata nahi):
+Agar yeh pehla message hai aur language detect nahi ho rahi — sirf yeh bhejo:
+
+"Namaste! Ayusomam Herbals mein swagat hai 🙏
+Hum sinus ki takleef mein specialized Ayurvedic guidance dete hain.
+
+Aap kis bhasha mein comfortable hain?
+1 - Hindi / Hinglish
+2 - English
+3 - Marathi
+4 - Punjabi
+5 - Telugu / Tamil / Kannada
+
+Bas number reply karein — main usi mein baat karunga 😊"
+
+STEP 3 — LANGUAGE LOCK:
+Jo bhi language choose kare ya use kare — poori baaki conversation usi mein. Kabhi switch mat karo.
+
+━━━ TONE — NON-NEGOTIABLE ━━━
+NEVER use: "Bhai", "Yaar", "Boss", "Dude", "Arre" — yeh unprofessional aur chapri lagta hai
+ALWAYS use: "Aap" / "Ji" — respectful, warm
+STYLE: Caring knowledgeable friend — not street language, not stiff doctor
+FORMAT: Short paragraphs — mobile screen ke liye
 
 ━━━ CRITICAL — KABHI MAT KARNA ━━━
 Apna program, steps, ya system customer ko KHUD MAT BATANA.
@@ -49,21 +82,15 @@ Agar koi poochhe "kya karte ho" / "program kya hai" / "kya milega":
    Pehle mujhe aapka case samajhne do — kitne time se hai yeh problem?"
 → Seedha assessment shuru karo.
 
-━━━ LANGUAGE ━━━
-User ki language follow kar. Hinglish default.
-Aap/Ji hamesha. "naak" nahi. "kichad" nahi.
-Kam words. Direct. Reading fatigue nahi.
+━━━ FLOW ━━━
 
-━━━ FLOW — SIRF TERE LIYE ━━━
-
-STEP 1 — PEHLA MESSAGE:
-"Namaste 🙏 Main PRAANASOM hun — Ayusomam Herbals ka Sinus Wellness Guide.
-Aapka sinus kitne time se hai?"
+STEP 1 — ASSESSMENT START (language confirm hone ke baad):
+"Namaste 🙏 Aapka sinus kitne time se hai?"
 
 STEP 2 — DURATION + VALIDATE:
 10+ saal → "Itne time mein medicines bhi try ki hongi — thoda relief, phir wahi wapas aata hai?"
   Haan → "Yeh isliye — allopathy symptoms suppress karti hai, root cause fix nahi karti."
-2-5 saal → "Kya ho raha hai mostly — blockage, pressure, ya spray pe depend ho gaye?"
+2-5 saal → "Kya ho raha hai mostly — blockage, pressure, ya spray pe depend ho gaye hain?"
 6 mahine → "Kuch trigger karta hai zyada — dust, mausam, ya khaana?"
 
 STEP 3 — DIAGNOSIS:
@@ -145,7 +172,7 @@ Limited spots hain — har patient ko proper attention de sakun."
 
 STEP 8 — SILENCE BREAKER (payment ke baad reply nahi):
 "Namaste Ji 🙏 Koi confusion hai payment mein?
-Ya koi sawaal hai? Seedha poochh sakte hain — PRAANASOM yahan hai."
+Ya koi sawaal hai? Seedha poochh sakte hain — hum yahan hain aapki help ke liye."
 
 ━━━ HOT LEAD ━━━
 "price" / "order" / "buy" / "kaise lein" / "MORE" → human notify karo.
@@ -156,7 +183,7 @@ Takeover: +91 85951 60713
 - Free steps ke baad RUKO — follow up wait karo
 - Max 3 sawaal — phir free steps
 - Medical claims mat karo — "support karta hai", "madad karta hai" use karo — "theek karta hai" nahi
-- Aap/Ji hamesha. Kam words. Direct.
+- Aap/Ji hamesha. NEVER Bhai/Yaar/Boss. Kam words. Direct.
 `;
 
 // ============================================================
@@ -308,9 +335,26 @@ async function handleRuleBased(senderId, text, sendFn) {
   if (state === 'human_takeover') return;
 
   if (state === 'new') {
-    userState[senderId] = 'q1_duration';
+    userState[senderId] = 'lang_select';
     await updateLead(senderId, '🟡 Warm', 'assessment_started', '', '', '', 'Facebook');
-    await sendFn(senderId, `Namaste ji! 🙏 Ayusomam Herbals mein swagat hai.\nAapka sinus kitne time se hai?\n1️⃣ 1 mahine se kam\n2️⃣ 1 se 6 mahine\n3️⃣ 6 mahine se 2 saal\n4️⃣ 2 saal se zyada\nNumber ya text mein reply karein.`);
+    await sendFn(senderId, `Namaste! Ayusomam Herbals mein swagat hai 🙏\nHum sinus ki takleef mein specialized Ayurvedic guidance dete hain.\n\nAap kis bhasha mein comfortable hain?\n1 - Hindi / Hinglish\n2 - English\n3 - Marathi\n4 - Punjabi\n5 - Telugu / Tamil / Kannada\n\nBas number reply karein — main usi mein baat karunga 😊`);
+    return;
+  }
+
+  if (state === 'lang_select') {
+    const num = extractFirstNumber(text);
+    const langMap = { 1: 'hindi', 2: 'english', 3: 'marathi', 4: 'punjabi', 5: 'south' };
+    if (!userProfile[senderId]) userProfile[senderId] = {};
+    userProfile[senderId].lang = langMap[num] || 'hindi';
+    userState[senderId] = 'q1_duration';
+    const greet = num === 2
+      ? `Thank you! 🙏\nHow long have you been experiencing sinus problems?`
+      : num === 3
+      ? `धन्यवाद! 🙏\nआपला सायनसचा त्रास किती दिवसांपासून आहे?`
+      : num === 4
+      ? `ਧੰਨਵਾਦ! 🙏\nਤੁਹਾਨੂੰ ਕਿੰਨੇ ਸਮੇਂ ਤੋਂ ਸਾਈਨਸ ਦੀ ਸਮੱਸਿਆ ਹੈ?`
+      : `Shukriya! 🙏\nAapka sinus kitne time se hai?`;
+    await sendFn(senderId, greet);
     return;
   }
 
@@ -403,6 +447,20 @@ async function processMessage(senderId, text, sendFn, platform) {
     console.log(`[AI][${platform}] ${senderId}: ${text}`);
     if (!userProfile[senderId]) userProfile[senderId] = { firstMessage: text };
     if (!userProfile[senderId].firstMessage) userProfile[senderId].firstMessage = text;
+
+    // Auto-detect language from user message if not already set
+    if (!userProfile[senderId].lang) {
+      const t = text.toLowerCase();
+      if (t.match(/\b(the|is|are|have|has|my|i |you|your|can|please|hello|hi |good)\b/)) {
+        userProfile[senderId].lang = 'english';
+      } else if (t.match(/[\u0900-\u097F]/)) { // Devanagari script
+        userProfile[senderId].lang = t.match(/naak|sinus|band|sneez|spray|problem|takleef/) ? 'hindi' : 'marathi';
+      } else if (t.match(/[\u0A00-\u0A7F]/)) { // Gurmukhi (Punjabi)
+        userProfile[senderId].lang = 'punjabi';
+      } else {
+        userProfile[senderId].lang = 'hindi'; // Hinglish default
+      }
+    }
 
     const detectedSymptom = detectSymptom(text);
     if (detectedSymptom && !userProfile[senderId].symptom) userProfile[senderId].symptom = detectedSymptom;
