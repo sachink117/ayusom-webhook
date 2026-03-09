@@ -47,7 +47,8 @@ function getTimeSlot() {
 // ============================================================
 const FREE_STEPS = {
   morning: {
-    allergic: `✅ Aapka type samajh aa gaya — Allergic Sinus 🌿
+    allergic: `✅ Vataja-Kaphaja Pratishyaya 🌿
+Type: Allergic Rhinosinusitis | Dosha: Vata + Kapha
 
 Aaj ke 2 steps subah try karein — ek doosre ke complementary hain:
 
@@ -63,7 +64,8 @@ Ek bhagona paani mein 4-5 fresh tulsi patte + adha inch kuch adrak daalen. Ubaal
 
 Shaam ko zaroor batana — kuch fark mehsoos hua? 🙏`,
 
-    congestive: `✅ Aapka type samajh aa gaya — Congestive Sinus 🔴
+    congestive: `✅ Kaphaja Pratishyaya 🔵
+Type: Congestive Sinusitis | Dosha: Kapha dominant
 
 Aaj ke 2 steps subah try karein:
 
@@ -79,7 +81,8 @@ Paani mein 1 inch kuchi adrak + ½ tsp saunth (dry ginger powder) daalen. Ubaal 
 
 Shaam ko batana zaroor — kitna fark aaya? 🙏`,
 
-    heat: `✅ Aapka type samajh aa gaya — Heat / Pittaj Sinus 🔥
+    heat: `✅ Pittaja Pratishyaya 🔥
+Type: Inflammatory Sinusitis | Dosha: Pitta aggravation
 
 Aaj ke 2 steps subah try karein:
 
@@ -95,7 +98,8 @@ Dono naak mein 1-1 boond pure desi ghee (garm nahi — room temp). 5 min bilkul 
 
 Shaam ko zaroor batana 🙏`,
 
-    dependency: `✅ Aapka type samajh aa gaya — Spray Dependency ⚠️
+    dependency: `✅ Dushta Pratishyaya ⚠️
+Type: Chronic Rebound Sinusitis | Dosha: Vata + Srotas blockage
 
 Aaj ke 2 steps subah try karein:
 
@@ -113,7 +117,8 @@ Shaam ko zaroor batana 🙏`
   },
 
   night: {
-    allergic: `✅ Aapka type samajh aa gaya — Allergic Sinus 🌿
+    allergic: `✅ Vataja-Kaphaja Pratishyaya 🌿
+Type: Allergic Rhinosinusitis | Dosha: Vata + Kapha
 
 Aaj raat ke 2 steps try karein:
 
@@ -129,7 +134,8 @@ Ek cup garm doodh mein ½ tsp haldi + ½ tsp ghee milaen. Dhire dhire peeyein. S
 
 Subah uthke zaroor batana — neend kaisi aayi, naak khuli thi ya band? 🙏`,
 
-    congestive: `✅ Aapka type samajh aa gaya — Congestive Sinus 🔴
+    congestive: `✅ Kaphaja Pratishyaya 🔵
+Type: Congestive Sinusitis | Dosha: Kapha dominant
 
 Aaj raat ke 2 steps try karein:
 
@@ -145,7 +151,8 @@ Aaj raat ke 2 steps try karein:
 
 Subah uthke naak ki condition zaroor batana 🙏`,
 
-    heat: `✅ Aapka type samajh aa gaya — Heat / Pittaj Sinus 🔥
+    heat: `✅ Pittaja Pratishyaya 🔥
+Type: Inflammatory Sinusitis | Dosha: Pitta aggravation
 
 Aaj raat ke 2 steps try karein:
 
@@ -161,7 +168,8 @@ Dono naak mein 1-1 boond desi ghee. Sone se pehle 5 min bilkul still baith ke ra
 
 Subah kaise feel hua zaroor batana 🙏`,
 
-    dependency: `✅ Aapka type samajh aa gaya — Spray Dependency ⚠️
+    dependency: `✅ Dushta Pratishyaya ⚠️
+Type: Chronic Rebound Sinusitis | Dosha: Vata + Srotas blockage
 
 Aaj raat ke 2 steps try karein:
 
@@ -203,26 +211,22 @@ const SEVERITY_INSIGHT = {
 };
 
 const SYMPTOM_INSIGHT = {
-  congestive: '📌 Congestive pattern — balgam ya inflammation nasal passage block kar rahi hai.',
-  allergic:   '📌 Allergic pattern — immune system over-react kar rahi hai triggers pe.',
-  heat:       '📌 Pittaj/Heat pattern — andar inflammatory heat hai jo thick discharge aur pressure create kar rahi hai.',
-  dependency: '📌 Dependency pattern — spray ne natural breathing mechanism ko override kar diya hai.'
+  congestive: '📌 Yeh Kaphaja Pratishyaya ka pattern hai — Kapha dosha vitiated hone se nasal passages mein ama accumulate hoti hai, srotas block hote hain. Subah zyada hona is ka classic sign hai.',
+  allergic:   '📌 Yeh Vataja-Kaphaja Pratishyaya hai — Vata aur Kapha dono vitiated hain. Sneezing Vata ka naak se bahar nikalna hai, watery discharge bhi Vata-Kapha imbalance ka sign.',
+  heat:       '📌 Yeh Pittaja Pratishyaya hai — Pitta dosha vitiated hone se nasal lining mein heat aur inflammation badh jaati hai. Yellow-green discharge aur burning Pitta aggravation ke clear signs hain.',
+  dependency: '📌 Yeh Dushta Pratishyaya ka pattern hai — prolonged external substance se nasal mucosa ki natural functioning disturb ho gayi hai. Srotas chronically block hain, Vata movement irregular hai.'
 };
 
 // ============================================================
 // FOLLOW-UP MESSAGES
 // ============================================================
 const FOLLOW_UP_MSG = {
-  morning: `Kaisa raha din? 🌟
+  morning: `Kaisa raha? 🌿
 
-Subah wale 2 steps try kiye? Kuch fark mehsoos hua — thoda bhi?
+Subah ke steps try kiye the — naak mein kuch fark pada? Thoda bhi ho toh batana.`,
+  night: `Subah uthar ke kaisi lag rahi hai naak? 🌅
 
-Emaandar batayein — chahe positive ho ya na ho 🙏`,
-  night: `Subah ki shubhkamnayein! 🌅
-
-Kal raat wale 2 steps try kiye? Neend kaisi aayi, subah naak khuli thi ya band thi?
-
-Emaandar batayein 🙏`
+Raat ke steps try kiye the — raat ko thoda better tha?`
 };
 
 // ============================================================
@@ -230,8 +234,8 @@ Emaandar batayein 🙏`
 // ============================================================
 function buildPitch(type, timing, hasRelief) {
   const reliefLine = hasRelief
-    ? `Achha laga sun ke 🙏 Yeh jo fark mehsoos hua — yeh sirf 2 steps ka surface kaam tha. Andar ka root cause abhi bhi waise ka waisa hai.\n\n`
-    : `Samajh aata hai 🙏 Itne time ki problem — 2 steps se root tak nahi pahuncha, yeh normal hai. Iske liye structured approach chahiye.\n\n`;
+    ? `Achha 🙏 Yeh thodi relief jo mili — yeh sirf surface pe tha. Andar jo chal raha hai woh 2 steps se nahi badlega.\n\n`
+    : `Samajh mein aata hai — itni purani problem 2 steps se thodi nahi jaati. Iske liye kuch aur chahiye.\n\n`;
 
   const typeLabel = {
     allergic: 'Allergic Sinus 🌿',
@@ -241,7 +245,7 @@ function buildPitch(type, timing, hasRelief) {
   }[type] || 'Sinus Problem';
 
   return reliefLine +
-`Aapka type: *${typeLabel}*
+`Identified presentation: *${typeLabel}*
 
 Hum 2 protocols offer karte hain — upgrades nahi, approaches alag hain:
 
@@ -286,7 +290,7 @@ Dinon    7 din   |    14 din
 Routine  1x/day  |    2x/day
 Tracking Basic   |    Full
 Herbal   Optional|    Included
-Best for Acute   |    Chronic
+Case    Acute/New |    Chronic/Old
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ⚠️ Yeh dono alag approaches hain — P1 leke baad P2 pe switch nahi hota. Jo aapki situation pe fit kare, wohi pehle se lo.
