@@ -247,7 +247,7 @@ function buildPlanMsg(sinusType) {
 Hum 2 alag protocols offer karte hain — yeh upgrades nahi hain, approaches fundamentally alag hain:
 
 ╔═══════════════════════════════╗
-║   PROTOCOL 1 — Rs.499         ║
+║   PROTOCOL 1 — Rs.499        ║
 ║   7-Day Sinus Stabilization   ║
 ╚═══════════════════════════════╝
 
@@ -268,7 +268,7 @@ Price: Rs.499 (one-time)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ╔═══════════════════════════════╗
-║   PROTOCOL 2 — Rs.1,299       ║
+║   PROTOCOL 2 — Rs.1,299      ║
 ║   14-Day Deep Sinus Protocol  ║
 ╚═══════════════════════════════╝
 
@@ -399,6 +399,113 @@ async function sendMessage(recipientId, text) {
   }
 }
 
+// Send Messenger button template (clickable URL buttons)
+async function sendPaymentButton(recipientId, planNum) {
+  const isP1 = planNum === 1;
+  const payload = {
+    recipient: { id: recipientId },
+    message: {
+      attachment: {
+        type: 'template',
+        payload: {
+          template_type: 'button',
+          text: isP1
+            ? '7-Day Sinus Stabilization Plan — Rs.499\n\nPayment ke baad screenshot yahan bhejein 🙏'
+            : '14-Day Deep Sinus Protocol — Rs.1,299\n\nPayment ke baad screenshot yahan bhejein 🙏',
+          buttons: [
+            {
+              type: 'web_url',
+              url: isP1 ? PAYMENT_499 : PAYMENT_1299,
+              title: isP1 ? '💳 Pay Rs.499 — Protocol 1' : '💳 Pay Rs.1,299 — Protocol 2'
+            }
+          ]
+        }
+      }
+    }
+  };
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+    );
+    const data = await res.json();
+    if (data.error) console.error('FB Button error:', data.error);
+  } catch (e) { console.error('sendPaymentButton error:', e.message); }
+}
+
+// Send WhatsApp CTA button (always-present footer)
+async function sendWAButtons(recipientId, text) {
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v18.0/${WHATSAPP_PHONE_ID}/messages`,
+      {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp', to: recipientId, type: 'text',
+          text: { body: text }
+        })
+      }
+    );
+    const data = await res.json();
+    if (data.error) console.error('WA Send error:', data.error);
+  } catch (e) { console.error('sendWAButtons error:', e.message); }
+}
+
+// ============================================================
+// AI FALLBACK — Claude API for unrecognised inputs
+// ============================================================
+async function getAIResponse(senderId, userText) {
+  if (!CLAUDE_API_KEY) return null;
+  const sinusType = userProfile[senderId]?.symptom || 'unknown';
+  const stage = userState[senderId] || 'new';
+  const TYPE_NAMES = {
+    allergic: 'Vataja-Kaphaja Pratishyaya (Allergic Rhinosinusitis)',
+    congestive: 'Kaphaja Pratishyaya (Congestive Sinusitis)',
+    heat: 'Pittaja Pratishyaya (Inflammatory Sinusitis)',
+    dependency: 'Dushta Pratishyaya (Chronic Rebound Sinusitis)'
+  };
+  const system = `Tu Ayusomam Herbals ka Ayurvedic sinus specialist hai. Hinglish mein jawab de — simple, warm, clinical. 2-3 lines max.
+
+User ki sinus type: ${TYPE_NAMES[sinusType] || 'assessment pending'}
+Current stage: ${stage}
+
+Rules:
+- Sirf sinus aur Ayurveda ke baare mein baat kar
+- Protocol 1 (Rs.499, 7-day) aur Protocol 2 (Rs.1299, 14-day) offer kar sakte ho
+- Off-topic ho toh politely redirect kar
+- Kabhi bhi doosre brands ya allopathy recommend mat kar
+- Payment links mat dena — sirf batana ki "1 ya 2 reply karo"`;
+
+  if (!convHistory[senderId]) convHistory[senderId] = [];
+  convHistory[senderId].push({ role: 'user', content: userText });
+  if (convHistory[senderId].length > 10) convHistory[senderId] = convHistory[senderId].slice(-10);
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 200,
+        system,
+        messages: convHistory[senderId]
+      })
+    });
+    const data = await res.json();
+    const reply = data.content?.[0]?.text || null;
+    if (reply) convHistory[senderId].push({ role: 'assistant', content: reply });
+    return reply;
+  } catch (e) {
+    console.error('AI error:', e.message);
+    return null;
+  }
+}
+
 // ============================================================
 // SEND WHATSAPP MESSAGE
 // ============================================================
@@ -424,7 +531,7 @@ async function sendWAMessage(to, text) {
 // ============================================================
 async function handleRuleBased(senderId, text, sendFn) {
   const state = userState[senderId] || 'new';
-  if (state === 'human_takeover') return;
+  if (state === 'human_takeover') return true;
 
   // ── NEW ──
   if (state === 'new') {
@@ -434,7 +541,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     await sendFn(senderId,
       `Namaste! 🙏 Ayusomam Herbals mein swagat hai.\n\nAapko sinus ki takleef hai — sahi jagah aaiye hain.\n\nPehle samajhte hain — yeh problem kitne samay se hai?\n1 — 1 se 6 mahine\n2 — 6 mahine se 1 saal\n3 — 1 se 3 saal\n4 — 3 saal se zyada\n\nBas number reply karein 🙏`
     );
-    return;
+    return true;
   }
 
   // ── Q1: DURATION ──
@@ -444,7 +551,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     const ans = detected || (num === 1 ? 'short' : num === 2 ? 'medium' : num >= 3 ? 'long' : null);
     if (!ans) {
       await sendFn(senderId, 'Thoda aur clearly batayein — kitne mahine ya saal se hai? 🙏');
-      return;
+      return true;
     }
     userProfile[senderId].duration = ans;
     userState[senderId] = 'q2_symptom';
@@ -453,7 +560,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     await sendFn(senderId,
       `Samajh gaya 🙏\n\nMain problem kya hai?\n1️⃣ Naak band, chehra bhaari, pressure\n2️⃣ Sneezing, runny nose, dust/mausam se trigger\n3️⃣ Burning sensation, thick mucus, sar dard\n4️⃣ Nasal spray ke bina so nahi sakta\n\nNumber reply karein.`
     );
-    return;
+    return true;
   }
 
   // ── Q2: SYMPTOM ──
@@ -464,7 +571,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     const ans = detected || map[num] || null;
     if (!ans) {
       await sendFn(senderId, 'Apna main symptom batayein — ek number reply karein 🙏');
-      return;
+      return true;
     }
     userProfile[senderId].symptom = ans;
     userState[senderId] = 'q3_tried';
@@ -473,7 +580,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     await sendFn(senderId,
       `Pehle kuch try kiya?\n1️⃣ Nahi, abhi tak kuch nahi\n2️⃣ Allopathy / antibiotic\n3️⃣ Nasal spray\n4️⃣ Sab try kiya — relief temporary hi raha\n\nNumber reply karein.`
     );
-    return;
+    return true;
   }
 
   // ── Q3: TRIED ──
@@ -481,7 +588,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     const num = extractFirstNumber(text);
     if (!num || num < 1 || num > 4) {
       await sendFn(senderId, '1 se 4 ke beech number reply karein 🙏');
-      return;
+      return true;
     }
     const map = { 1: 'kuch nahi', 2: 'allopathy', 3: 'nasal spray', 4: 'sab try kiya' };
     const triedVal = map[num];
@@ -492,7 +599,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     await sendFn(senderId,
       `Roz ki life mein kitna affect karta hai?\n1️⃣ Thoda — adjust ho jaata hun\n2️⃣ Moderate — kaafi takleef hoti hai\n3️⃣ Severe — neend, kaam, sab affected\n\nNumber reply karein.`
     );
-    return;
+    return true;
   }
 
   // ── Q4: SEVERITY → FREE STEPS ──
@@ -500,7 +607,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     const num = extractFirstNumber(text);
     if (!num || num < 1 || num > 3) {
       await sendFn(senderId, '1, 2 ya 3 reply karein 🙏');
-      return;
+      return true;
     }
     const sevVal = { 1: 'mild', 2: 'moderate', 3: 'severe' }[num];
     userProfile[senderId].severity = sevVal;
@@ -519,7 +626,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     // Send surface disclaimer + choice immediately
     userState[senderId] = 'after_steps';
     await sendFn(senderId, SURFACE_MSG);
-    return;
+    return true;
   }
 
   // ── AFTER STEPS: start now or try first ──
@@ -531,7 +638,7 @@ async function handleRuleBased(senderId, text, sendFn) {
       userState[senderId] = 'try_first';
       await updateLead(senderId, '🟡 Warm', 'try_first', userProfile[senderId].symptom, '', '', 'Facebook');
       await sendFn(senderId, `Bilkul 🙏 Steps try karein — subah aur raat dono.\n\nKuch bhi sawaal ho ya result share karna ho — yahan reply karein.\n\nJab ready ho tab protocol ke liye batayein.`);
-      return;
+      return true;
     }
 
     // Default: 1 or any other input → show full plans
@@ -539,7 +646,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     const sinusType = userProfile[senderId].symptom || 'congestive';
     await updateLead(senderId, '🔴 Hot', 'plans_shown', sinusType, '', '', 'Facebook');
     await sendFn(senderId, buildPlanMsg(sinusType));
-    return;
+    return true;
   }
 
   // ── PLAN SELECTION ──
@@ -550,20 +657,21 @@ async function handleRuleBased(senderId, text, sendFn) {
     if (t === '1' || t.match(/\b499\b|protocol 1|plan 1/)) {
       userState[senderId] = 'plan_selected';
       await updateLead(senderId, '🔴 Hot', 'protocol_1_selected', userProfile[senderId]?.symptom, '', '', 'Facebook');
-      await sendFn(senderId,
-        `Sahi decision 🙏\n\n7-Day Sinus Stabilization Plan — Rs.499\n\nPayment link:\n${PAYMENT_499}\n\nPayment ke baad screenshot yahan bhejein.\n\nAyusomam Herbals 🌿`
-      );
-      return;
+      await sendFn(senderId, `Sahi decision 🙏\n\nPayment ke baad screenshot yahan bhejein.\n\nAyusomam Herbals 🌿`);
+      // Send clickable button only on Messenger (sendFn === sendMessage)
+      if (sendFn === sendMessage) await sendPaymentButton(senderId, 1);
+      else await sendFn(senderId, `Payment link:\n${PAYMENT_499}`);
+      return true;
     }
 
     // Protocol 2 — 1299
     if (t === '2' || t.match(/\b1299\b|protocol 2|plan 2/)) {
       userState[senderId] = 'plan_selected';
       await updateLead(senderId, '🔴 Hot', 'protocol_2_selected', userProfile[senderId]?.symptom, '', '', 'Facebook');
-      await sendFn(senderId,
-        `Bahut achha 🙏\n\n14-Day Deep Sinus Protocol — Rs.1,299\n\nPayment link:\n${PAYMENT_1299}\n\nPayment ke baad screenshot yahan bhejein.\n\nAyusomam Herbals 🌿`
-      );
-      return;
+      await sendFn(senderId, `Bahut achha 🙏\n\nPayment ke baad screenshot yahan bhejein.\n\nAyusomam Herbals 🌿`);
+      if (sendFn === sendMessage) await sendPaymentButton(senderId, 2);
+      else await sendFn(senderId, `Payment link:\n${PAYMENT_1299}`);
+      return true;
     }
 
     // Difference question
@@ -571,7 +679,7 @@ async function handleRuleBased(senderId, text, sendFn) {
       await sendFn(senderId,
         `Key difference:\n\nProtocol 1 — 7 din, ek time daily, acute/new cases. Body ko stabilize karna goal.\n\nProtocol 2 — 14 din, subah + raat dono, chronic/old ya spray dependent cases. Root dosha imbalance address karna goal.\n\nDono fundamentally alag hain — ek ka extension nahi.\n\nSeedha batayein — 1 ya 2?`
       );
-      return;
+      return true;
     }
 
     // Specialist
@@ -581,24 +689,27 @@ async function handleRuleBased(senderId, text, sendFn) {
       await sendFn(senderId,
         `Bilkul 🙏 Sachin Ji personally baat karenge.\n📱 ${WHATSAPP_NUM}\n\nAyusomam Herbals 🌿`
       );
-      return;
+      return true;
     }
 
     await sendFn(senderId,
       `Reply karein:\n1 — Protocol 1 (Rs.499)\n2 — Protocol 2 (Rs.1,299)\n3 — Dono mein kya fark hai?\n4 — Specialist se baat 🙏`
     );
-    return;
+    return true;
   }
 
   // ── POST PAYMENT ──
-  if (state === 'plan_selected' || state === 'done') {
+  if (state === 'plan_selected' || state === 'done' || state === 'try_first') {
     await sendFn(senderId, `Kisi bhi madad ke liye seedha WhatsApp karein:\n📱 ${WHATSAPP_NUM}\nAyusomam Herbals 🌿`);
-    return;
+    return true;
   }
+
+  // Unrecognised state — let AI handle
+  return false;
 }
 
 // ============================================================
-// MAIN PROCESSOR — Rule-based only (AI_MODE removed for strict control)
+// MAIN PROCESSOR — Rule-based + AI fallback
 // ============================================================
 async function processMessage(senderId, text, sendFn, platform) {
   if (userState[senderId] === 'human_takeover') {
@@ -608,17 +719,42 @@ async function processMessage(senderId, text, sendFn, platform) {
 
   console.log(`[${platform}] ${senderId}: ${text}`);
 
-  // Payment query — direct intercept
   const t = text.toLowerCase();
+  const state = userState[senderId] || 'new';
+
+  // Payment query — direct intercept
   const isPaymentQuery = t.match(/payment|kaise karu|kitna hai|price|cost|1299|499|buy|lena hai|link do|gpay|phonepe|paytm|order/);
-  if (isPaymentQuery && (userState[senderId] === 'pitched' || userState[senderId] === 'after_steps')) {
-    await sendFn(senderId,
-      `Payment ke liye:\n\n*Protocol 1 (₹499):* 👉 ${PAYMENT_499}\n*Protocol 2 (₹1,299):* 👉 ${PAYMENT_1299}\n\nPayment ke baad screenshot bhejein 🙏\n📱 ${WHATSAPP_NUM}`
-    );
+  if (isPaymentQuery && (state === 'pitched' || state === 'after_steps' || state === 'plan_selected')) {
+    if (sendFn === sendMessage) {
+      await sendFn(senderId, `Payment links:`);
+      await sendPaymentButton(senderId, 1);
+      await sendPaymentButton(senderId, 2);
+    } else {
+      await sendFn(senderId,
+        `Payment links:\n\nProtocol 1 (Rs.499):\n${PAYMENT_499}\n\nProtocol 2 (Rs.1,299):\n${PAYMENT_1299}\n\nPayment ke baad screenshot bhejein 🙏\n${WHATSAPP_NUM}`
+      );
+    }
     return;
   }
 
-  await handleRuleBased(senderId, text, sendFn);
+  // WhatsApp direct contact request
+  if (t.match(/whatsapp|watsapp|contact|call|seedha baat/)) {
+    await sendFn(senderId, `Seedha baat karein:\n📱 ${WHATSAPP_NUM}\n\nAyusomam Herbals 🌿`);
+    return;
+  }
+
+  // Rule-based flow — returns true if handled
+  const handled = await handleRuleBased(senderId, text, sendFn);
+
+  // AI fallback for unrecognised messages
+  if (!handled) {
+    const aiReply = await getAIResponse(senderId, text);
+    if (aiReply) {
+      await sendFn(senderId, aiReply);
+    } else {
+      await sendFn(senderId, `Sachin Ji se seedha baat karein:\n📱 ${WHATSAPP_NUM}\n\nAyusomam Herbals 🌿`);
+    }
+  }
 }
 
 // ============================================================
