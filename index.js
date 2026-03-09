@@ -220,85 +220,93 @@ const SYMPTOM_INSIGHT = {
 // ============================================================
 // FOLLOW-UP MESSAGES
 // ============================================================
-const FOLLOW_UP_MSG = {
-  morning: `Kaisa raha? 🌿
+const SURFACE_MSG = `Yeh surface level relief dega 🙏
 
-Subah ke steps try kiye the — naak mein kuch fark pada? Thoda bhi ho toh batana.`,
-  night: `Subah uthar ke kaisi lag rahi hai naak? 🌅
+Agar aapko sinus baar baar hota hai ya theek nahi ho pa raha — toh sirf in steps se root tak nahi pahunchoge. Iske liye structured approach use karna chahiye jo dosha imbalance pe seedha kaam kare.
 
-Raat ke steps try kiye the — raat ko thoda better tha?`
-};
+Aap kya prefer karenge?
+1️⃣ Abhi structured approach start karna chahta/chahti hun
+2️⃣ Pehle steps try karta/karti hun, baad mein decide karunga/karungi
+
+Number reply karein.`;
 
 // ============================================================
 // DUAL PLAN PITCH
 // ============================================================
-function buildPitch(type, timing, hasRelief) {
-  const reliefLine = hasRelief
-    ? `Achha 🙏 Yeh thodi relief jo mili — yeh sirf surface pe tha. Andar jo chal raha hai woh 2 steps se nahi badlega.\n\n`
-    : `Samajh mein aata hai — itni purani problem 2 steps se thodi nahi jaati. Iske liye kuch aur chahiye.\n\n`;
+function buildPlanMsg(sinusType) {
+  const TYPE_LABEL_MAP = {
+    allergic:   'Vataja-Kaphaja Pratishyaya | Allergic Rhinosinusitis | Dosha: Vata + Kapha',
+    congestive: 'Kaphaja Pratishyaya | Congestive Sinusitis | Dosha: Kapha dominant',
+    heat:       'Pittaja Pratishyaya | Inflammatory Sinusitis | Dosha: Pitta aggravation',
+    dependency: 'Dushta Pratishyaya | Chronic Rebound Sinusitis | Dosha: Vata + Srotas'
+  };
+  const typeLabel = TYPE_LABEL_MAP[sinusType] || 'Pratishyaya';
 
-  const typeLabel = {
-    allergic: 'Allergic Sinus 🌿',
-    congestive: 'Congestive Sinus 🔴',
-    heat: 'Heat / Pittaj Sinus 🔥',
-    dependency: 'Spray Dependency ⚠️'
-  }[type] || 'Sinus Problem';
+  return `Identified presentation: *${typeLabel}*
 
-  return reliefLine +
-`Identified presentation: *${typeLabel}*
+Hum 2 alag protocols offer karte hain — yeh upgrades nahi hain, approaches fundamentally alag hain:
 
-Hum 2 protocols offer karte hain — upgrades nahi, approaches alag hain:
+╔═══════════════════════════════╗
+║   PROTOCOL 1 — Rs.499        ║
+║   7-Day Sinus Stabilization   ║
+╚═══════════════════════════════╝
 
-╔═══════════════════════════╗
-║  🌿 PROTOCOL 1 — ₹499    ║
-║  7-Day Sinus Stabilization ║
-╚═══════════════════════════╝
-
-*Kis ke liye:*
+Kiske liye sahi hai:
 ✔ Problem 6 mahine–1 saal ke andar
-✔ Pehli baar structured try karna hai
-✔ Dekhna chahte ho — kaam karta hai ya nahi
+✔ Pehli baar structured try karna
+✔ Symptoms baar baar aate hain — stable karna hai
 
-*Kya milega:*
-📅 7 din ka protocol
-⏰ Ek time daily routine (subah ya raat)
-📲 WhatsApp pe step-by-step guidance
-🌿 Herbal support — optional, sirf zaroorat pe
-🎯 Body flare mode → stable state
+Kya milega:
+📅 7 din ka complete protocol
+⏰ Ek time daily (subah ya raat) — simple routine
+📲 WhatsApp pe daily guidance
+🌿 Herbal support — optional, zaroorat pe suggest
+🎯 Body ko flare mode se stable state mein laana
 
-╔═══════════════════════════╗
-║  🔥 PROTOCOL 2 — ₹1,299  ║
-║  14-Day Deep Sinus Protocol║
-╚═══════════════════════════╝
+Price: Rs.499 (one-time)
 
-*Kis ke liye:*
-✔ Problem 1+ saal se hai
-✔ Spray pe dependent hain
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+╔═══════════════════════════════╗
+║   PROTOCOL 2 — Rs.1,299      ║
+║   14-Day Deep Sinus Protocol  ║
+╚═══════════════════════════════╝
+
+Kiske liye sahi hai:
+✔ Problem 1+ saal se chal rahi hai
+✔ Nasal spray pe dependent hain
 ✔ Pehle try kar chuke — temporary hi raha
+✔ Root imbalance address karna chahte hain
 
-*Kya milega:*
-📅 14 din ka protocol
-⏰ Subah + Raat — dono time routine
-📊 Daily tracking — steps progress ke saath adjust
-🌿 Herbal support — personalized, included
-🎯 Root imbalance directly address karna
+Kya milega:
+📅 14 din ka complete protocol
+⏰ Subah + Raat — dono time personalized routine
+📊 Daily tracking — steps progress ke saath adjust hoti hain
+🌿 Herbal support included aur personalized
+🩺 Dosha-specific diet guidance
+🎯 Root dosha imbalance directly address karna
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      P1 ₹499    |   P2 ₹1,299
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Dinon    7 din   |    14 din
-Routine  1x/day  |    2x/day
-Tracking Basic   |    Full
-Herbal   Optional|    Included
-Case    Acute/New |    Chronic/Old
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Price: Rs.1,299 (one-time)
 
-⚠️ Yeh dono alag approaches hain — P1 leke baad P2 pe switch nahi hota. Jo aapki situation pe fit kare, wohi pehle se lo.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Sikha Ji (Pune) — P2 se spray dependency mein 14 din mein kaafi improvement.
-Vivek Ji (Noida) — P1 se hi subah ki blockage mein fark aaya.
+         P1 Rs.499   |   P2 Rs.1,299
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Duration    7 din    |    14 din
+Routine    1x/day    |    2x/day
+Tracking    Basic    |    Full daily
+Herbal   Optional    |    Included
+Diet tips    No      |    Yes
+Best for  Acute/New  |    Chronic/Old
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Reply karein — *1* ya *2* 🙏`;
+⚠️ Dono alag approaches hain — ek doosre ka extension nahi. Jo aapki situation pe fit kare wohi lo.
+
+Reply karein:
+1 — Protocol 1 (Rs.499)
+2 — Protocol 2 (Rs.1,299)
+3 — Dono mein kya fark hai?
+4 — Specialist se baat karni hai`;
 }
 
 // ============================================================
@@ -508,53 +516,29 @@ async function handleRuleBased(senderId, text, sendFn) {
     const stepMsg = (FREE_STEPS[timing] && FREE_STEPS[timing][type]) || FREE_STEPS[timing]['congestive'];
     await sendFn(senderId, stepMsg);
 
-    // Auto follow-up: 6hr morning, 8hr night
-    const delayMs = timing === 'morning' ? 6 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000;
-    setTimeout(async () => {
-      if (userState[senderId] === 'free_steps_sent') {
-        try {
-          await sendFn(senderId, FOLLOW_UP_MSG[timing]);
-          userState[senderId] = 'follow_up_sent';
-        } catch (e) { console.error('Follow-up error:', e.message); }
-      }
-    }, delayMs);
+    // Send surface disclaimer + choice immediately
+    userState[senderId] = 'after_steps';
+    await sendFn(senderId, SURFACE_MSG);
     return;
   }
 
-  // ── FOLLOW UP RESPONSE → EMAIL ASK → PITCH ──
-  if (state === 'free_steps_sent' || state === 'follow_up_sent') {
-    const t = text.toLowerCase();
-    // Detect relief or not
-    const hasRelief = t.match(/haan|ha|yes|fark|better|khula|rahat|acha|acha|thoda|helpful|hua|laga|mila/);
-    userProfile[senderId].reportedRelief = !!hasRelief;
-    userState[senderId] = 'email_ask';
-    // Ask email before pitch
-    await sendFn(senderId, EMAIL_ASK);
-    return;
-  }
+  // ── AFTER STEPS: start now or try first ──
+  if (state === 'after_steps') {
+    const t = text.toLowerCase().trim();
+    const wantsTry = t === '2' || t.match(/pehle|try|baad|steps/);
 
-  // ── EMAIL COLLECTION ──
-  if (state === 'email_ask') {
-    const trimmed = text.trim();
-    if (isEmailAddress(trimmed)) {
-      userProfile[senderId].email = trimmed;
-      await updateLead(
-        senderId, '🔴 Hot', 'email_collected',
-        userProfile[senderId].symptom, '', trimmed, 'Facebook',
-        { email: trimmed }
-      );
-      await sendFn(senderId, `Shukriya! 🙏 Email save ho gaya — aage ke reminders aapko milenge.\n\nAb aapke liye protocol options:` );
-    } else {
-      // No valid email — still move forward, save what they said
-      userProfile[senderId].email = null;
-      await sendFn(senderId, `Theek hai 🙏`);
+    if (wantsTry) {
+      userState[senderId] = 'try_first';
+      await updateLead(senderId, '🟡 Warm', 'try_first', userProfile[senderId].symptom, '', '', 'Facebook');
+      await sendFn(senderId, `Bilkul 🙏 Steps try karein — subah aur raat dono.\n\nKuch bhi sawaal ho ya result share karna ho — yahan reply karein.\n\nJab ready ho tab protocol ke liye batayein.`);
+      return;
     }
-    // Now pitch
+
+    // Default: 1 or any other input → show full plans
     userState[senderId] = 'pitched';
-    const type = userProfile[senderId].symptom || 'congestive';
-    const timing = userProfile[senderId].freeStepTiming || 'night';
-    const hasRelief = userProfile[senderId].reportedRelief;
-    await sendFn(senderId, buildPitch(type, timing, hasRelief));
+    const sinusType = userProfile[senderId].symptom || 'congestive';
+    await updateLead(senderId, '🔴 Hot', 'plans_shown', sinusType, '', '', 'Facebook');
+    await sendFn(senderId, buildPlanMsg(sinusType));
     return;
   }
 
@@ -563,45 +547,45 @@ async function handleRuleBased(senderId, text, sendFn) {
     const t = text.toLowerCase().trim();
 
     // Protocol 1 — 499
-    if (t === '1' || t === 'a' || t.match(/\b499\b|protocol 1|plan 1|chota|short|acute|test karna|pehli baar/)) {
+    if (t === '1' || t.match(/\b499\b|protocol 1|plan 1/)) {
       userState[senderId] = 'plan_selected';
       await updateLead(senderId, '🔴 Hot', 'protocol_1_selected', userProfile[senderId]?.symptom, '', '', 'Facebook');
       await sendFn(senderId,
-        `Sahi decision! 🙏\n\n*7-Day Sinus Stabilization Plan — ₹499*\n✦ Pattern-based daily routine over WhatsApp\n✦ Mucus drainage + nasal comfort guidance\n✦ Body ko flare mode se stable state mein laata hai\n\n💳 Payment:\n👉 ${PAYMENT_499}\n\nPayment ke baad screenshot yahan bhejein.\nDay 1 guidance kal milegi.\n\n📱 ${WHATSAPP_NUM}\nAyusomam Herbals 🌿`
+        `Sahi decision 🙏\n\n7-Day Sinus Stabilization Plan — Rs.499\n\nPayment link:\n${PAYMENT_499}\n\nPayment ke baad screenshot yahan bhejein.\n\nAyusomam Herbals 🌿`
       );
       return;
     }
 
     // Protocol 2 — 1299
-    if (t === '2' || t === 'b' || t.match(/\b1299\b|protocol 2|plan 2|long|chronic|spray|dono time|subah raat/)) {
+    if (t === '2' || t.match(/\b1299\b|protocol 2|plan 2/)) {
       userState[senderId] = 'plan_selected';
       await updateLead(senderId, '🔴 Hot', 'protocol_2_selected', userProfile[senderId]?.symptom, '', '', 'Facebook');
       await sendFn(senderId,
-        `Sahi choice! 🙏\n\n*Protocol 2 — ₹1,299*\n✦ Subah + raat dono time personalized routine\n✦ 14 din full tracking + herbal support guidance\n✦ Aapke chronic/long-term case ke liye designed\n\n💳 Payment:\n👉 ${PAYMENT_1299}\n\nPayment ke baad screenshot yahan bhejein.\nDay 1 routine kal milega.\n\n📱 ${WHATSAPP_NUM}\nAyusomam Herbals 🌿`
+        `Bahut achha 🙏\n\n14-Day Deep Sinus Protocol — Rs.1,299\n\nPayment link:\n${PAYMENT_1299}\n\nPayment ke baad screenshot yahan bhejein.\n\nAyusomam Herbals 🌿`
       );
       return;
     }
 
-    // Confusion / which one
-    if (t.match(/kaun sa|which|sochna|confused|difference|fark kya|kya fark|dono mein|samajh nahi/)) {
+    // Difference question
+    if (t === '3' || t.match(/kaun sa|fark|difference|confused|dono mein|samajh/)) {
       await sendFn(senderId,
-        `Yeh dono alag approaches hain — ek doosre ka extension nahi:\n\n*Protocol 1 (₹499)* — Problem short-term hai (6 mahine–1 saal), ya pehli baar try kar rahe hain clarity ke liye. Ek time daily. Yeh apne aap mein complete protocol hai.\n\n*Protocol 2 (₹1,299)* — Problem 1+ saal se hai, ya spray dependent hain. Subah + raat dono time + herbal guidance. Andar ka imbalance deep hai — ek time se approach alag hoti hai.\n\n⚠️ Protocol 1 leke baad 2 pe switch nahi hota — approach change hoti hai, continuity toot jaati hai.\n\nAapki situation ke hisaab se seedha batayein — *1* ya *2*? 🙏`
+        `Key difference:\n\nProtocol 1 — 7 din, ek time daily, acute/new cases. Body ko stabilize karna goal.\n\nProtocol 2 — 14 din, subah + raat dono, chronic/old ya spray dependent cases. Root dosha imbalance address karna goal.\n\nDono fundamentally alag hain — ek ka extension nahi.\n\nSeedha batayein — 1 ya 2?`
       );
       return;
     }
 
-    // Specialist request
-    if (t.match(/specialist|sachin|baat|call|more/)) {
+    // Specialist
+    if (t === '4' || t.match(/specialist|sachin|baat|call/)) {
       userState[senderId] = 'human_takeover';
       await updateLead(senderId, '🔴 Hot', 'requested_specialist', userProfile[senderId]?.symptom, '', '', 'Facebook');
       await sendFn(senderId,
-        `Bilkul! 🙏\nSachin ji seedha aapke saath baat karenge.\n📱 ${WHATSAPP_NUM}\n\nAyusomam Herbals 🌿`
+        `Bilkul 🙏 Sachin Ji personally baat karenge.\n📱 ${WHATSAPP_NUM}\n\nAyusomam Herbals 🌿`
       );
       return;
     }
 
     await sendFn(senderId,
-      `Protocol choose karein:\n\n*1* — ₹499 (acute/short-term, ek time daily)\n*2* — ₹1,299 (long-term/chronic, subah + raat + herbal)\n\nYa Sachin ji se baat: MORE 🙏`
+      `Reply karein:\n1 — Protocol 1 (Rs.499)\n2 — Protocol 2 (Rs.1,299)\n3 — Dono mein kya fark hai?\n4 — Specialist se baat 🙏`
     );
     return;
   }
@@ -627,7 +611,7 @@ async function processMessage(senderId, text, sendFn, platform) {
   // Payment query — direct intercept
   const t = text.toLowerCase();
   const isPaymentQuery = t.match(/payment|kaise karu|kitna hai|price|cost|1299|499|buy|lena hai|link do|gpay|phonepe|paytm|order/);
-  if (isPaymentQuery && userState[senderId] === 'pitched') {
+  if (isPaymentQuery && (userState[senderId] === 'pitched' || userState[senderId] === 'after_steps')) {
     await sendFn(senderId,
       `Payment ke liye:\n\n*Protocol 1 (₹499):* 👉 ${PAYMENT_499}\n*Protocol 2 (₹1,299):* 👉 ${PAYMENT_1299}\n\nPayment ke baad screenshot bhejein 🙏\n📱 ${WHATSAPP_NUM}`
     );
