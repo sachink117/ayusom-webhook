@@ -831,6 +831,41 @@ app.post('/bot-control', (req, res) => {
 // START
 // ============================================================
 const PORT = process.env.PORT || 3000;
+// ============================================================
+// WEBSITE CHATBOT LEAD ENDPOINT
+// ============================================================
+app.post('/website-lead', async (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+
+  try {
+    const { name, phone, sinusType, stage, message } = req.body;
+    console.log(`WEBSITE LEAD: ${name} | ${phone} | ${sinusType} | ${stage}`);
+
+    await updateLead(
+      phone || `web_${Date.now()}`,
+      '🟡 Warm',
+      stage || 'website_chat',
+      sinusType || '',
+      name || 'Website Visitor',
+      message || 'Website chatbot lead',
+      'Website'
+    );
+
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Website lead error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.options('/website-lead', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.sendStatus(200);
+});
 app.listen(PORT, () => {
   console.log(`
  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
