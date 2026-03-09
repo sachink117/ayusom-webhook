@@ -222,68 +222,108 @@ function buildPlanMsg(sinusType) {
   };
   const typeLabel = TYPE_LABEL_MAP[sinusType] || 'Pratishyaya';
 
-  return `Identified presentation: *${typeLabel}*
+  const SOCIAL_PROOF = {
+    allergic: '🙏 Rajesh bhai (Jaipur) — "5 saal se allergy thi, har mausam mein sneeze. Protocol 2 ke Day 6 se sneeze 80% kam ho gayi. Ab bina tissue ke ghar se nikalta hun."',
+    congestive: '🙏 Pooja didi (Delhi) — "3 saal se naak band rehti thi, raat ko muh se saans leti thi. Protocol 2 ke Day 4 se naak khulni shuru hui. Ab neend puri hoti hai."',
+    heat: '🙏 Amit bhai (Pune) — "Sar mein hamesha dard, naak se yellow aata tha. Protocol 2 ke 5th din se headache gayab. Ab 2 mahine ho gaye, wapas nahi aaya."',
+    dependency: '🙏 Neha didi (Mumbai) — "4 saal se Otrivin ke bina so nahi paati thi. Protocol 2 ke 10th din se spray chhod di. Ab naturally saans le rahi hun."'
+  };
 
-Hum 2 alag protocols offer karte hain — yeh upgrades nahi hain, approaches fundamentally alag hain:
+  const SOCIAL_PROOF_2 = {
+    allergic: '🙏 Sunita ji (Lucknow) — "Beti ko dust se sneeze hoti thi roz. 7-day protocol se itna fark aaya ki school mein bhi ab tissue nahi chahiye."',
+    congestive: '🙏 Manoj bhai (Indore) — "Chehra bhaari, pressure rehta tha. 499 wala protocol try kiya — Day 3 se halka lagne laga. Sochta hun 14-day bhi karunga."',
+    heat: '🙏 Kavita didi (Nagpur) — "Naak mein jalan aur thick mucus. Protocol 1 se itna relief mila ki ab mausam badle toh bhi kuch nahi hota."',
+    dependency: '🙏 Ravi bhai (Hyderabad) — "Raat ko 2-3 baar spray lagata tha. Sachin Ji ne Protocol 2 diya — 12th din se spray ki zaroorat hi nahi padi."'
+  };
+
+  const URGENCY = {
+    allergic: '⚠️ Allergy jitni purani hoti hai, naak ki lining utni zyada kharab hoti jaati hai. Aaj shuru karoge toh jaldi theek hoga — kal ka koi bharosa nahi.',
+    congestive: '⚠️ Jitne din naak band rehti hai, utna zyada srotas block hota jaata hai. Ek din ki bhi deri = recovery mein extra din lagte hain.',
+    heat: '⚠️ Pitta badhta jaata hai time ke saath — inflammation aur failti hai. Aaj rok loge toh damage kam hoga.',
+    dependency: '⚠️ Har baar spray lagane se naak ki lining aur kamzor hoti jaati hai. Jitni jaldi chhodo, utni jaldi body khud heal karegi.'
+  };
+
+  const socialProof = SOCIAL_PROOF[sinusType] || SOCIAL_PROOF.congestive;
+  const socialProof2 = SOCIAL_PROOF_2[sinusType] || SOCIAL_PROOF_2.congestive;
+  const urgency = URGENCY[sinusType] || URGENCY.congestive;
+
+  return `Aapki identified presentation: *${typeLabel}*
+
+${urgency}
+
+Dekhiye aapke jaisi problem wale logon ka kya kehna hai:
+
+${socialProof}
+
+${socialProof2}
+
+📊 *Ab tak 600+ logon ne Ayusomam protocols follow kiye hain — har umar, har sheher se.*
+
+Aapke liye 2 protocols hain — dono alag approach hain, upgrade nahi:
 
 ╔═══════════════════════════════╗
-║   PROTOCOL 1 — Rs.499         ║
+║   PROTOCOL 1 — ₹499 only      ║
 ║   7-Day Sinus Stabilization   ║
 ╚═══════════════════════════════╝
-Kiske liye sahi hai:
-✔ Problem 6 mahine–1 saal ke andar
-✔ Pehli baar structured try karna
-✔ Symptoms baar baar aate hain — stable karna hai
+Kiske liye:
+✔ Problem naya hai — 6 mahine se 1 saal
+✔ Pehli baar kuch structured try karna hai
+✔ Baar baar hota hai — ek baar stable karna hai
 
 Kya milega:
-📅 7 din ka complete protocol
-⏰ Ek time daily (subah ya raat) — simple routine
-📲 WhatsApp pe daily guidance
-🌿 Herbal support — optional, zaroorat pe suggest
-🎯 Body ko flare mode se stable state mein laana
+📅 7 din ka poora protocol — roz clear steps
+⏰ Sirf 15-20 min daily — subah ya raat
+📲 Sachin Ji personally WhatsApp pe guide karenge
+🌿 Ghar ke ingredients + zaroorat pe herbal support
+🎯 Body ko flare mode se bahar laana
 
-Price: Rs.499 (one-time)
+💡 *Sochiye — ek ENT visit mein ₹500-800 jaate hain sirf consultation ke. Yahaan ₹499 mein 7 din ka complete protocol + daily guidance milegi.*
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ╔═══════════════════════════════╗
-║   PROTOCOL 2 — Rs.1,299       ║
+║   PROTOCOL 2 — ₹1,299         ║
 ║   14-Day Deep Sinus Protocol  ║
 ╚═══════════════════════════════╝
-Kiske liye sahi hai:
-✔ Problem 1+ saal se chal rahi hai
-✔ Nasal spray pe dependent hain
-✔ Pehle try kar chuke — temporary hi raha
-✔ Root imbalance address karna chahte hain
+⭐ *SABSE POPULAR — 10 mein se 7 log yahi lete hain*
+
+Kiske liye:
+✔ Problem purani hai — 1 saal se zyada
+✔ Spray ya medicine pe depend ho gaye ho
+✔ Pehle bahut try kiya — temporary relief hi mila
+✔ Ab root cause se theek karna hai — permanently
 
 Kya milega:
-📅 14 din ka complete protocol
-⏰ Subah + Raat — dono time personalized routine
-📊 Daily tracking — steps progress ke saath adjust hoti hain
-🌿 Herbal support included aur personalized
-🩺 Dosha-specific diet guidance
-🎯 Root dosha imbalance directly address karna
+📅 14 din ka complete protocol — har din progress hogi
+⏰ Subah + Raat — dono waqt personalized routine
+📊 Daily tracking — aapke hisaab se steps adjust hongi
+🌿 Herbal support included — sab kuch personalized
+🩺 Aapke dosha ke hisaab se khaana-peena bhi batayenge
+📲 Sachin Ji se seedha WhatsApp pe baat — jab chaaho
+🎯 Root dosha imbalance ko seedha address karna
 
-Price: Rs.1,299 (one-time)
+💡 *Monthly medicines pe ₹1,500-3,000 jaate hain — aur phir bhi wapas aata hai. Yahaan ₹1,299 mein 14 din ka deep protocol jo root cause pe kaam karta hai.*
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-             P1 Rs.499  |  P2 Rs.1,299
+             P1 ₹499    |  P2 ₹1,299
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Duration     7 din      |  14 din
 Routine      1x/day     |  2x/day
 Tracking     Basic      |  Full daily
 Herbal       Optional   |  Included
-Diet tips    No         |  Yes
-Best for     Acute/New  |  Chronic/Old
+Diet plan    Nahi       |  Haan
+Best for     Naya       |  Purana/Chronic
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🕐 *Aaj shuru karein — kal subah tak Day 1 protocol aapke WhatsApp pe hoga.*
 
 ⚠️ Dono alag approaches hain — ek doosre ka extension nahi. Jo aapki situation pe fit kare wohi lo.
 
-Reply karein:
-1 — Protocol 1 (Rs.499)
-2 — Protocol 2 (Rs.1,299)
+Bas reply karein:
+1 — Protocol 1 (₹499)
+2 — Protocol 2 (₹1,299)
 3 — Dono mein kya fark hai?
-4 — Specialist se baat karni hai`;
+4 — Sachin Ji se seedha baat karni hai`;
 }
 
 // ============================================================
