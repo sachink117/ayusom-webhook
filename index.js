@@ -16,7 +16,7 @@ const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
 
 const PAGE_ID = '1035532399636645';
 const PAYMENT_1299 = 'https://rzp.io/rzp/qu8zhQT';
-const PAYMENT_499 = 'https://rzp.io/rzp/qu8zhQT'; // 499 link same for now — update when ready
+const PAYMENT_499 = 'https://rzp.io/rzp/Re2W26iX';
 const WHATSAPP_NUM = '+91 85951 60713';
 const WEBSITE = 'www.ayusomamherbals.com';
 
@@ -180,6 +180,36 @@ Subah zaroor batana — spray lena pada ya nahi? 🙏`
 };
 
 // ============================================================
+// ASSESSMENT INSIGHTS — educational line after each answer
+// ============================================================
+const DURATION_INSIGHT = {
+  short:    '📌 Short-term mein body abhi reactive phase mein hai — sahi approach se results zyada fast aate hain.',
+  medium:   '📌 6 mahine–1 saal mein pattern set hone lagta hai — structured intervention sahi time pe hai.',
+  long:     '📌 1–3 saal mein problem chronic hone ki taraf jaati hai — root cause pe kaam karna zaroori ho jaata hai.',
+  verylong: '📌 3+ saal ki chronic condition mein repeated stress hua hai — deep protocol hi kaam karta hai.'
+};
+
+const TRIED_INSIGHT = {
+  'kuch nahi':   '📌 Abhi tak kuch try nahi kiya — body naturally respond karti hai structured approach se jab already medicated na ho.',
+  allopathy:     '📌 Allopathy symptoms suppress karti hai — inflammation temporarily thami, root cause waise ka waisa rehta hai. Isliye band karne pe symptoms wapas aate hain.',
+  'nasal spray': '📌 Nasal spray naak ki lining constrict karti hai — temporary open hoti hai. Regular use se mucosal damage aur dependency badhti hai.',
+  'sab try kiya':'📌 Root cause pe seedha kaam nahi hua isliye wapas aaya. Ayurvedic approach underlying imbalance pe kaam karti hai, sirf symptoms pe nahi.'
+};
+
+const SEVERITY_INSIGHT = {
+  mild:     '📌 Abhi flare mode mild hai — sahi time hai tackle karne ka before it becomes moderate.',
+  moderate: '📌 Moderate impact matlab body already compensating kar rahi hai daily — structured intervention needed.',
+  severe:   '📌 Severe impact mein sleep, focus, energy sab affected — yeh sirf sinus nahi, quality of life issue hai.'
+};
+
+const SYMPTOM_INSIGHT = {
+  congestive: '📌 Congestive pattern — balgam ya inflammation nasal passage block kar rahi hai.',
+  allergic:   '📌 Allergic pattern — immune system over-react kar rahi hai triggers pe.',
+  heat:       '📌 Pittaj/Heat pattern — andar inflammatory heat hai jo thick discharge aur pressure create kar rahi hai.',
+  dependency: '📌 Dependency pattern — spray ne natural breathing mechanism ko override kar diya hai.'
+};
+
+// ============================================================
 // FOLLOW-UP MESSAGES
 // ============================================================
 const FOLLOW_UP_MSG = {
@@ -213,36 +243,58 @@ function buildPitch(type, timing, hasRelief) {
   return reliefLine +
 `Aapka type: *${typeLabel}*
 
-Hum 2 alag protocols offer karte hain — yeh upgrades nahi hain, dono ki approach alag hai. Jo aapki situation pe fit kare, wohi sahi hai.
+Hum 2 protocols offer karte hain — upgrades nahi, approaches alag hain:
 
-━━━━━━━━━━━━━━━━━━━━
-🌿 *Protocol 1 — ₹499*
-Acute / Short-term / Pehli baar try karna hai
-━━━━━━━━━━━━━━━━━━━━
-✦ Problem 6 mahine se 1 saal ke andar hai
-✦ Ya clarity chahiye — pehle dekh lena chahte ho kaise kaam karta hai
-✦ Ek time daily structured Ayurvedic routine (subah ya raat)
-✦ 14 din ka focused step-by-step protocol
-✦ Yeh apne aap mein complete hai — iska kaam specific, targeted hai
+╔═══════════════════════════╗
+║  🌿 PROTOCOL 1 — ₹499    ║
+║  7-Day Sinus Stabilization ║
+╚═══════════════════════════╝
 
-━━━━━━━━━━━━━━━━━━━━
-🔥 *Protocol 2 — ₹1,299*
-Long-term / Chronic / Spray dependency
-━━━━━━━━━━━━━━━━━━━━
-✦ Problem 1+ saal se hai, ya spray pe dependent hain
-✦ Andar ka imbalance zyada deep hai — ek time se address nahi hoga
-✦ Subah + raat dono time personalized routine
-✦ 14 din full tracking — progress ke hisaab se steps adjust hoti hain
-✦ Herbal support guidance — kya lena hai, kab lena hai, kaise
-✦ Yeh Protocol 1 ka extension nahi hai — iska approach hi alag hai
+*Kis ke liye:*
+✔ Problem 6 mahine–1 saal ke andar
+✔ Pehli baar structured try karna hai
+✔ Dekhna chahte ho — kaam karta hai ya nahi
 
-⚠️ *Important:* Dono protocols separately designed hain. Protocol 1 leke baad Protocol 2 pe switch nahi ho sakta — approach change ho jaati hai, continuity nahi rehti. Jo sahi lagta ho, wohi pehle se lo.
+*Kya milega:*
+📅 7 din ka protocol
+⏰ Ek time daily routine (subah ya raat)
+📲 WhatsApp pe step-by-step guidance
+🌿 Herbal support — optional, sirf zaroorat pe
+🎯 Body flare mode → stable state
 
-Hamare patients:
-Sikha Ji (Pune) — Protocol 2 se spray dependency mein 14 din mein kaafi improvement.
-Vivek Ji (Noida) — Protocol 1 se hi subah ki blockage mein clearly fark aaya.
+╔═══════════════════════════╗
+║  🔥 PROTOCOL 2 — ₹1,299  ║
+║  14-Day Deep Sinus Protocol║
+╚═══════════════════════════╝
 
-Seedha batayein — *1* ya *2*? 🙏`;
+*Kis ke liye:*
+✔ Problem 1+ saal se hai
+✔ Spray pe dependent hain
+✔ Pehle try kar chuke — temporary hi raha
+
+*Kya milega:*
+📅 14 din ka protocol
+⏰ Subah + Raat — dono time routine
+📊 Daily tracking — steps progress ke saath adjust
+🌿 Herbal support — personalized, included
+🎯 Root imbalance directly address karna
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      P1 ₹499    |   P2 ₹1,299
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Dinon    7 din   |    14 din
+Routine  1x/day  |    2x/day
+Tracking Basic   |    Full
+Herbal   Optional|    Included
+Best for Acute   |    Chronic
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ Yeh dono alag approaches hain — P1 leke baad P2 pe switch nahi hota. Jo aapki situation pe fit kare, wohi pehle se lo.
+
+Sikha Ji (Pune) — P2 se spray dependency mein 14 din mein kaafi improvement.
+Vivek Ji (Noida) — P1 se hi subah ki blockage mein fark aaya.
+
+Reply karein — *1* ya *2* 🙏`;
 }
 
 // ============================================================
@@ -384,6 +436,8 @@ async function handleRuleBased(senderId, text, sendFn) {
     }
     userProfile[senderId].duration = ans;
     userState[senderId] = 'q2_symptom';
+    const dInsight = DURATION_INSIGHT[ans] || '';
+    if (dInsight) await sendFn(senderId, dInsight);
     await sendFn(senderId,
       `Samajh gaya 🙏\n\nMain problem kya hai?\n1️⃣ Naak band, chehra bhaari, pressure\n2️⃣ Sneezing, runny nose, dust/mausam se trigger\n3️⃣ Burning sensation, thick mucus, sar dard\n4️⃣ Nasal spray ke bina so nahi sakta\n\nNumber reply karein.`
     );
@@ -402,8 +456,10 @@ async function handleRuleBased(senderId, text, sendFn) {
     }
     userProfile[senderId].symptom = ans;
     userState[senderId] = 'q3_tried';
+    const sInsight = SYMPTOM_INSIGHT[ans] || '';
+    if (sInsight) await sendFn(senderId, sInsight);
     await sendFn(senderId,
-      `Theek hai 🙏\n\nPehle kuch try kiya?\n1️⃣ Nahi, abhi tak kuch nahi\n2️⃣ Allopathy / antibiotic\n3️⃣ Nasal spray\n4️⃣ Sab try kiya — relief temporary hi raha\n\nNumber reply karein.`
+      `Pehle kuch try kiya?\n1️⃣ Nahi, abhi tak kuch nahi\n2️⃣ Allopathy / antibiotic\n3️⃣ Nasal spray\n4️⃣ Sab try kiya — relief temporary hi raha\n\nNumber reply karein.`
     );
     return;
   }
@@ -416,10 +472,13 @@ async function handleRuleBased(senderId, text, sendFn) {
       return;
     }
     const map = { 1: 'kuch nahi', 2: 'allopathy', 3: 'nasal spray', 4: 'sab try kiya' };
-    userProfile[senderId].tried = map[num];
+    const triedVal = map[num];
+    userProfile[senderId].tried = triedVal;
     userState[senderId] = 'q4_severity';
+    const tInsight = TRIED_INSIGHT[triedVal] || '';
+    if (tInsight) await sendFn(senderId, tInsight);
     await sendFn(senderId,
-      `Aur ek — roz ki life mein kitna affect karta hai?\n1️⃣ Thoda — adjust ho jaata hun\n2️⃣ Moderate — kaafi takleef hoti hai\n3️⃣ Severe — neend, kaam, sab affected\n\nNumber reply karein.`
+      `Roz ki life mein kitna affect karta hai?\n1️⃣ Thoda — adjust ho jaata hun\n2️⃣ Moderate — kaafi takleef hoti hai\n3️⃣ Severe — neend, kaam, sab affected\n\nNumber reply karein.`
     );
     return;
   }
@@ -431,7 +490,10 @@ async function handleRuleBased(senderId, text, sendFn) {
       await sendFn(senderId, '1, 2 ya 3 reply karein 🙏');
       return;
     }
-    userProfile[senderId].severity = { 1: 'mild', 2: 'moderate', 3: 'severe' }[num];
+    const sevVal = { 1: 'mild', 2: 'moderate', 3: 'severe' }[num];
+    userProfile[senderId].severity = sevVal;
+    const sevInsight = SEVERITY_INSIGHT[sevVal] || '';
+    if (sevInsight) await sendFn(senderId, sevInsight);
     const type = userProfile[senderId].symptom || 'congestive';
     const timing = getTimeSlot();
     userProfile[senderId].freeStepTiming = timing;
@@ -501,7 +563,7 @@ async function handleRuleBased(senderId, text, sendFn) {
       userState[senderId] = 'plan_selected';
       await updateLead(senderId, '🔴 Hot', 'protocol_1_selected', userProfile[senderId]?.symptom, '', '', 'Facebook');
       await sendFn(senderId,
-        `Sahi decision! 🙏\n\n*Protocol 1 — ₹499*\n✦ Ek time daily structured Ayurvedic routine\n✦ 14 din focused protocol — aapke type ke liye\n\n💳 Payment:\n👉 ${PAYMENT_499}\n\nPayment ke baad screenshot yahan bhejein.\nDay 1 routine kal milega.\n\n📱 ${WHATSAPP_NUM}\nAyusomam Herbals 🌿`
+        `Sahi decision! 🙏\n\n*7-Day Sinus Stabilization Plan — ₹499*\n✦ Pattern-based daily routine over WhatsApp\n✦ Mucus drainage + nasal comfort guidance\n✦ Body ko flare mode se stable state mein laata hai\n\n💳 Payment:\n👉 ${PAYMENT_499}\n\nPayment ke baad screenshot yahan bhejein.\nDay 1 guidance kal milegi.\n\n📱 ${WHATSAPP_NUM}\nAyusomam Herbals 🌿`
       );
       return;
     }
