@@ -247,7 +247,7 @@ function buildPlanMsg(sinusType) {
 Hum 2 alag protocols offer karte hain — yeh upgrades nahi hain, approaches fundamentally alag hain:
 
 ╔═══════════════════════════════╗
-║   PROTOCOL 1 — Rs.499        ║
+║   PROTOCOL 1 — Rs.499         ║
 ║   7-Day Sinus Stabilization   ║
 ╚═══════════════════════════════╝
 
@@ -268,7 +268,7 @@ Price: Rs.499 (one-time)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ╔═══════════════════════════════╗
-║   PROTOCOL 2 — Rs.1,299      ║
+║   PROTOCOL 2 — Rs.1,299       ║
 ║   14-Day Deep Sinus Protocol  ║
 ╚═══════════════════════════════╝
 
