@@ -25,6 +25,7 @@ const WHATSAPP_NUM = '+91 85951 60713';
 const userState = {};
 const userProfile = {};
 const convHistory = {};
+const followUpTracker = {}; // { senderId: { pitchedAt, followUp1Sent, followUp2Sent, platform, sendFnType } }
 
 // ============================================================
 // IST TIME HELPER
@@ -200,15 +201,116 @@ const SYMPTOM_INSIGHT = {
 // ============================================================
 // FOLLOW-UP MESSAGE
 // ============================================================
-const SURFACE_MSG = `Yeh surface level relief dega 🙏
+const SURFACE_MSG = `☝️ Yeh steps temporary relief ke liye hain — root cause pe kaam nahi karte.
 
-Agar aapko sinus baar baar hota hai ya theek nahi ho pa raha — toh sirf in steps se root tak nahi pahunchoge. Iske liye structured approach use karna chahiye jo dosha imbalance pe seedha kaam kare.
+Agar sinus baar baar aata hai ya months se chal raha hai — toh andar ka dosha imbalance address karna padega. Warna yeh cycle chalti rahegi 🔄
 
-Aap kya prefer karenge?
-1️⃣ Abhi structured approach start karna chahta/chahti hun
-2️⃣ Pehle steps try karta/karti hun, baad mein decide karunga/karungi
+Aap batayein:
+1️⃣ Haan, structured protocol dekhna hai
+2️⃣ Pehle steps try karti/karta hun, baad mein bataungi/bataunga`;
 
-Number reply karein.`;
+// ============================================================
+// FOLLOW-UP MESSAGES (24hr & 48hr)
+// ============================================================
+const FOLLOWUP_24HR = {
+  allergic: `Hey 👋 Kal aapne assessment kiya tha na?
+
+Steps try kiye? Kuch fark aaya? 🤔
+
+Ek insight dein — allergic sinus mein naak ki lining har trigger ke saath aur sensitive hoti jaati hai. Matlab jitna late karein, utna zyada react karegi 📈
+
+Typically jo log protocol follow karte hain — Day 5-6 tak sneezing noticeably kam hoti hai ✅
+
+Agar ready hain — bas 1 ya 2 reply karein, kal se shuru 🙏
+1 — ₹499 (7-day)
+2 — ₹1,299 (14-day)`,
+
+  congestive: `Hey 👋 Kal assessment hua tha na aapka?
+
+Steam/rinse se kuch relief aaya? 🤔
+
+Ek zaroori baat — congestion mein srotas (nasal channels) jitne din block rehte hain, utne zyada thick hote jaate hain. Recovery mein har din ka delay matter karta hai 📈
+
+Typically protocol follow karne pe Day 3-4 se naak khulni start hoti hai ✅
+
+Ready hain toh bas reply karein — kal se Day 1 🙏
+1 — ₹499 (7-day)
+2 — ₹1,299 (14-day)`,
+
+  heat: `Hey 👋 Kal assessment hua tha aapka
+
+Steps se kuch fark laga? 🤔
+
+Ek important baat — Pitta-based inflammation aise nahi rukti, time ke saath surrounding areas mein failti hai. Jitni jaldi address karein, utna kam damage 📈
+
+Protocol follow karne wale logon ko typically Week 1 mein clear reduction dikhta hai ✅
+
+Shuru karna hai toh bas reply karein 🙏
+1 — ₹499 (7-day)
+2 — ₹1,299 (14-day)`,
+
+  dependency: `Hey 👋 Kal assessment hua tha na aapka?
+
+Steam try kiya? Spray thodi kam lagi? 🤔
+
+Ek seedhi baat — har baar spray lagane se naak ki lining aur patli hoti jaati hai. Yeh dependency ka cycle hai — jitni jaldi todein, utna acha 📈
+
+Protocol follow karne wale log typically 10-12 din mein spray significantly kam kar paate hain ✅
+
+Ready hain toh bas reply karein 🙏
+1 — ₹499 (7-day)
+2 — ₹1,299 (14-day)`
+};
+
+const FOLLOWUP_48HR = {
+  allergic: `🙏 Last message aapke liye —
+
+Sochiye — har mahine ENT pe ₹500-800 jaate hain, medicines alag. Phir bhi mausam badle toh wapas shuru.
+
+₹499 mein 7 din ka complete protocol milta hai — daily guidance ke saath. Aur ₹1,299 mein 14 din ka deep protocol jo root dosha imbalance pe kaam karta hai.
+
+Iske baad hum aapko message nahi karenge ✋
+Jab mann ho tab reply karein:
+1 — ₹499 (7-day)
+2 — ₹1,299 (14-day)
+3 — Sachin Ji se baat`,
+
+  congestive: `🙏 Last message aapke liye —
+
+Monthly medicines pe ₹1,500-3,000 lagte hain — phir bhi naak band ki band. Kyunki wo sirf symptoms pe kaam karti hain, root cause pe nahi.
+
+₹499 mein 7 din ka structured protocol. ₹1,299 mein 14 din ka deep protocol — dosha level pe kaam karta hai.
+
+Iske baad hum aapko message nahi karenge ✋
+Jab chahein reply karein:
+1 — ₹499 (7-day)
+2 — ₹1,299 (14-day)
+3 — Sachin Ji se baat`,
+
+  heat: `🙏 Last message aapke liye —
+
+Inflammation jab tak andar se address nahi hoti — tablets se temporary suppress hoke wapas aati hai. Yahi cycle chal raha hai.
+
+₹499 mein 7 din ka protocol. ₹1,299 mein 14 din ka deep protocol — Pitta dosha ko root se balance karta hai.
+
+Iske baad hum message nahi karenge ✋
+Jab ready hon reply karein:
+1 — ₹499 (7-day)
+2 — ₹1,299 (14-day)
+3 — Sachin Ji se baat`,
+
+  dependency: `🙏 Last message aapke liye —
+
+Spray se naak khulti hai — lekin band karo toh double block. Yeh rebound cycle hai. Medicines isse nahi todti — naak ki lining ko heal karna padta hai.
+
+₹499 mein 7 din ka protocol. ₹1,299 mein 14 din ka deep protocol — mucosal healing + spray withdrawal dono cover karta hai.
+
+Iske baad hum message nahi karenge ✋
+Jab chahein reply karein:
+1 — ₹499 (7-day)
+2 — ₹1,299 (14-day)
+3 — Sachin Ji se baat`
+};
 
 // ============================================================
 // DUAL PLAN PITCH
@@ -222,108 +324,76 @@ function buildPlanMsg(sinusType) {
   };
   const typeLabel = TYPE_LABEL_MAP[sinusType] || 'Pratishyaya';
 
-  const SOCIAL_PROOF = {
-    allergic: '🙏 Rajesh bhai (Jaipur) — "5 saal se allergy thi, har mausam mein sneeze. Protocol 2 ke Day 6 se sneeze 80% kam ho gayi. Ab bina tissue ke ghar se nikalta hun."',
-    congestive: '🙏 Pooja didi (Delhi) — "3 saal se naak band rehti thi, raat ko muh se saans leti thi. Protocol 2 ke Day 4 se naak khulni shuru hui. Ab neend puri hoti hai."',
-    heat: '🙏 Amit bhai (Pune) — "Sar mein hamesha dard, naak se yellow aata tha. Protocol 2 ke 5th din se headache gayab. Ab 2 mahine ho gaye, wapas nahi aaya."',
-    dependency: '🙏 Neha didi (Mumbai) — "4 saal se Otrivin ke bina so nahi paati thi. Protocol 2 ke 10th din se spray chhod di. Ab naturally saans le rahi hun."'
+  const INSIGHT = {
+    allergic: '💡 Allergic sinus mein naak ki lining oversensitive ho jaati hai — har trigger pe react karti hai. Jab tak yeh sensitivity address nahi hoti, sneeze-runny nose ka cycle nahi rukega.',
+    congestive: '💡 Congestive sinus mein srotas (nasal channels) mein kapha jamta jaata hai — jitna time jaaye, utna thick ho. Jab tak andar se saaf nahi hoga, naak khulegi nahi properly.',
+    heat: '💡 Inflammatory sinus mein pitta dosha naak ki lining mein heat create karta hai — burning, yellow mucus, headache sab isi ka sign hai. Jab tak pitta balance nahi hoga, yeh repeat hota rahega.',
+    dependency: '💡 Spray naak ki lining ko artificially constrict karti hai — temporary khulti hai, phir double block. Jab tak lining heal nahi hogi, spray chhutegi nahi.'
   };
 
-  const SOCIAL_PROOF_2 = {
-    allergic: '🙏 Sunita ji (Lucknow) — "Beti ko dust se sneeze hoti thi roz. 7-day protocol se itna fark aaya ki school mein bhi ab tissue nahi chahiye."',
-    congestive: '🙏 Manoj bhai (Indore) — "Chehra bhaari, pressure rehta tha. 499 wala protocol try kiya — Day 3 se halka lagne laga. Sochta hun 14-day bhi karunga."',
-    heat: '🙏 Kavita didi (Nagpur) — "Naak mein jalan aur thick mucus. Protocol 1 se itna relief mila ki ab mausam badle toh bhi kuch nahi hota."',
-    dependency: '🙏 Ravi bhai (Hyderabad) — "Raat ko 2-3 baar spray lagata tha. Sachin Ji ne Protocol 2 diya — 12th din se spray ki zaroorat hi nahi padi."'
-  };
+  const insight = INSIGHT[sinusType] || INSIGHT.congestive;
 
-  const URGENCY = {
-    allergic: '⚠️ Allergy jitni purani hoti hai, naak ki lining utni zyada kharab hoti jaati hai. Aaj shuru karoge toh jaldi theek hoga — kal ka koi bharosa nahi.',
-    congestive: '⚠️ Jitne din naak band rehti hai, utna zyada srotas block hota jaata hai. Ek din ki bhi deri = recovery mein extra din lagte hain.',
-    heat: '⚠️ Pitta badhta jaata hai time ke saath — inflammation aur failti hai. Aaj rok loge toh damage kam hoga.',
-    dependency: '⚠️ Har baar spray lagane se naak ki lining aur kamzor hoti jaati hai. Jitni jaldi chhodo, utni jaldi body khud heal karegi.'
-  };
+  return `Aapka assessment complete hua ✅
 
-  const socialProof = SOCIAL_PROOF[sinusType] || SOCIAL_PROOF.congestive;
-  const socialProof2 = SOCIAL_PROOF_2[sinusType] || SOCIAL_PROOF_2.congestive;
-  const urgency = URGENCY[sinusType] || URGENCY.congestive;
+*${typeLabel}*
 
-  return `Aapki identified presentation: *${typeLabel}*
+${insight}
 
-${urgency}
+Aapke liye 2 protocols hain 👇
 
-Dekhiye aapke jaisi problem wale logon ka kya kehna hai:
+━━━━━━━━━━━━━━━━━━━━━
 
-${socialProof}
+⚡ *PROTOCOL 1 — ₹499*
+*7-Day Sinus Stabilization*
 
-${socialProof2}
+✔ Naya problem hai (6 months–1 saal)
+✔ Pehli baar structured try karna hai
+✔ Sirf 15-20 min daily
 
-📊 *Ab tak 600+ logon ne Ayusomam protocols follow kiye hain — har umar, har sheher se.*
+📅 7 din — roz clear steps
+📲 Sachin Ji WhatsApp pe personally guide karenge
+🌿 Ghar ke cheezein + herbal support
 
-Aapke liye 2 protocols hain — dono alag approach hain, upgrade nahi:
+💰 Ek ENT visit = ₹500-800 sirf consultation
+Yahan ₹499 mein 7 din ka poora protocol + daily guidance
 
-╔═══════════════════════════════╗
-║   PROTOCOL 1 — ₹499 only      ║
-║   7-Day Sinus Stabilization   ║
-╚═══════════════════════════════╝
-Kiske liye:
-✔ Problem naya hai — 6 mahine se 1 saal
-✔ Pehli baar kuch structured try karna hai
-✔ Baar baar hota hai — ek baar stable karna hai
+━━━━━━━━━━━━━━━━━━━━━
 
-Kya milega:
-📅 7 din ka poora protocol — roz clear steps
-⏰ Sirf 15-20 min daily — subah ya raat
-📲 Sachin Ji personally WhatsApp pe guide karenge
-🌿 Ghar ke ingredients + zaroorat pe herbal support
-🎯 Body ko flare mode se bahar laana
+🔥 *PROTOCOL 2 — ₹1,299*
+*14-Day Deep Sinus Protocol*
+⭐ Sabse zyada log yahi lete hain
 
-💡 *Sochiye — ek ENT visit mein ₹500-800 jaate hain sirf consultation ke. Yahaan ₹499 mein 7 din ka complete protocol + daily guidance milegi.*
+✔ Purani problem — 1+ saal
+✔ Spray/medicine pe depend hain
+✔ Pehle try kiya — temporary hi raha
+✔ Root cause se permanently theek karna hai
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📅 14 din — subah + raat personalized routine
+📊 Daily tracking — aapke progress ke saath adjust hota hai
+🌿 Herbal support included + personalized
+🩺 Dosha ke hisaab se diet guidance
+📲 Sachin Ji se direct WhatsApp access
 
-╔═══════════════════════════════╗
-║   PROTOCOL 2 — ₹1,299         ║
-║   14-Day Deep Sinus Protocol  ║
-╚═══════════════════════════════╝
-⭐ *SABSE POPULAR — 10 mein se 7 log yahi lete hain*
+💰 Monthly medicines = ₹1,500-3,000 — phir bhi wapas aata hai
+Yahan ₹1,299 mein root cause pe seedha kaam
 
-Kiske liye:
-✔ Problem purani hai — 1 saal se zyada
-✔ Spray ya medicine pe depend ho gaye ho
-✔ Pehle bahut try kiya — temporary relief hi mila
-✔ Ab root cause se theek karna hai — permanently
+━━━━━━━━━━━━━━━━━━━━━
+         ₹499      |  ₹1,299
+━━━━━━━━━━━━━━━━━━━━━
+Din      7          |  14
+Routine  1x/day     |  2x/day
+Tracking Basic      |  Full
+Herbal   Optional   |  Included
+Diet     ✗          |  ✓
+━━━━━━━━━━━━━━━━━━━━━
 
-Kya milega:
-📅 14 din ka complete protocol — har din progress hogi
-⏰ Subah + Raat — dono waqt personalized routine
-📊 Daily tracking — aapke hisaab se steps adjust hongi
-🌿 Herbal support included — sab kuch personalized
-🩺 Aapke dosha ke hisaab se khaana-peena bhi batayenge
-📲 Sachin Ji se seedha WhatsApp pe baat — jab chaaho
-🎯 Root dosha imbalance ko seedha address karna
+🕐 Aaj reply karein — kal subah Day 1 aapke WhatsApp pe
 
-💡 *Monthly medicines pe ₹1,500-3,000 jaate hain — aur phir bhi wapas aata hai. Yahaan ₹1,299 mein 14 din ka deep protocol jo root cause pe kaam karta hai.*
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-             P1 ₹499    |  P2 ₹1,299
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Duration     7 din      |  14 din
-Routine      1x/day     |  2x/day
-Tracking     Basic      |  Full daily
-Herbal       Optional   |  Included
-Diet plan    Nahi       |  Haan
-Best for     Naya       |  Purana/Chronic
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🕐 *Aaj shuru karein — kal subah tak Day 1 protocol aapke WhatsApp pe hoga.*
-
-⚠️ Dono alag approaches hain — ek doosre ka extension nahi. Jo aapki situation pe fit kare wohi lo.
-
-Bas reply karein:
-1 — Protocol 1 (₹499)
-2 — Protocol 2 (₹1,299)
-3 — Dono mein kya fark hai?
-4 — Sachin Ji se seedha baat karni hai`;
+Bas number reply karein:
+1 — ₹499 (7-day)
+2 — ₹1,299 (14-day)
+3 — Fark samjhna hai
+4 — Sachin Ji se baat`;
 }
 
 // ============================================================
@@ -499,7 +569,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     userState[senderId] = 'q1_duration';
     await updateLead(senderId, '🟡 Warm', 'assessment_started', '', '', '', 'Facebook');
     await sendFn(senderId,
-      `Namaste! 🙏 Ayusomam Herbals mein swagat hai.\n\nAapko sinus ki takleef hai — sahi jagah aaiye hain.\n\nPehle samajhte hain — yeh problem kitne samay se hai?\n1 — 1 se 6 mahine\n2 — 6 mahine se 1 saal\n3 — 1 se 3 saal\n4 — 3 saal se zyada\n\nBas number reply karein 🙏`
+      `Namaste 🙏 Ayusomam Herbals mein aapka swagat hai.\n\nSinus ki problem hai? Aap bilkul sahi jagah aaye hain ✅\n\nPehle aapki condition samajhte hain — 4 chhote sawaal hain, sirf 2 min lagenge.\n\nYeh problem kitne samay se hai?\n1️⃣ 1–6 mahine\n2️⃣ 6 mahine–1 saal\n3️⃣ 1–3 saal\n4️⃣ 3 saal se zyada\n\nBas number reply karein 👇`
     );
     return true;
   }
@@ -518,7 +588,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     const dInsight = DURATION_INSIGHT[ans] || '';
     if (dInsight) await sendFn(senderId, dInsight);
     await sendFn(senderId,
-      `Samajh gaya 🙏\n\nMain problem kya hai?\n1️⃣ Naak band, chehra bhaari, pressure\n2️⃣ Sneezing, runny nose, dust/mausam se trigger\n3️⃣ Burning sensation, thick mucus, sar dard\n4️⃣ Nasal spray ke bina so nahi sakta\n\nNumber reply karein.`
+      `Noted ✅\n\nAb batayein — sabse zyada kya hota hai?\n1️⃣ Naak band, chehra bhaari, pressure 😤\n2️⃣ Sneezing, runny nose, dust/mausam se trigger 🤧\n3️⃣ Burning, thick mucus, sar dard 🔥\n4️⃣ Nasal spray ke bina saans nahi aati 😰\n\nNumber reply karein 👇`
     );
     return true;
   }
@@ -538,7 +608,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     const sInsight = SYMPTOM_INSIGHT[ans] || '';
     if (sInsight) await sendFn(senderId, sInsight);
     await sendFn(senderId,
-      `Pehle kuch try kiya?\n1️⃣ Nahi, abhi tak kuch nahi\n2️⃣ Allopathy / antibiotic\n3️⃣ Nasal spray\n4️⃣ Sab try kiya — relief temporary hi raha\n\nNumber reply karein.`
+      `Samajh aaya ✅\n\nIske liye pehle kuch try kiya?\n1️⃣ Nahi, kuch nahi kiya abhi tak\n2️⃣ Allopathy / antibiotic li\n3️⃣ Nasal spray use ki\n4️⃣ Sab try kiya — kuch permanent nahi hua 😔\n\nNumber reply karein 👇`
     );
     return true;
   }
@@ -557,7 +627,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     const tInsight = TRIED_INSIGHT[triedVal] || '';
     if (tInsight) await sendFn(senderId, tInsight);
     await sendFn(senderId,
-      `Roz ki life mein kitna affect karta hai?\n1️⃣ Thoda — adjust ho jaata hun\n2️⃣ Moderate — kaafi takleef hoti hai\n3️⃣ Severe — neend, kaam, sab affected\n\nNumber reply karein.`
+      `Last sawaal 👇\n\nDaily life mein kitna affect karta hai?\n1️⃣ Thoda — manage ho jaata hai\n2️⃣ Kaafi — regularly dikkat hoti hai 😣\n3️⃣ Bahut zyada — neend, kaam, sab affected 😫\n\nNumber reply karein 👇`
     );
     return true;
   }
@@ -591,12 +661,14 @@ async function handleRuleBased(senderId, text, sendFn) {
     if (wantsTry) {
       userState[senderId] = 'try_first';
       await updateLead(senderId, '🟡 Warm', 'try_first', userProfile[senderId].symptom, '', '', 'Facebook');
+      followUpTracker[senderId] = { pitchedAt: Date.now(), followUp1Sent: false, followUp2Sent: false, platform: userProfile[senderId].platform || 'facebook' };
       await sendFn(senderId, `Bilkul 🙏 Steps try karein — subah aur raat dono.\n\nKuch bhi sawaal ho ya result share karna ho — yahan reply karein.\n\nJab ready ho tab protocol ke liye batayein.`);
       return true;
     }
     userState[senderId] = 'pitched';
     const sinusType = userProfile[senderId].symptom || 'congestive';
     await updateLead(senderId, '🔴 Hot', 'plans_shown', sinusType, '', '', 'Facebook');
+    followUpTracker[senderId] = { pitchedAt: Date.now(), followUp1Sent: false, followUp2Sent: false, platform: userProfile[senderId].platform || 'facebook' };
     await sendFn(senderId, buildPlanMsg(sinusType));
     return true;
   }
@@ -608,6 +680,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     // Protocol 1
     if (t === '1' || t.match(/\b499\b|protocol 1|plan 1/)) {
       userState[senderId] = 'plan_selected';
+      delete followUpTracker[senderId];
       await updateLead(senderId, '🔴 Hot', 'protocol_1_selected', userProfile[senderId]?.symptom, '', '', 'Facebook');
       await sendFn(senderId,
         `Sahi decision 🙏\n\nPayment link:\n${PAYMENT_499}\n\nPayment ke baad screenshot yahan bhejein.\n\nAyusomam Herbals 🌿`
@@ -618,6 +691,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     // Protocol 2
     if (t === '2' || t.match(/\b1299\b|protocol 2|plan 2/)) {
       userState[senderId] = 'plan_selected';
+      delete followUpTracker[senderId];
       await updateLead(senderId, '🔴 Hot', 'protocol_2_selected', userProfile[senderId]?.symptom, '', '', 'Facebook');
       await sendFn(senderId,
         `Bahut achha 🙏\n\nPayment link:\n${PAYMENT_1299}\n\nPayment ke baad screenshot yahan bhejein.\n\nAyusomam Herbals 🌿`
@@ -668,6 +742,8 @@ async function processMessage(senderId, text, sendFn, platform) {
   }
 
   console.log(`[${platform}] ${senderId}: ${text}`);
+  if (!userProfile[senderId]) userProfile[senderId] = {};
+  userProfile[senderId].platform = platform === 'WhatsApp' ? 'whatsapp' : 'facebook';
   const t = text.toLowerCase();
   const state = userState[senderId] || 'new';
 
@@ -895,20 +971,64 @@ app.options('/website-lead', (req, res) => {
 });
 
 // ============================================================
+// FOLLOW-UP ENGINE (runs every 30 min)
+// ============================================================
+const HOUR_24 = 24 * 60 * 60 * 1000;
+const HOUR_48 = 48 * 60 * 60 * 1000;
+
+setInterval(async () => {
+  const now = Date.now();
+  for (const [userId, tracker] of Object.entries(followUpTracker)) {
+    const state = userState[userId];
+    const sinusType = userProfile[userId]?.symptom || 'congestive';
+    const sendFn = tracker.platform === 'whatsapp' ? sendWAMessage : sendMessage;
+
+    // Skip if user already converted or in human takeover
+    if (['plan_selected', 'done', 'human_takeover'].includes(state)) {
+      delete followUpTracker[userId];
+      continue;
+    }
+
+    const elapsed = now - tracker.pitchedAt;
+
+    // 24hr follow-up
+    if (!tracker.followUp1Sent && elapsed >= HOUR_24) {
+      const msg = FOLLOWUP_24HR[sinusType] || FOLLOWUP_24HR.congestive;
+      await sendFn(userId, msg);
+      tracker.followUp1Sent = true;
+      await updateLead(userId, '🟡 Warm', 'followup_24hr', sinusType, '', '', tracker.platform);
+      console.log(`📩 24hr follow-up sent: ${userId} [${tracker.platform}]`);
+    }
+
+    // 48hr follow-up
+    if (!tracker.followUp2Sent && elapsed >= HOUR_48) {
+      const msg = FOLLOWUP_48HR[sinusType] || FOLLOWUP_48HR.congestive;
+      await sendFn(userId, msg);
+      tracker.followUp2Sent = true;
+      await updateLead(userId, '🟡 Warm', 'followup_48hr_final', sinusType, '', '', tracker.platform);
+      console.log(`📩 48hr final follow-up sent: ${userId} [${tracker.platform}]`);
+      // Remove after last follow-up
+      delete followUpTracker[userId];
+    }
+  }
+}, 30 * 60 * 1000); // Check every 30 minutes
+
+// ============================================================
 // START
 // ============================================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Ayusomam Herbals Bot v2 — Running
-Port    : ${PORT}
-Mode    : ✅ Rule-Based (Strict)
-Facebook: /webhook
-WhatsApp: /whatsapp
-Razorpay: /razorpay-webhook
-Website : /website-lead
-Plans   : ₹499 (P1) + ₹1,299 (P2)
+Ayusomam Herbals Bot v3 — Running
+Port      : ${PORT}
+Mode      : ✅ Rule-Based (Strict)
+Facebook  : /webhook
+WhatsApp  : /whatsapp
+Razorpay  : /razorpay-webhook
+Website   : /website-lead
+Plans     : ₹499 (P1) + ₹1,299 (P2)
+Follow-up : ✅ 24hr + 48hr auto (every 30 min check)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   `);
 });
