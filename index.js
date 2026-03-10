@@ -437,26 +437,50 @@ Jab ready ho, yeh links hain:
     return;
   }
 
-  // STATE: ASKED_DURATION → Save duration, ask symptoms
+  // STATE: ASKED_DURATION → Echo duration empathetically, ask symptoms
   if (userData.state === "asked_duration") {
     userData.duration = text;
     userData.state = "asked_symptoms";
 
-    await sendMessage(
-      senderId,
-      `Okay. Aur main symptoms jaanna chahta hun — subah naak band rehti hai, smell nahi aati, spray pe depend ho, ya kuch aur? Jo bhi feel hota hai apne words mein batao. 🌿`
-    );
+    const years = extractFirstNumber(text);
+    const tl = text.toLowerCase();
 
-    await logToSheet(senderId, senderName, `Duration: ${text}`, "DURATION", "");
+    let durationAck;
+    if (years >= 10 || (years >= 5 && /saal|year|sal/.test(tl))) {
+      durationAck = `${years} saal se yeh takleef hai aapko... 😮\u200d💨\n\nItne lambe waqt mein body andar se bahut kuch jhel chuki hoti hai — sirf naak nahi, sleep, energy, concentration — sab affect hota hai.\n\nYeh case serious hai aur properly diagnose karna zaroori hai.`;
+    } else if (years >= 2 || /saal|year/.test(tl)) {
+      durationAck = `${years || "Kai"} saal se chal raha hai yeh — iska matlab yeh temporary nahi, andar kuch set ho chuka hai.\n\nSahi diagnosis ke bina treatment kaam nahi karti.`;
+    } else if (/mahine|month|mahina/.test(tl)) {
+      durationAck = `Kaafi waqt se chal rahi hai yeh takleef — is stage pe sahi protocol se jaldi theek ho sakta hai.\n\nPehle thoda aur samajhte hain.`;
+    } else {
+      durationAck = `Okay, samajh gaya. Pehle properly diagnose karte hain — symptoms ke hisaab se sinus ka type alag hota hai aur treatment bhi.`;
+    }
+
+    await sendMessage(senderId, durationAck);
+    await new Promise((r) => setTimeout(r, 1000));
+    await sendMessage(senderId, "Aur symptoms kya hain — subah naak band rehti hai, smell nahi aati, spray pe depend ho, ya kuch aur? Jo bhi feel hota hai apne words mein batao. 🌿");
+
+    await logToSheet(senderId, senderName, "Duration: " + text, "DURATION", "");
     return;
   }
 
-  // STATE: ASKED_SYMPTOMS → Detect type, send reveal + pitch
+  // STATE: ASKED_SYMPTOMS → Echo duration+symptoms, then reveal type
   if (userData.state === "asked_symptoms") {
     userData.symptoms = text;
     const sinusType = detectSinusType(text);
     userData.sinusType = sinusType;
     userData.state = "pitched";
+
+    // Build summary ack — echo their duration + symptoms back
+    const dur = userData.duration || "";
+    const summaryAck = `Theek hai, note kar liya. 🌿\n\n` +
+      `*Aapki situation:*\n` +
+      `📅 Takleef: ${dur} se\n` +
+      `🔍 Symptoms: ${text}\n\n` +
+      `Yeh details dekh ke diagnosis kar raha hun...`;
+
+    await sendMessage(senderId, summaryAck);
+    await new Promise((r) => setTimeout(r, 1500));
 
     // Send reveal
     const reveal = getRevealMessage(sinusType);
