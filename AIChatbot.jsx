@@ -68,61 +68,61 @@ Type: Allergic Rhinosinusitis | Dosha: Vata + Kapha
 
 Aaj ke 2 steps subah try karein - ek doosre ke complementary hain:
 
-1\\ *Tulsi-Ginger Steam* - Subah uthte hi, khaana khaane se pehle
+1. *Tulsi-Ginger Steam* - Subah uthte hi, khaana khaane se pehle
 Ek bhagona paani mein 4-5 fresh tulsi patte + adha inch kuch adrak daalen. Ubaal lein, phir towel sar pe odh ke 8-10 min steam lein. Muh band, sirf naak se saans lein.
 
-⏱\ 15-20 min baad -
+⏱ 15-20 min baad -
 
-2\\ *Saline Nasal Rinse*
-1 cup gunguna paani + \1/2 tsp saindhav namak (sendha namak). Haath ki hatheli mein leke ek naak se kheenchein, doosri se bahar aane dein. Dono taraf.
+2. *Saline Nasal Rinse*
+1 cup gunguna paani + 1/2 tsp saindhav namak (sendha namak). Haath ki hatheli mein leke ek naak se kheenchein, doosri se bahar aane dein. Dono taraf.
 Steam ne mucus dhila kiya - rinse usse bahar karta hai.
 
-⚠\ Yeh steps aaj ke liye temporary surface relief hain. Allergy ka root - sensitized naak ki lining - sirf structured protocol se address hoti hai. Shaam ko zaroor batana - kuch fark mehsoos hua? 🙏`,
+⚠ Yeh steps aaj ke liye temporary surface relief hain. Allergy ka root - sensitized naak ki lining - sirf structured protocol se address hoti hai. Shaam ko zaroor batana - kuch fark mehsoos hua? 🙏`,
 
     congestive: `✅ Kaphaja Pratishyaya 🔵
 Type: Congestive Sinusitis | Dosha: Kapha dominant
 
 Aaj ke 2 steps subah try karein:
 
-1\\ *Adrak-Saunth Steam* - khaali pet, uthte hi
-Paani mein 1 inch kuchi adrak + \1/2 tsp saunth (dry ginger powder) daalen. Ubaal ke 10 min steam lein, towel sar pe. Balgam loose hoga andar se.
+1. *Adrak-Saunth Steam* - khaali pet, uthte hi
+Paani mein 1 inch kuchi adrak + 1/2 tsp saunth (dry ginger powder) daalen. Ubaal ke 10 min steam lein, towel sar pe. Balgam loose hoga andar se.
 
-⏱\ 20-25 min baad -
+⏱ 20-25 min baad -
 
-2\\ *Warm Jal Neti / Saline Rinse*
-1 cup gunguna paani + \1/2 tsp saindhav namak. Naak mein dono taraf rinse karein - gently, force nahi. Loose hua balgam bahar nikalega.
+2. *Warm Jal Neti / Saline Rinse*
+1 cup gunguna paani + 1/2 tsp saindhav namak. Naak mein dono taraf rinse karein - gently, force nahi. Loose hua balgam bahar nikalega.
 
-⚠\ Yeh sirf aaj ke liye temporary relief hai. Andar ki congestion ka source structured approach se hi address hota hai. Shaam ko batana zaroor - kitna fark aaya? 🙏`,
+⚠ Yeh sirf aaj ke liye temporary relief hai. Andar ki congestion ka source structured approach se hi address hota hai. Shaam ko batana zaroor - kitna fark aaya? 🙏`,
 
     heat: `✅ Pittaja Pratishyaya 🔥
 Type: Inflammatory Sinusitis | Dosha: Pitta aggravation
 
 Aaj ke 2 steps subah try karein:
 
-1\\ *Dhaniya-Saunf Infusion* - khaali pet, subah uthke
+1. *Dhaniya-Saunf Infusion* - khaali pet, subah uthke
 1 tsp dhaniya (coriander seeds) + 1 tsp saunf ko raat bhar paani mein bhigo ke rakhein. Subah chhan ke thanda hi peeyein. Pitta ko andar se shant karta hai.
 
-⏱\ 30-40 min baad khaana khaane ke baad -
+⏱ 30-40 min baad khaana khaane ke baad -
 
-2\\ *Ghee Nasya* (medicated nasal application)
+2. *Ghee Nasya* (medicated nasal application)
 Dono naak mein 1-1 boond pure desi ghee (garm nahi - room temp). 5 min bilkul still baith ke rakhein. Burning sensation aur inflammation mein seedha kaam karta hai.
 
-⚠\ Yeh andar ki pitta vitiation ka root address nahi karti - sirf aaj ke liye relief hai. Shaam ko zaroor batana 🙏`,
+⚠ Yeh andar ki pitta vitiation ka root address nahi karti - sirf aaj ke liye relief hai. Shaam ko zaroor batana 🙏`,
 
-    dependency: `✅ Dushta Pratishyaya ⚠\
+    dependency: `✅ Dushta Pratishyaya ⚠
 Type: Chronic Rebound Sinusitis | Dosha: Vata + Srotas blockage
 
 Aaj ke 2 steps subah try karein:
 
-1\\ *Pre-Spray Steam Replacement*
+1. *Pre-Spray Steam Replacement*
 Spray use karne se pehle 10 min steam karein - plain paani, koi additive nahi. Agar naak khul jaaye toh spray ki zaroorat na padhe. Agar padhe toh sirf ek naak mein - doosri naak open rahe.
 
-⏱\ Dono ke beech minimum 30 min ka gap -
+⏱ Dono ke beech minimum 30 min ka gap -
 
-2\\ *Anu Taila / Desi Ghee Nasya*
+2. *Anu Taila / Desi Ghee Nasya*
 Steam ke 30 min baad, dono naak mein 1-1 boond desi ghee ya anu taila (Ayurvedic nasal drops - easily available). Naak ki lining ko nourish karta hai - spray ki harshness se healing shuru hoti hai.
 
-⚠\ Spray ne jo mucosal damage kiya hai - yeh ghee se thodi healing karta hai, lekin dependency todne ke liye structured protocol chahiye. Shaam ko zaroor batana 🙏`
+⚠ Spray ne jo mucosal damage kiya hai - yeh ghee se thodi healing karta hai, lekin dependency todne ke liye structured protocol chahiye. Shaam ko zaroor batana 🙏`
   },
   night: {
     allergic: `✅ Vataja-Kaphaja Pratishyaya 🌿
@@ -130,60 +130,60 @@ Type: Allergic Rhinosinusitis | Dosha: Vata + Kapha
 
 Aaj raat ke 2 steps try karein:
 
-1\\ *Haldi-Ghee Nasal Protocol* - Khana khaane ke 1 hour baad
-Ek cup garm doodh mein \1/2 tsp haldi + \1/2 tsp ghee milaen. Dhire dhire peeyein. Saath mein - dono naak mein 1-1 boond desi ghee nasya karein. Andar ki inflammation pe kaam karta hai.
+1. *Haldi-Ghee Nasal Protocol* - Khana khaane ke 1 hour baad
+Ek cup garm doodh mein 1/2 tsp haldi + 1/2 tsp ghee milaen. Dhire dhire peeyein. Saath mein - dono naak mein 1-1 boond desi ghee nasya karein. Andar ki inflammation pe kaam karta hai.
 
-⏱\ 45-60 min baad, sone se 20-30 min pehle -
+⏱ 45-60 min baad, sone se 20-30 min pehle -
 
-2\\ *Sone se Pehle Steam*
+2. *Sone se Pehle Steam*
 4-5 tulsi patte paani mein, 8 min steam. Towel sar pe. Raat ko dustbits aur allergens naak mein settle hote hain - yeh flush karta hai. Steam ke baad seedha so jaayein, bahar hawa mein mat niklein.
 
-⚠\ Yeh raat ke liye surface relief hai - allergy ki root cause waise ki waisi hai. Subah uthke zaroor batana - neend kaisi aayi, naak khuli thi ya band? 🙏`,
+⚠ Yeh raat ke liye surface relief hai - allergy ki root cause waise ki waisi hai. Subah uthke zaroor batana - neend kaisi aayi, naak khuli thi ya band? 🙏`,
 
     congestive: `✅ Kaphaja Pratishyaya 🔵
 Type: Congestive Sinusitis | Dosha: Kapha dominant
 
 Aaj raat ke 2 steps try karein:
 
-1\\ *Adrak-Haldi Kadha* - Raat ke khane ke 30-40 min baad
-\1/2 inch adrak + \1/2 tsp haldi + 1 cup paani - 5 min ubaalein. Thoda thanda karke peeyein. Balgam ko andar se loose karta hai overnight.
+1. *Adrak-Haldi Kadha* - Raat ke khane ke 30-40 min baad
+1/2 inch adrak + 1/2 tsp haldi + 1 cup paani - 5 min ubaalein. Thoda thanda karke peeyein. Balgam ko andar se loose karta hai overnight.
 
-⏱\ 40-50 min baad, sone se 15-20 min pehle -
+⏱ 40-50 min baad, sone se 15-20 min pehle -
 
-2\\ *Steam + Ghee Nasya*
+2. *Steam + Ghee Nasya*
 10 min steam (towel sar pe). Phir 5 min baith ke - dono naak mein 1-1 boond desi ghee. Steam ne balgam dhila kiya, ghee nasal lining ko coat karta hai taki raat ko throat mein na girta rahe.
 
-⚠\ Yeh sirf aaj raat ke liye temporary relief hai. Subah uthke naak ki condition zaroor batana 🙏`,
+⚠ Yeh sirf aaj raat ke liye temporary relief hai. Subah uthke naak ki condition zaroor batana 🙏`,
 
     heat: `✅ Pittaja Pratishyaya 🔥
 Type: Inflammatory Sinusitis | Dosha: Pitta aggravation
 
 Aaj raat ke 2 steps try karein:
 
-1\\ *Cooling Drink Before Dinner*
+1. *Cooling Drink Before Dinner*
 Khana khaane se 20-30 min pehle - 1 glass room-temp nariyal paani ya saunf-dhaniya infusion (raat bhar bhigo ke). Fried, spicy, fermented khana aaj avoid karein - pitta raat ko badhta hai.
 
-⏱\ Khana khaane ke 1 hour baad -
+⏱ Khana khaane ke 1 hour baad -
 
-2\\ *Chandan-Ghee Nasya*
+2. *Chandan-Ghee Nasya*
 Dono naak mein 1-1 boond desi ghee. Sone se pehle 5 min bilkul still baith ke rakhein. Ghee cooling + anti-inflammatory hota hai - pitta-based burning pe seedha kaam karta hai.
 
-⚠\ Yeh raat ke liye surface-level relief hai. Pitta ka root internally address karna padega. Subah kaise feel hua zaroor batana 🙏`,
+⚠ Yeh raat ke liye surface-level relief hai. Pitta ka root internally address karna padega. Subah kaise feel hua zaroor batana 🙏`,
 
-    dependency: `✅ Dushta Pratishyaya ⚠\
+    dependency: `✅ Dushta Pratishyaya ⚠
 Type: Chronic Rebound Sinusitis | Dosha: Vata + Srotas blockage
 
 Aaj raat ke 2 steps try karein:
 
-1\\ *Spray se Pehle Steam Trial*
+1. *Spray se Pehle Steam Trial*
 Sone se pehle 10 min steam - plain paani. Naak kholne ki koshish spray ki jagah steam se karein. Agar zaroorat pad hi jaaye toh sirf ek naak, minimum amount.
 
-⏱\ Steam ke 30-40 min baad -
+⏱ Steam ke 30-40 min baad -
 
-2\\ *Ghee Nasya + Correct Sleeping Position*
+2. *Ghee Nasya + Correct Sleeping Position*
 Dono naak mein 1-1 boond desi ghee. Sone ki position: jis taraf naak zyada khuli ho - us taraf nahi, doosri taraf karwat lein. Gravity se dono naak ko equally breathe karne ka mauka milta hai.
 
-⚠\ Spray dependency mein mucosal damage heal hone mein time lagta hai - yeh raat ke liye thodi madad hai. Subah zaroor batana - spray lena pada ya nahi? 🙏`
+⚠ Spray dependency mein mucosal damage heal hone mein time lagta hai - yeh raat ke liye thodi madad hai. Subah zaroor batana - spray lena pada ya nahi? 🙏`
   }
 };
 
@@ -250,7 +250,7 @@ Diet     ✗          |  ✓
 }
 
 // ── SURFACE MESSAGE ──
-const SURFACE_MSG = `☝\ Yeh steps temporary relief ke liye hain - root cause pe kaam nahi karte.
+const SURFACE_MSG = `☝ Yeh steps temporary relief ke liye hain - root cause pe kaam nahi karte.
 
 Agar sinus baar baar aata hai ya months se chal raha hai - toh andar ka dosha imbalance address karna padega. Warna yeh cycle chalti rahegi 🔄
 
