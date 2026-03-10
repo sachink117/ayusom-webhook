@@ -795,13 +795,16 @@ app.post('/webhook', async (req, res) => {
         if (msg.sender.id === PAGE_ID) {
           const recipientId = msg.recipient?.id;
           if (recipientId && recipientId !== PAGE_ID) {
-            const msgText = msg.message?.text || '';
-            if (msgText.startsWith('BOT_ON_')) {
-              const targetId = msgText.replace('BOT_ON_', '').trim();
-              userState[targetId] = 'new';
-              convHistory[targetId] = [];
-              console.log(`BOT REACTIVATED: ${targetId}`);
+            const msgText = (msg.message?.text || '').trim().toUpperCase();
+            if (msgText === 'ON') {
+              userState[recipientId] = 'new';
+              convHistory[recipientId] = [];
+              console.log(`BOT ON for ${recipientId}`);
+            } else if (msgText === 'OFF') {
+              userState[recipientId] = 'human_takeover';
+              console.log(`BOT OFF for ${recipientId}`);
             } else {
+              // Any other message from Page = human takeover
               userState[recipientId] = 'human_takeover';
               console.log(`HUMAN TAKEOVER: ${recipientId}`);
             }
@@ -1108,6 +1111,32 @@ setInterval(async () => {
     }
   }
 }, 30 * 60 * 1000); // Check every 30 minutes
+
+// ============================================================
+// ADMIN: BOT ON/OFF FOR ANY USER
+// ============================================================
+app.post('/admin/bot-off', express.json(), (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'userId required' });
+  userState[userId] = 'human_takeover';
+  console.log(`ADMIN BOT OFF: ${userId}`);
+  res.json({ status: 'ok', userId, bot: 'OFF' });
+});
+
+app.post('/admin/bot-on', express.json(), (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'userId required' });
+  userState[userId] = 'new';
+  convHistory[userId] = [];
+  console.log(`ADMIN BOT ON: ${userId}`);
+  res.json({ status: 'ok', userId, bot: 'ON' });
+});
+
+app.get('/admin/bot-status/:userId', (req, res) => {
+  const { userId } = req.params;
+  const state = userState[userId] || 'new';
+  res.json({ userId, state, botActive: state !== 'human_takeover' });
+});
 
 // ============================================================
 // START
