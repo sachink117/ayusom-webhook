@@ -366,10 +366,10 @@ export default function AIChatbot() {
           options: [
             "Hinglish (Hindi-English)",
             "English",
-            "हिंदी (Hindi)",
-            "తెలుగు (Telugu)",
-            "தமிழ் (Tamil)",
-            "ಕನ್ನಡ (Kannada)"
+            "Hindi",
+            "Telugu",
+            "Tamil",
+            "Kannada"
           ]
         }]);
       }, 600);
@@ -387,11 +387,11 @@ export default function AIChatbot() {
     // ── LANGUAGE SELECTION ──
     if (stage === 'select_lang') {
       let selectedLang = 'hinglish';
-      if (t.includes('english') && !t.includes('hindi')) selectedLang = 'english';
-      else if (t.includes('हिंदी') || t.includes('hindi)')) selectedLang = 'hindi';
-      else if (t.includes('తెలుగు') || t.includes('telugu')) selectedLang = 'telugu';
-      else if (t.includes('தமிழ்') || t.includes('tamil')) selectedLang = 'tamil';
-      else if (t.includes('ಕನ್ನಡ') || t.includes('kannada')) selectedLang = 'kannada';
+      if (t === 'english') selectedLang = 'english';
+      else if (t === 'hindi') selectedLang = 'hindi';
+      else if (t === 'telugu') selectedLang = 'telugu';
+      else if (t === 'tamil') selectedLang = 'tamil';
+      else if (t === 'kannada') selectedLang = 'kannada';
       else if (t.includes('hinglish')) selectedLang = 'hinglish';
 
       setLang(selectedLang);
