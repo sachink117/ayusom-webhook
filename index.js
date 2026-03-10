@@ -5,6 +5,7 @@ const app = express();
 
 app.use('/razorpay-webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
+app.use(express.static('public'));
 
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 const GOOGLE_SHEET_URL = process.env.GOOGLE_SHEET_URL;
@@ -562,12 +563,13 @@ Rules:
 async function handleRuleBased(senderId, text, sendFn) {
   const state = userState[senderId] || 'new';
   if (state === 'human_takeover') return true;
+  const _plat = ({ website: 'Website', whatsapp: 'WhatsApp' })[userProfile[senderId]?.platform] || 'Facebook';
 
   // ── NEW ──
   if (state === 'new') {
     if (!userProfile[senderId]) userProfile[senderId] = {};
     userState[senderId] = 'q1_duration';
-    await updateLead(senderId, '🟡 Warm', 'assessment_started', '', '', '', 'Facebook');
+    await updateLead(senderId, '🟡 Warm', 'assessment_started', '', '', '', _plat);
     await sendFn(senderId,
       `Namaste 🙏 Ayusomam Herbals mein aapka swagat hai.\n\nSinus ki problem hai? Aap bilkul sahi jagah aaye hain ✅\n\nPehle aapki condition samajhte hain — 4 chhote sawaal hain, sirf 2 min lagenge.\n\nYeh problem kitne samay se hai?\n1️⃣ 1–6 mahine\n2️⃣ 6 mahine–1 saal\n3️⃣ 1–3 saal\n4️⃣ 3 saal se zyada\n\nBas number reply karein 👇`
     );
@@ -646,7 +648,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     const type = userProfile[senderId].symptom || 'congestive';
     const timing = getTimeSlot();
     userProfile[senderId].freeStepTiming = timing;
-    await updateLead(senderId, '🔴 Hot', 'assessment_complete', type, '', '', 'Facebook');
+    await updateLead(senderId, '🔴 Hot', 'assessment_complete', type, '', '', _plat);
     userState[senderId] = 'after_steps';
     const stepMsg = (FREE_STEPS[timing] && FREE_STEPS[timing][type]) || FREE_STEPS[timing]['congestive'];
     await sendFn(senderId, stepMsg);
@@ -660,14 +662,14 @@ async function handleRuleBased(senderId, text, sendFn) {
     const wantsTry = t === '2' || t.match(/pehle|try|baad|steps/);
     if (wantsTry) {
       userState[senderId] = 'try_first';
-      await updateLead(senderId, '🟡 Warm', 'try_first', userProfile[senderId].symptom, '', '', 'Facebook');
+      await updateLead(senderId, '🟡 Warm', 'try_first', userProfile[senderId].symptom, '', '', _plat);
       followUpTracker[senderId] = { pitchedAt: Date.now(), followUp1Sent: false, followUp2Sent: false, platform: userProfile[senderId].platform || 'facebook' };
       await sendFn(senderId, `Bilkul 🙏 Steps try karein — subah aur raat dono.\n\nKuch bhi sawaal ho ya result share karna ho — yahan reply karein.\n\nJab ready ho tab protocol ke liye batayein.`);
       return true;
     }
     userState[senderId] = 'pitched';
     const sinusType = userProfile[senderId].symptom || 'congestive';
-    await updateLead(senderId, '🔴 Hot', 'plans_shown', sinusType, '', '', 'Facebook');
+    await updateLead(senderId, '🔴 Hot', 'plans_shown', sinusType, '', '', _plat);
     followUpTracker[senderId] = { pitchedAt: Date.now(), followUp1Sent: false, followUp2Sent: false, platform: userProfile[senderId].platform || 'facebook' };
     await sendFn(senderId, buildPlanMsg(sinusType));
     return true;
@@ -681,7 +683,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     if (t === '1' || t.match(/\b499\b|protocol 1|plan 1/)) {
       userState[senderId] = 'plan_selected';
       delete followUpTracker[senderId];
-      await updateLead(senderId, '🔴 Hot', 'protocol_1_selected', userProfile[senderId]?.symptom, '', '', 'Facebook');
+      await updateLead(senderId, '🔴 Hot', 'protocol_1_selected', userProfile[senderId]?.symptom, '', '', _plat);
       await sendFn(senderId,
         `Sahi decision 🙏\n\nPayment link:\n${PAYMENT_499}\n\nPayment ke baad screenshot yahan bhejein.\n\nAyusomam Herbals 🌿`
       );
@@ -692,7 +694,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     if (t === '2' || t.match(/\b1299\b|protocol 2|plan 2/)) {
       userState[senderId] = 'plan_selected';
       delete followUpTracker[senderId];
-      await updateLead(senderId, '🔴 Hot', 'protocol_2_selected', userProfile[senderId]?.symptom, '', '', 'Facebook');
+      await updateLead(senderId, '🔴 Hot', 'protocol_2_selected', userProfile[senderId]?.symptom, '', '', _plat);
       await sendFn(senderId,
         `Bahut achha 🙏\n\nPayment link:\n${PAYMENT_1299}\n\nPayment ke baad screenshot yahan bhejein.\n\nAyusomam Herbals 🌿`
       );
@@ -710,7 +712,7 @@ async function handleRuleBased(senderId, text, sendFn) {
     // Specialist
     if (t === '4' || t.match(/specialist|sachin|baat|call/)) {
       userState[senderId] = 'human_takeover';
-      await updateLead(senderId, '🔴 Hot', 'requested_specialist', userProfile[senderId]?.symptom, '', '', 'Facebook');
+      await updateLead(senderId, '🔴 Hot', 'requested_specialist', userProfile[senderId]?.symptom, '', '', _plat);
       await sendFn(senderId,
         `Bilkul 🙏 Sachin Ji personally baat karenge.\n📱 ${WHATSAPP_NUM}\n\nAyusomam Herbals 🌿`
       );
@@ -743,7 +745,7 @@ async function processMessage(senderId, text, sendFn, platform) {
 
   console.log(`[${platform}] ${senderId}: ${text}`);
   if (!userProfile[senderId]) userProfile[senderId] = {};
-  userProfile[senderId].platform = platform === 'WhatsApp' ? 'whatsapp' : 'facebook';
+  userProfile[senderId].platform = platform === 'WhatsApp' ? 'whatsapp' : platform === 'Website' ? 'website' : 'facebook';
   const t = text.toLowerCase();
   const state = userState[senderId] || 'new';
 
@@ -971,6 +973,56 @@ app.options('/website-lead', (req, res) => {
 });
 
 // ============================================================
+// WEBSITE CHATBOT ENDPOINT
+// ============================================================
+app.options('/website-chat', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.sendStatus(200);
+});
+
+app.post('/website-chat', async (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  try {
+    const { senderId, message } = req.body;
+    if (!senderId || !message) {
+      return res.status(400).json({ error: 'senderId and message required' });
+    }
+
+    const webSenderId = `WEB_${senderId}`;
+    const replies = [];
+
+    // Collect replies instead of sending via FB/WA
+    const collectReply = async (recipientId, text) => {
+      replies.push(text);
+    };
+
+    // Set platform for this user
+    if (!userProfile[webSenderId]) userProfile[webSenderId] = {};
+    userProfile[webSenderId].platform = 'website';
+
+    await processMessage(webSenderId, message.trim(), collectReply, 'Website');
+
+    // Log to sheet on first message
+    if (!userProfile[webSenderId]._webLogged) {
+      userProfile[webSenderId]._webLogged = true;
+      await updateLead(
+        webSenderId, '🟡 Warm', 'website_chat_started', '',
+        'Website Visitor', message, 'Website'
+      );
+    }
+
+    res.json({ replies });
+  } catch (e) {
+    console.error('Website chat error:', e.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============================================================
 // FOLLOW-UP ENGINE (runs every 30 min)
 // ============================================================
 const HOUR_24 = 24 * 60 * 60 * 1000;
@@ -1027,6 +1079,7 @@ Facebook  : /webhook
 WhatsApp  : /whatsapp
 Razorpay  : /razorpay-webhook
 Website   : /website-lead
+Web Chat  : /website-chat
 Plans     : ₹499 (P1) + ₹1,299 (P2)
 Follow-up : ✅ 24hr + 48hr auto (every 30 min check)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
