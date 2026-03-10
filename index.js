@@ -20,7 +20,7 @@ const SACHIN_PAGE_ID = process.env.SACHIN_PAGE_ID || ""; // Set in env to enable
 
 // ─── STATE STORE ───────────────────────────────────────────
 // state: 'new' | 'asked_duration' | 'asked_symptoms' | 'pitched' | 'done' | 'human'
-const userState = {}; // { senderId: { state, duration, symptoms, sinusType, hookIndex } }
+const userState = {}; // { senderId: { state, duration, symptoms, sinusType, hookIndex, postPitchReplies } }
 
 // ─── HOOK ROTATION (5 hooks, random) ───────────────────────
 const HOOKS = [
@@ -310,6 +310,114 @@ async function handleMessage(senderId, messageText, senderName) {
     return;
   }
 
+  // ── POST-PITCH CURIOSITY HANDLER ──────────────────────────
+  // Called when user asks questions AFTER payment link has been shared
+  function getPostPitchResponse(text, sinusType) {
+    const t = text.toLowerCase();
+
+    // REASSURANCE — "theek ho jaunga?" "kaam karega?" "guarantee?"
+    if (/theek|ठीक|work|karega|karegi|guarantee|pakka|sure|sach mein|really|result|fark|difference|improvement/.test(t)) {
+      return `Bilkul samajh aata hai yeh sawaal. 🌿
+
+3,000+ clients mein se — jo consistently follow karte hain — unka average experience:
+→ *Day 3-5:* Subah naak thodi better
+→ *Day 7:* Breathing mein noticeable difference
+→ *Day 10-14:* Sleep better, sar halka, smell wapas aane lagi
+
+Yeh ek honest picture hai — 100% log alag hote hain, aur isliye main *personally* 14 din check karta hun. Jo kisi pe kaam nahi kiya, unka protocol adjust kiya — woh bhi theek hue.
+
+*Meri guarantee simple hai:* Day 7 tak koi bhi fark feel na ho — main personally baat karunga aur protocol change karunga.
+
+Shuru karte hain? 🌿
+🌿 *₹1,299:* ${PAYMENT_1299}
+🌱 *₹499 Starter:* ${PAYMENT_499}`;
+    }
+
+    // DAY-BY-DAY curiosity — "din kaisa lagta hai?" "daily kya karna hai?"
+    if (/din|day|daily|roz|subah|raat|routine|schedule|time|kitna time|kab|kitne ghante|waqt/.test(t)) {
+      return `Ek typical din lagbhag *15-20 minute* ka kaam hai — subah aur raat. 🌿
+
+*Subah (8-10 min):*
+Steam + ek simple nasya routine — teri nose clear ho jaati hai din ke liye
+
+*Raat (5-7 min):*
+Ek warm drink + breathing — raat ki neend better ho jaati hai
+
+*Din mein:*
+Kuch food avoid karne hote hain — main list dunga personally (bahut simple hai, ghar ka khana)
+
+Koi gym nahi, koi complicated cheez nahi. Ghar mein jo hota hai usi se — laung, adrak, ghee.
+
+Aur main *har roz* ek message bhejna — "aaj kaisa raha?" — personally check karta hun. 🌿
+
+Ready ho? 
+🌿 *₹1,299 Full Program:* ${PAYMENT_1299}
+🌱 *₹499 Starter:* ${PAYMENT_499}`;
+    }
+
+    // WHAT'S INCLUDED — "kya kya milega?" "program mein kya hai?"
+    if (/kya milega|kya hai|exactly|detail|include|andar kya|program mein|content|material|kit/.test(t)) {
+      return `Yeh exactly milega program mein: 🌿
+
+✅ *Day 1 pe* — tumse personally baat — symptoms, history, triggers
+✅ *Tumhara custom routine* — subah + raat, specifically tumhare sinus type ke liye
+✅ *14 din roz mera WhatsApp* — "aaj kaisa raha?" personally
+✅ *Koi din bura gaya* — turant protocol adjust
+✅ *Day 7 + Day 14* — progress review personally
+✅ *Post-protocol* — maintenance guidance free
+
+Sab WhatsApp pe hota hai — koi app download nahi, koi website login nahi.
+
+Bas ek payment → main khud connect karta hun teri WhatsApp pe. 🌿
+
+*₹1,299:* ${PAYMENT_1299}
+*₹499 Starter:* ${PAYMENT_499}`;
+    }
+
+    // INGREDIENTS / WHAT TO USE — "kya use karna hai?" "konsi cheez?"
+    if (/cheez|ingredient|oil|herb|nasya|steam|laung|ghee|adrak|kya pina|kya khana|kya lagana|medicine|dawai|tablet/.test(t)) {
+      return `Sab ghar mein milne wali cheezein hain — koi expensive supplement nahi. 🌿
+
+Main inhe use karta hun primarily:
+→ *Laung* — steam mein
+→ *Ghee* — nasya ke liye (desi ghee)
+→ *Adrak + tulsi* — morning drink
+→ *Saindhav namak* — gargling
+
+Exact quantities aur method main *personally* bhejta hun Day 1 pe — tumhare sinus type ke hisaab se adjust karke.
+
+₹499 ya ₹1,299 — dono mein yeh included hai. 🌿
+
+Shuru karein?
+🌿 *₹1,299:* ${PAYMENT_1299}
+🌱 *₹499:* ${PAYMENT_499}`;
+    }
+
+    // SPRAY SPECIFIC — "spray kab chodunga?" "spray chhodni padegi?"
+    if (/spray|chhodni|chhodna|dependent|otrivin|nasivion|without spray/.test(t)) {
+      return `Bahut important sawaal hai yeh. 🌿
+
+Spray ek din mein nahi chhodti — protocol gradually wean karta hai. Pehle ek nostril, phir dono. Aur spray ki jagah natural alternatives deta hun jo nasal tissue heal karte hain.
+
+Aksar Day 5-7 tak log spray ki zaroorat khatam feel karte hain — bina withdrawal ke.
+
+Yeh exact process main personally guide karta hun. 🌿
+
+Shuru karein?
+🌿 *₹1,299:* ${PAYMENT_1299}
+🌱 *₹499:* ${PAYMENT_499}`;
+    }
+
+    // DEFAULT fallback
+    return `Samajh aata hai. 🌿
+
+Koi bhi sawaal ho — main personally WhatsApp pe bhi available hun.
+
+Jab ready ho, yeh links hain:
+🌿 *₹1,299 Full Program:* ${PAYMENT_1299}
+🌱 *₹499 Starter:* ${PAYMENT_499}`;
+  }
+
   // ── STATE MACHINE ─────────────────────────────────────────
 
   // STATE: NEW → Send hook + Q1
@@ -375,13 +483,24 @@ async function handleMessage(senderId, messageText, senderName) {
       "PITCHED",
       sinusType
     );
+    userData.postPitchReplies = 0; // reset counter when pitch first sent
     return;
   }
 
-  // STATE: PITCHED → Handle objections or follow up
+  // STATE: PITCHED → Handle objections or follow up (max 2 bot replies then human takeover)
   if (userData.state === "pitched") {
+
+    // If already replied twice post-pitch → silent (Sachin handles)
+    if (userData.postPitchReplies >= 2) {
+      userData.state = "human";
+      console.log(`🔴 Auto human takeover for ${senderId} — 2 post-pitch replies done`);
+      await logToSheet(senderId, senderName, `Auto handoff after 2 replies`, "HUMAN_TAKEOVER", userData.sinusType);
+      return;
+    }
+
     // Check if they said yes / want to proceed
     if (/haan|ha |yes|theek|ok|okay|shuru|karein|karna|chahta|chahti|le leta|le lungi|lena|interested/.test(textLower)) {
+      userData.postPitchReplies = (userData.postPitchReplies || 0) + 1;
       await sendMessage(
         senderId,
         `Bahut acha! 🌿\n\nYeh links hain:\n\n🌱 *₹499 Starter:* ${PAYMENT_499}\n\n🌿 *₹1,299 Full Program:* ${PAYMENT_1299}\n\nPayment ke baad confirm karna — main personally WhatsApp pe connect karunga. 🌿`
@@ -389,17 +508,24 @@ async function handleMessage(senderId, messageText, senderName) {
       return;
     }
 
-    // Handle objections
+    // Handle objections — increment counter
+    userData.postPitchReplies = (userData.postPitchReplies || 0) + 1;
     const objectionReply = getObjectionResponse(text, userData.sinusType);
-    await sendMessage(senderId, objectionReply);
 
-    await logToSheet(
-      senderId,
-      senderName,
-      `Objection: ${text}`,
-      "OBJECTION",
-      userData.sinusType
-    );
+    // If this is the 2nd reply → add handoff message at the end
+    if (userData.postPitchReplies >= 2) {
+      await sendMessage(senderId, objectionReply);
+      await new Promise((r) => setTimeout(r, 800));
+      await sendMessage(
+        senderId,
+        `Koi aur sawaal hai toh seedha WhatsApp pe poochho — main personally jawab dunga. 🌿\n\n📱 *85951 60713*`
+      );
+      userData.state = "human";
+      await logToSheet(senderId, senderName, `Handoff after 2 replies: ${text}`, "HUMAN_TAKEOVER", userData.sinusType);
+    } else {
+      await sendMessage(senderId, objectionReply);
+      await logToSheet(senderId, senderName, `Objection: ${text}`, "OBJECTION", userData.sinusType);
+    }
     return;
   }
 
