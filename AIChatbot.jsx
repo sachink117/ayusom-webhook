@@ -17,41 +17,41 @@ const TYPE_LABEL = {
 
 // ── PLAN DETAILS BY TYPE ──
 const PLAN_DETAILS_BY_TYPE = {
-  allergic: "\u{1F4A1} Allergic sinus mein naak ki lining oversensitive ho jaati hai \u2014 har trigger pe react karti hai. Jab tak yeh sensitivity address nahi hoti, sneeze-runny nose ka cycle nahi rukega.",
-  congestive: "\u{1F4A1} Congestive sinus mein srotas (nasal channels) mein kapha jamta jaata hai \u2014 jitna time jaaye, utna thick ho. Jab tak andar se saaf nahi hoga, naak khulegi nahi properly.",
-  heat: "\u{1F4A1} Inflammatory sinus mein pitta dosha naak ki lining mein heat create karta hai \u2014 burning, yellow mucus, headache sab isi ka sign hai. Jab tak pitta balance nahi hoga, yeh repeat hota rahega.",
-  dependency: "\u{1F4A1} Spray naak ki lining ko artificially constrict karti hai \u2014 temporary khulti hai, phir double block. Jab tak lining heal nahi hogi, spray chhutegi nahi."
+  allergic: "💡 Allergic sinus mein naak ki lining oversensitive ho jaati hai - har trigger pe react karti hai. Jab tak yeh sensitivity address nahi hoti, sneeze-runny nose ka cycle nahi rukega.",
+  congestive: "💡 Congestive sinus mein srotas (nasal channels) mein kapha jamta jaata hai - jitna time jaaye, utna thick ho. Jab tak andar se saaf nahi hoga, naak khulegi nahi properly.",
+  heat: "💡 Inflammatory sinus mein pitta dosha naak ki lining mein heat create karta hai - burning, yellow mucus, headache sab isi ka sign hai. Jab tak pitta balance nahi hoga, yeh repeat hota rahega.",
+  dependency: "💡 Spray naak ki lining ko artificially constrict karti hai - temporary khulti hai, phir double block. Jab tak lining heal nahi hogi, spray chhutegi nahi."
 };
 
 // ── DURATION INSIGHTS ──
 const DURATION_INSIGHT = {
-  short: '\u{1F4CC} Short-term mein body abhi reactive phase mein hai \u2014 sahi approach se results zyada fast aate hain.',
-  medium: '\u{1F4CC} 6 mahine\u20131 saal mein pattern set hone lagta hai \u2014 structured intervention sahi time pe hai.',
-  long: '\u{1F4CC} 1\u20133 saal mein problem chronic hone ki taraf jaati hai \u2014 root cause pe kaam karna zaroori ho jaata hai.',
-  verylong: '\u{1F4CC} 3+ saal ki chronic condition mein repeated stress hua hai \u2014 deep protocol hi kaam karta hai.'
+  short: '📌 Short-term mein body abhi reactive phase mein hai - sahi approach se results zyada fast aate hain.',
+  medium: '📌 6 mahine-1 saal mein pattern set hone lagta hai - structured intervention sahi time pe hai.',
+  long: '📌 1-3 saal mein problem chronic hone ki taraf jaati hai - root cause pe kaam karna zaroori ho jaata hai.',
+  verylong: '📌 3+ saal ki chronic condition mein repeated stress hua hai - deep protocol hi kaam karta hai.'
 };
 
 // ── SYMPTOM INSIGHTS ──
 const SYMPTOM_INSIGHT = {
-  congestive: '\u{1F4CC} Yeh Kaphaja Pratishyaya ka pattern hai \u2014 Kapha dosha vitiated hone se nasal passages mein ama accumulate hoti hai, srotas block hote hain. Subah zyada hona is ka classic sign hai.',
-  allergic: '\u{1F4CC} Yeh Vataja-Kaphaja Pratishyaya hai \u2014 Vata aur Kapha dono vitiated hain. Sneezing Vata ka naak se bahar nikalna hai, watery discharge bhi Vata-Kapha imbalance ka sign.',
-  heat: '\u{1F4CC} Yeh Pittaja Pratishyaya hai \u2014 Pitta dosha vitiated hone se nasal lining mein heat aur inflammation badh jaati hai. Yellow-green discharge aur burning Pitta aggravation ke clear signs hain.',
-  dependency: '\u{1F4CC} Yeh Dushta Pratishyaya ka pattern hai \u2014 prolonged external substance se nasal mucosa ki natural functioning disturb ho gayi hai. Srotas chronically block hain, Vata movement irregular hai.'
+  congestive: '📌 Yeh Kaphaja Pratishyaya ka pattern hai - Kapha dosha vitiated hone se nasal passages mein ama accumulate hoti hai, srotas block hote hain. Subah zyada hona is ka classic sign hai.',
+  allergic: '📌 Yeh Vataja-Kaphaja Pratishyaya hai - Vata aur Kapha dono vitiated hain. Sneezing Vata ka naak se bahar nikalna hai, watery discharge bhi Vata-Kapha imbalance ka sign.',
+  heat: '📌 Yeh Pittaja Pratishyaya hai - Pitta dosha vitiated hone se nasal lining mein heat aur inflammation badh jaati hai. Yellow-green discharge aur burning Pitta aggravation ke clear signs hain.',
+  dependency: '📌 Yeh Dushta Pratishyaya ka pattern hai - prolonged external substance se nasal mucosa ki natural functioning disturb ho gayi hai. Srotas chronically block hain, Vata movement irregular hai.'
 };
 
 // ── TRIED INSIGHTS ──
 const TRIED_INSIGHT = {
-  'kuch nahi': '\u{1F4CC} Abhi tak kuch try nahi kiya \u2014 body naturally respond karti hai structured approach se jab already medicated na ho.',
-  allopathy: '\u{1F4CC} Allopathy symptoms suppress karti hai \u2014 inflammation temporarily thami, root cause waise ka waisa rehta hai. Isliye band karne pe symptoms wapas aate hain.',
-  'nasal spray': '\u{1F4CC} Nasal spray naak ki lining constrict karti hai \u2014 temporary open hoti hai. Regular use se mucosal damage aur dependency badhti hai.',
-  'sab try kiya': '\u{1F4CC} Root cause pe seedha kaam nahi hua isliye wapas aaya. Ayurvedic approach underlying imbalance pe kaam karti hai, sirf symptoms pe nahi.'
+  'kuch nahi': '📌 Abhi tak kuch try nahi kiya - body naturally respond karti hai structured approach se jab already medicated na ho.',
+  allopathy: '📌 Allopathy symptoms suppress karti hai - inflammation temporarily thami, root cause waise ka waisa rehta hai. Isliye band karne pe symptoms wapas aate hain.',
+  'nasal spray': '📌 Nasal spray naak ki lining constrict karti hai - temporary open hoti hai. Regular use se mucosal damage aur dependency badhti hai.',
+  'sab try kiya': '📌 Root cause pe seedha kaam nahi hua isliye wapas aaya. Ayurvedic approach underlying imbalance pe kaam karti hai, sirf symptoms pe nahi.'
 };
 
 // ── SEVERITY INSIGHTS ──
 const SEVERITY_INSIGHT = {
-  mild: '\u{1F4CC} Abhi flare mode mild hai \u2014 sahi time hai tackle karne ka before it becomes moderate.',
-  moderate: '\u{1F4CC} Moderate impact matlab body already compensating kar rahi hai daily \u2014 structured intervention needed.',
-  severe: '\u{1F4CC} Severe impact mein sleep, focus, energy sab affected \u2014 yeh sirf sinus nahi, quality of life issue hai.'
+  mild: '📌 Abhi flare mode mild hai - sahi time hai tackle karne ka before it becomes moderate.',
+  moderate: '📌 Moderate impact matlab body already compensating kar rahi hai daily - structured intervention needed.',
+  severe: '📌 Severe impact mein sleep, focus, energy sab affected - yeh sirf sinus nahi, quality of life issue hai.'
 };
 
 // ── FREE STEPS ──
@@ -63,127 +63,127 @@ function getTimeSlot() {
 
 const FREE_STEPS = {
   morning: {
-    allergic: `\u2705 Vataja-Kaphaja Pratishyaya \u{1F33F}
+    allergic: `✅ Vataja-Kaphaja Pratishyaya 🌿
 Type: Allergic Rhinosinusitis | Dosha: Vata + Kapha
 
-Aaj ke 2 steps subah try karein \u2014 ek doosre ke complementary hain:
+Aaj ke 2 steps subah try karein - ek doosre ke complementary hain:
 
-1\uFE0F\u20E3 *Tulsi-Ginger Steam* \u2014 Subah uthte hi, khaana khaane se pehle
+1\\ *Tulsi-Ginger Steam* - Subah uthte hi, khaana khaane se pehle
 Ek bhagona paani mein 4-5 fresh tulsi patte + adha inch kuch adrak daalen. Ubaal lein, phir towel sar pe odh ke 8-10 min steam lein. Muh band, sirf naak se saans lein.
 
-\u23F1\uFE0F 15-20 min baad \u2014
+⏱\ 15-20 min baad -
 
-2\uFE0F\u20E3 *Saline Nasal Rinse*
-1 cup gunguna paani + \u00BD tsp saindhav namak (sendha namak). Haath ki hatheli mein leke ek naak se kheenchein, doosri se bahar aane dein. Dono taraf.
-Steam ne mucus dhila kiya \u2014 rinse usse bahar karta hai.
+2\\ *Saline Nasal Rinse*
+1 cup gunguna paani + \1/2 tsp saindhav namak (sendha namak). Haath ki hatheli mein leke ek naak se kheenchein, doosri se bahar aane dein. Dono taraf.
+Steam ne mucus dhila kiya - rinse usse bahar karta hai.
 
-\u26A0\uFE0F Yeh steps aaj ke liye temporary surface relief hain. Allergy ka root \u2014 sensitized naak ki lining \u2014 sirf structured protocol se address hoti hai. Shaam ko zaroor batana \u2014 kuch fark mehsoos hua? \u{1F64F}`,
+⚠\ Yeh steps aaj ke liye temporary surface relief hain. Allergy ka root - sensitized naak ki lining - sirf structured protocol se address hoti hai. Shaam ko zaroor batana - kuch fark mehsoos hua? 🙏`,
 
-    congestive: `\u2705 Kaphaja Pratishyaya \u{1F535}
+    congestive: `✅ Kaphaja Pratishyaya 🔵
 Type: Congestive Sinusitis | Dosha: Kapha dominant
 
 Aaj ke 2 steps subah try karein:
 
-1\uFE0F\u20E3 *Adrak-Saunth Steam* \u2014 khaali pet, uthte hi
-Paani mein 1 inch kuchi adrak + \u00BD tsp saunth (dry ginger powder) daalen. Ubaal ke 10 min steam lein, towel sar pe. Balgam loose hoga andar se.
+1\\ *Adrak-Saunth Steam* - khaali pet, uthte hi
+Paani mein 1 inch kuchi adrak + \1/2 tsp saunth (dry ginger powder) daalen. Ubaal ke 10 min steam lein, towel sar pe. Balgam loose hoga andar se.
 
-\u23F1\uFE0F 20-25 min baad \u2014
+⏱\ 20-25 min baad -
 
-2\uFE0F\u20E3 *Warm Jal Neti / Saline Rinse*
-1 cup gunguna paani + \u00BD tsp saindhav namak. Naak mein dono taraf rinse karein \u2014 gently, force nahi. Loose hua balgam bahar nikalega.
+2\\ *Warm Jal Neti / Saline Rinse*
+1 cup gunguna paani + \1/2 tsp saindhav namak. Naak mein dono taraf rinse karein - gently, force nahi. Loose hua balgam bahar nikalega.
 
-\u26A0\uFE0F Yeh sirf aaj ke liye temporary relief hai. Andar ki congestion ka source structured approach se hi address hota hai. Shaam ko batana zaroor \u2014 kitna fark aaya? \u{1F64F}`,
+⚠\ Yeh sirf aaj ke liye temporary relief hai. Andar ki congestion ka source structured approach se hi address hota hai. Shaam ko batana zaroor - kitna fark aaya? 🙏`,
 
-    heat: `\u2705 Pittaja Pratishyaya \u{1F525}
+    heat: `✅ Pittaja Pratishyaya 🔥
 Type: Inflammatory Sinusitis | Dosha: Pitta aggravation
 
 Aaj ke 2 steps subah try karein:
 
-1\uFE0F\u20E3 *Dhaniya-Saunf Infusion* \u2014 khaali pet, subah uthke
+1\\ *Dhaniya-Saunf Infusion* - khaali pet, subah uthke
 1 tsp dhaniya (coriander seeds) + 1 tsp saunf ko raat bhar paani mein bhigo ke rakhein. Subah chhan ke thanda hi peeyein. Pitta ko andar se shant karta hai.
 
-\u23F1\uFE0F 30-40 min baad khaana khaane ke baad \u2014
+⏱\ 30-40 min baad khaana khaane ke baad -
 
-2\uFE0F\u20E3 *Ghee Nasya* (medicated nasal application)
-Dono naak mein 1-1 boond pure desi ghee (garm nahi \u2014 room temp). 5 min bilkul still baith ke rakhein. Burning sensation aur inflammation mein seedha kaam karta hai.
+2\\ *Ghee Nasya* (medicated nasal application)
+Dono naak mein 1-1 boond pure desi ghee (garm nahi - room temp). 5 min bilkul still baith ke rakhein. Burning sensation aur inflammation mein seedha kaam karta hai.
 
-\u26A0\uFE0F Yeh andar ki pitta vitiation ka root address nahi karti \u2014 sirf aaj ke liye relief hai. Shaam ko zaroor batana \u{1F64F}`,
+⚠\ Yeh andar ki pitta vitiation ka root address nahi karti - sirf aaj ke liye relief hai. Shaam ko zaroor batana 🙏`,
 
-    dependency: `\u2705 Dushta Pratishyaya \u26A0\uFE0F
+    dependency: `✅ Dushta Pratishyaya ⚠\
 Type: Chronic Rebound Sinusitis | Dosha: Vata + Srotas blockage
 
 Aaj ke 2 steps subah try karein:
 
-1\uFE0F\u20E3 *Pre-Spray Steam Replacement*
-Spray use karne se pehle 10 min steam karein \u2014 plain paani, koi additive nahi. Agar naak khul jaaye toh spray ki zaroorat na padhe. Agar padhe toh sirf ek naak mein \u2014 doosri naak open rahe.
+1\\ *Pre-Spray Steam Replacement*
+Spray use karne se pehle 10 min steam karein - plain paani, koi additive nahi. Agar naak khul jaaye toh spray ki zaroorat na padhe. Agar padhe toh sirf ek naak mein - doosri naak open rahe.
 
-\u23F1\uFE0F Dono ke beech minimum 30 min ka gap \u2014
+⏱\ Dono ke beech minimum 30 min ka gap -
 
-2\uFE0F\u20E3 *Anu Taila / Desi Ghee Nasya*
-Steam ke 30 min baad, dono naak mein 1-1 boond desi ghee ya anu taila (Ayurvedic nasal drops \u2014 easily available). Naak ki lining ko nourish karta hai \u2014 spray ki harshness se healing shuru hoti hai.
+2\\ *Anu Taila / Desi Ghee Nasya*
+Steam ke 30 min baad, dono naak mein 1-1 boond desi ghee ya anu taila (Ayurvedic nasal drops - easily available). Naak ki lining ko nourish karta hai - spray ki harshness se healing shuru hoti hai.
 
-\u26A0\uFE0F Spray ne jo mucosal damage kiya hai \u2014 yeh ghee se thodi healing karta hai, lekin dependency todne ke liye structured protocol chahiye. Shaam ko zaroor batana \u{1F64F}`
+⚠\ Spray ne jo mucosal damage kiya hai - yeh ghee se thodi healing karta hai, lekin dependency todne ke liye structured protocol chahiye. Shaam ko zaroor batana 🙏`
   },
   night: {
-    allergic: `\u2705 Vataja-Kaphaja Pratishyaya \u{1F33F}
+    allergic: `✅ Vataja-Kaphaja Pratishyaya 🌿
 Type: Allergic Rhinosinusitis | Dosha: Vata + Kapha
 
 Aaj raat ke 2 steps try karein:
 
-1\uFE0F\u20E3 *Haldi-Ghee Nasal Protocol* \u2014 Khana khaane ke 1 hour baad
-Ek cup garm doodh mein \u00BD tsp haldi + \u00BD tsp ghee milaen. Dhire dhire peeyein. Saath mein \u2014 dono naak mein 1-1 boond desi ghee nasya karein. Andar ki inflammation pe kaam karta hai.
+1\\ *Haldi-Ghee Nasal Protocol* - Khana khaane ke 1 hour baad
+Ek cup garm doodh mein \1/2 tsp haldi + \1/2 tsp ghee milaen. Dhire dhire peeyein. Saath mein - dono naak mein 1-1 boond desi ghee nasya karein. Andar ki inflammation pe kaam karta hai.
 
-\u23F1\uFE0F 45-60 min baad, sone se 20-30 min pehle \u2014
+⏱\ 45-60 min baad, sone se 20-30 min pehle -
 
-2\uFE0F\u20E3 *Sone se Pehle Steam*
-4-5 tulsi patte paani mein, 8 min steam. Towel sar pe. Raat ko dustbits aur allergens naak mein settle hote hain \u2014 yeh flush karta hai. Steam ke baad seedha so jaayein, bahar hawa mein mat niklein.
+2\\ *Sone se Pehle Steam*
+4-5 tulsi patte paani mein, 8 min steam. Towel sar pe. Raat ko dustbits aur allergens naak mein settle hote hain - yeh flush karta hai. Steam ke baad seedha so jaayein, bahar hawa mein mat niklein.
 
-\u26A0\uFE0F Yeh raat ke liye surface relief hai \u2014 allergy ki root cause waise ki waisi hai. Subah uthke zaroor batana \u2014 neend kaisi aayi, naak khuli thi ya band? \u{1F64F}`,
+⚠\ Yeh raat ke liye surface relief hai - allergy ki root cause waise ki waisi hai. Subah uthke zaroor batana - neend kaisi aayi, naak khuli thi ya band? 🙏`,
 
-    congestive: `\u2705 Kaphaja Pratishyaya \u{1F535}
+    congestive: `✅ Kaphaja Pratishyaya 🔵
 Type: Congestive Sinusitis | Dosha: Kapha dominant
 
 Aaj raat ke 2 steps try karein:
 
-1\uFE0F\u20E3 *Adrak-Haldi Kadha* \u2014 Raat ke khane ke 30-40 min baad
-\u00BD inch adrak + \u00BD tsp haldi + 1 cup paani \u2014 5 min ubaalein. Thoda thanda karke peeyein. Balgam ko andar se loose karta hai overnight.
+1\\ *Adrak-Haldi Kadha* - Raat ke khane ke 30-40 min baad
+\1/2 inch adrak + \1/2 tsp haldi + 1 cup paani - 5 min ubaalein. Thoda thanda karke peeyein. Balgam ko andar se loose karta hai overnight.
 
-\u23F1\uFE0F 40-50 min baad, sone se 15-20 min pehle \u2014
+⏱\ 40-50 min baad, sone se 15-20 min pehle -
 
-2\uFE0F\u20E3 *Steam + Ghee Nasya*
-10 min steam (towel sar pe). Phir 5 min baith ke \u2014 dono naak mein 1-1 boond desi ghee. Steam ne balgam dhila kiya, ghee nasal lining ko coat karta hai taki raat ko throat mein na girta rahe.
+2\\ *Steam + Ghee Nasya*
+10 min steam (towel sar pe). Phir 5 min baith ke - dono naak mein 1-1 boond desi ghee. Steam ne balgam dhila kiya, ghee nasal lining ko coat karta hai taki raat ko throat mein na girta rahe.
 
-\u26A0\uFE0F Yeh sirf aaj raat ke liye temporary relief hai. Subah uthke naak ki condition zaroor batana \u{1F64F}`,
+⚠\ Yeh sirf aaj raat ke liye temporary relief hai. Subah uthke naak ki condition zaroor batana 🙏`,
 
-    heat: `\u2705 Pittaja Pratishyaya \u{1F525}
+    heat: `✅ Pittaja Pratishyaya 🔥
 Type: Inflammatory Sinusitis | Dosha: Pitta aggravation
 
 Aaj raat ke 2 steps try karein:
 
-1\uFE0F\u20E3 *Cooling Drink Before Dinner*
-Khana khaane se 20-30 min pehle \u2014 1 glass room-temp nariyal paani ya saunf-dhaniya infusion (raat bhar bhigo ke). Fried, spicy, fermented khana aaj avoid karein \u2014 pitta raat ko badhta hai.
+1\\ *Cooling Drink Before Dinner*
+Khana khaane se 20-30 min pehle - 1 glass room-temp nariyal paani ya saunf-dhaniya infusion (raat bhar bhigo ke). Fried, spicy, fermented khana aaj avoid karein - pitta raat ko badhta hai.
 
-\u23F1\uFE0F Khana khaane ke 1 hour baad \u2014
+⏱\ Khana khaane ke 1 hour baad -
 
-2\uFE0F\u20E3 *Chandan-Ghee Nasya*
-Dono naak mein 1-1 boond desi ghee. Sone se pehle 5 min bilkul still baith ke rakhein. Ghee cooling + anti-inflammatory hota hai \u2014 pitta-based burning pe seedha kaam karta hai.
+2\\ *Chandan-Ghee Nasya*
+Dono naak mein 1-1 boond desi ghee. Sone se pehle 5 min bilkul still baith ke rakhein. Ghee cooling + anti-inflammatory hota hai - pitta-based burning pe seedha kaam karta hai.
 
-\u26A0\uFE0F Yeh raat ke liye surface-level relief hai. Pitta ka root internally address karna padega. Subah kaise feel hua zaroor batana \u{1F64F}`,
+⚠\ Yeh raat ke liye surface-level relief hai. Pitta ka root internally address karna padega. Subah kaise feel hua zaroor batana 🙏`,
 
-    dependency: `\u2705 Dushta Pratishyaya \u26A0\uFE0F
+    dependency: `✅ Dushta Pratishyaya ⚠\
 Type: Chronic Rebound Sinusitis | Dosha: Vata + Srotas blockage
 
 Aaj raat ke 2 steps try karein:
 
-1\uFE0F\u20E3 *Spray se Pehle Steam Trial*
-Sone se pehle 10 min steam \u2014 plain paani. Naak kholne ki koshish spray ki jagah steam se karein. Agar zaroorat pad hi jaaye toh sirf ek naak, minimum amount.
+1\\ *Spray se Pehle Steam Trial*
+Sone se pehle 10 min steam - plain paani. Naak kholne ki koshish spray ki jagah steam se karein. Agar zaroorat pad hi jaaye toh sirf ek naak, minimum amount.
 
-\u23F1\uFE0F Steam ke 30-40 min baad \u2014
+⏱\ Steam ke 30-40 min baad -
 
-2\uFE0F\u20E3 *Ghee Nasya + Correct Sleeping Position*
-Dono naak mein 1-1 boond desi ghee. Sone ki position: jis taraf naak zyada khuli ho \u2014 us taraf nahi, doosri taraf karwat lein. Gravity se dono naak ko equally breathe karne ka mauka milta hai.
+2\\ *Ghee Nasya + Correct Sleeping Position*
+Dono naak mein 1-1 boond desi ghee. Sone ki position: jis taraf naak zyada khuli ho - us taraf nahi, doosri taraf karwat lein. Gravity se dono naak ko equally breathe karne ka mauka milta hai.
 
-\u26A0\uFE0F Spray dependency mein mucosal damage heal hone mein time lagta hai \u2014 yeh raat ke liye thodi madad hai. Subah zaroor batana \u2014 spray lena pada ya nahi? \u{1F64F}`
+⚠\ Spray dependency mein mucosal damage heal hone mein time lagta hai - yeh raat ke liye thodi madad hai. Subah zaroor batana - spray lena pada ya nahi? 🙏`
   }
 };
 
@@ -192,67 +192,67 @@ function buildPlanMsg(sinusType) {
   const typeLabel = TYPE_LABEL[sinusType] || 'Pratishyaya';
   const insight = PLAN_DETAILS_BY_TYPE[sinusType] || PLAN_DETAILS_BY_TYPE.congestive;
 
-  return `Aapka assessment complete hua \u2705
+  return `Aapka assessment complete hua ✅
 
 ${typeLabel}
 
 ${insight}
 
-Aapke liye 2 protocols hain \u{1F447}
+Aapke liye 2 protocols hain 👇
 
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+---------------------
 
-\u26A1 *PROTOCOL 1 \u2014 \u20B9499*
+⚡ *PROTOCOL 1 - Rs.499*
 7-Day Sinus Stabilization
 
-\u2714 Naya problem hai (6 months\u20131 saal)
-\u2714 Pehli baar structured try karna hai
-\u2714 Sirf 15-20 min daily
+✔ Naya problem hai (6 months-1 saal)
+✔ Pehli baar structured try karna hai
+✔ Sirf 15-20 min daily
 
-\u{1F4C5} 7 din \u2014 roz clear steps
-\u{1F4F2} Sachin Ji WhatsApp pe personally guide karenge
-\u{1F33F} Ghar ke cheezein + herbal support
+📅 7 din - roz clear steps
+📲 Sachin Ji WhatsApp pe personally guide karenge
+🌿 Ghar ke cheezein + herbal support
 
-\u{1F4B0} Ek ENT visit = \u20B9500-800 sirf consultation
-Yahan \u20B9499 mein 7 din ka poora protocol + daily guidance
+💰 Ek ENT visit = Rs.500-800 sirf consultation
+Yahan Rs.499 mein 7 din ka poora protocol + daily guidance
 
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+---------------------
 
-\u{1F525} *PROTOCOL 2 \u2014 \u20B91,299*
+🔥 *PROTOCOL 2 - Rs.1,299*
 14-Day Deep Sinus Protocol
-\u2B50 Sabse zyada log yahi lete hain
+⭐ Sabse zyada log yahi lete hain
 
-\u2714 Purani problem \u2014 1+ saal
-\u2714 Spray/medicine pe depend hain
-\u2714 Pehle try kiya \u2014 temporary hi raha
-\u2714 Root cause se permanently theek karna hai
+✔ Purani problem - 1+ saal
+✔ Spray/medicine pe depend hain
+✔ Pehle try kiya - temporary hi raha
+✔ Root cause se permanently theek karna hai
 
-\u{1F4C5} 14 din \u2014 subah + raat personalized routine
-\u{1F4CA} Daily tracking \u2014 aapke progress ke saath adjust hota hai
-\u{1F33F} Herbal support included + personalized
-\u{1FA7A} Dosha ke hisaab se diet guidance
-\u{1F4F2} Sachin Ji se direct WhatsApp access
+📅 14 din - subah + raat personalized routine
+📊 Daily tracking - aapke progress ke saath adjust hota hai
+🌿 Herbal support included + personalized
+🩺 Dosha ke hisaab se diet guidance
+📲 Sachin Ji se direct WhatsApp access
 
-\u{1F4B0} Monthly medicines = \u20B91,500-3,000 \u2014 phir bhi wapas aata hai
-Yahan \u20B91,299 mein root cause pe seedha kaam
+💰 Monthly medicines = Rs.1,500-3,000 - phir bhi wapas aata hai
+Yahan Rs.1,299 mein root cause pe seedha kaam
 
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-         \u20B9499      |  \u20B91,299
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+---------------------
+         Rs.499      |  Rs.1,299
+---------------------
 Din      7          |  14
 Routine  1x/day     |  2x/day
 Tracking Basic      |  Full
 Herbal   Optional   |  Included
-Diet     \u2717          |  \u2713
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Diet     ✗          |  ✓
+---------------------
 
-\u{1F550} Aaj reply karein \u2014 kal subah Day 1 aapke WhatsApp pe`;
+🕐 Aaj reply karein - kal subah Day 1 aapke WhatsApp pe`;
 }
 
 // ── SURFACE MESSAGE ──
-const SURFACE_MSG = `\u261D\uFE0F Yeh steps temporary relief ke liye hain \u2014 root cause pe kaam nahi karte.
+const SURFACE_MSG = `☝\ Yeh steps temporary relief ke liye hain - root cause pe kaam nahi karte.
 
-Agar sinus baar baar aata hai ya months se chal raha hai \u2014 toh andar ka dosha imbalance address karna padega. Warna yeh cycle chalti rahegi \u{1F504}
+Agar sinus baar baar aata hai ya months se chal raha hai - toh andar ka dosha imbalance address karna padega. Warna yeh cycle chalti rahegi 🔄
 
 Aap batayein:`;
 
@@ -325,9 +325,15 @@ export default function AIChatbot() {
     if (!initialized.current) {
       initialized.current = true;
       sendLead({ stage: 'chat_opened', sinusType: '', name: '', phone: '' });
-      setStage('ask_naam');
+      setStage('q1_duration');
       await addBotMessage(
-        "Namaste \u{1F64F} Ayusomam Herbals mein aapka swagat hai.\n\nSinus ki problem hai? Aap bilkul sahi jagah aaye hain \u2705\n\nHum aapki condition ka Ayurvedic assessment karenge — sirf 2 min lagenge.\n\nPehle aapka shubh naam bata dijiye \u{1F64F}"
+        "Namaste 🙏 Ayusomam Herbals mein aapka swagat hai.\n\nSinus ki problem hai? Aap bilkul sahi jagah aaye hain ✅\n\nHum aapki condition ka FREE Ayurvedic assessment karenge - sirf 2 min lagenge.\n\nYeh problem kitne samay se hai?",
+        [
+          "1-6 mahine",
+          "6 mahine-1 saal",
+          "1-3 saal",
+          "3 saal se zyada"
+        ]
       );
     }
   };
@@ -344,9 +350,9 @@ export default function AIChatbot() {
     if (stage === 'q1_duration') {
       let duration = null;
       if (t.includes('1') && !t.includes('3') && (t.includes('6') || t.includes('mahine') || t.includes('month'))) duration = 'short';
-      else if (t === '1' || t.includes('1-6') || t.includes('1–6')) duration = 'short';
+      else if (t === '1' || t.includes('1-6') || t.includes('1-6')) duration = 'short';
       else if (t === '2' || t.includes('6 mahine') || t.includes('1 saal')) duration = 'medium';
-      else if (t === '3' || t.includes('1-3') || t.includes('1–3') || t.includes('2 saal') || t.includes('3 saal')) duration = 'long';
+      else if (t === '3' || t.includes('1-3') || t.includes('1-3') || t.includes('2 saal') || t.includes('3 saal')) duration = 'long';
       else if (t === '4' || t.includes('zyada') || t.includes('3+') || t.includes('bahut') || t.includes('bachpan')) duration = 'verylong';
       else {
         // Try to detect from text
@@ -357,10 +363,10 @@ export default function AIChatbot() {
       }
 
       if (!duration) {
-        await addBotMessage('Thoda aur clearly batayein \u2014 kitne mahine ya saal se hai? \u{1F64F}', [
-          "1\u20136 mahine",
-          "6 mahine\u20131 saal",
-          "1\u20133 saal",
+        await addBotMessage('Thoda aur clearly batayein - kitne mahine ya saal se hai? 🙏', [
+          "1-6 mahine",
+          "6 mahine-1 saal",
+          "1-3 saal",
           "3 saal se zyada"
         ]);
         return;
@@ -374,12 +380,12 @@ export default function AIChatbot() {
       const dInsight = DURATION_INSIGHT[duration];
       if (dInsight) msgs.push({ text: dInsight });
       msgs.push({
-        text: "Noted \u2705\n\nAb batayein \u2014 sabse zyada kya hota hai?",
+        text: "Noted ✅\n\nAb batayein - sabse zyada kya hota hai?",
         options: [
-          "Naak band, chehra bhaari, pressure \u{1F624}",
-          "Sneezing, runny nose, dust/mausam se trigger \u{1F927}",
-          "Burning, thick mucus, sar dard \u{1F525}",
-          "Nasal spray ke bina saans nahi aati \u{1F630}"
+          "Naak band, chehra bhaari, pressure 😤",
+          "Sneezing, runny nose, dust/mausam se trigger 🤧",
+          "Burning, thick mucus, sar dard 🔥",
+          "Nasal spray ke bina saans nahi aati 😰"
         ]
       });
       await addBotMessages(msgs);
@@ -404,30 +410,24 @@ export default function AIChatbot() {
       }
 
       if (!symptom) {
-        await addBotMessage('Apna main symptom batayein \u2014 ek number reply karein \u{1F64F}', [
-          "Naak band, chehra bhaari, pressure \u{1F624}",
-          "Sneezing, runny nose, dust/mausam se trigger \u{1F927}",
-          "Burning, thick mucus, sar dard \u{1F525}",
-          "Nasal spray ke bina saans nahi aati \u{1F630}"
+        await addBotMessage('Apna main symptom batayein - ek number reply karein 🙏', [
+          "Naak band, chehra bhaari, pressure 😤",
+          "Sneezing, runny nose, dust/mausam se trigger 🤧",
+          "Burning, thick mucus, sar dard 🔥",
+          "Nasal spray ke bina saans nahi aati 😰"
         ]);
         return;
       }
 
       const newAnswers = { ...answers, symptom };
       setAnswers(newAnswers);
-      setStage('q3_tried');
+      setStage('ask_naam');
 
       const msgs = [];
       const sInsight = SYMPTOM_INSIGHT[symptom];
       if (sInsight) msgs.push({ text: sInsight });
       msgs.push({
-        text: "Samajh aaya \u2705\n\nIske liye pehle kuch try kiya?",
-        options: [
-          "Nahi, kuch nahi kiya abhi tak",
-          "Allopathy / antibiotic li",
-          "Nasal spray use ki",
-          "Sab try kiya \u2014 kuch permanent nahi hua \u{1F614}"
-        ]
+        text: "Samajh aaya ✅\n\nAssessment result aapko bhejne ke liye aapka naam bata dijiye 🙏"
       });
       await addBotMessages(msgs);
       return;
@@ -446,11 +446,11 @@ export default function AIChatbot() {
       }
 
       if (!tried) {
-        await addBotMessage('1 se 4 ke beech number reply karein \u{1F64F}', [
+        await addBotMessage('1 se 4 ke beech number reply karein 🙏', [
           "Nahi, kuch nahi kiya abhi tak",
           "Allopathy / antibiotic li",
           "Nasal spray use ki",
-          "Sab try kiya \u2014 kuch permanent nahi hua \u{1F614}"
+          "Sab try kiya - kuch permanent nahi hua 😔"
         ]);
         return;
       }
@@ -463,11 +463,11 @@ export default function AIChatbot() {
       const tInsight = TRIED_INSIGHT[tried];
       if (tInsight) msgs.push({ text: tInsight });
       msgs.push({
-        text: "Last sawaal \u{1F447}\n\nDaily life mein kitna affect karta hai?",
+        text: "Last sawaal 👇\n\nDaily life mein kitna affect karta hai?",
         options: [
-          "Thoda \u2014 manage ho jaata hai",
-          "Kaafi \u2014 regularly dikkat hoti hai \u{1F623}",
-          "Bahut zyada \u2014 neend, kaam, sab affected \u{1F62B}"
+          "Thoda - manage ho jaata hai",
+          "Kaafi - regularly dikkat hoti hai 😣",
+          "Bahut zyada - neend, kaam, sab affected 😫"
         ]
       });
       await addBotMessages(msgs);
@@ -486,10 +486,10 @@ export default function AIChatbot() {
       }
 
       if (!severity) {
-        await addBotMessage('1, 2 ya 3 reply karein \u{1F64F}', [
-          "Thoda \u2014 manage ho jaata hai",
-          "Kaafi \u2014 regularly dikkat hoti hai \u{1F623}",
-          "Bahut zyada \u2014 neend, kaam, sab affected \u{1F62B}"
+        await addBotMessage('1, 2 ya 3 reply karein 🙏', [
+          "Thoda - manage ho jaata hai",
+          "Kaafi - regularly dikkat hoti hai 😣",
+          "Bahut zyada - neend, kaam, sab affected 😫"
         ]);
         return;
       }
@@ -529,7 +529,7 @@ export default function AIChatbot() {
 
       // Show assessment result with English + Ayurvedic name
       msgs.push({
-        text: `${answers.name} Ji, aapka assessment complete hua \u2705\n\n\u{1F3AF} Aapki condition:\n\u{1F4CB} English: *${ENGLISH_TYPE[sinusType] || 'Sinusitis'}*\n\u{1F33F} Ayurvedic: *${AYURVEDIC_TYPE[sinusType] || 'Pratishyaya'}*\n\nAb hum aapko aaj ke liye 2 immediate relief steps de rahe hain \u{1F447}`
+        text: `${answers.name} Ji, aapka assessment complete hua ✅\n\n🎯 Aapki condition:\n📋 English: *${ENGLISH_TYPE[sinusType] || 'Sinusitis'}*\n🌿 Ayurvedic: *${AYURVEDIC_TYPE[sinusType] || 'Pratishyaya'}*\n\nAb hum aapko aaj ke liye 2 immediate relief steps de rahe hain 👇`
       });
 
       const stepMsg = (FREE_STEPS[timing] && FREE_STEPS[timing][sinusType]) || FREE_STEPS[timing]['congestive'];
@@ -550,7 +550,7 @@ export default function AIChatbot() {
         setStage('try_first');
         sendLead({ stage: 'try_first', sinusType: answers.symptom || '', name: answers.name || '', phone: answers.phone || '' });
         await addBotMessage(
-          "Bilkul \u{1F64F} Steps try karein \u2014 subah aur raat dono.\n\nKuch bhi sawaal ho \u2014 yahan type karein ya seedha WhatsApp karein:",
+          "Bilkul 🙏 Steps try karein - subah aur raat dono.\n\nKuch bhi sawaal ho - yahan type karein ya seedha WhatsApp karein:",
           [`WhatsApp: ${WHATSAPP_NUM}`]
         );
         return;
@@ -561,8 +561,8 @@ export default function AIChatbot() {
       const sinusType = answers.symptom || 'congestive';
       sendLead({ stage: 'plans_shown', sinusType, name: answers.name || '', phone: answers.phone || '' });
       await addBotMessage(buildPlanMsg(sinusType), [
-        "\u20B9499 \u2014 7-Day Protocol",
-        "\u20B91,299 \u2014 14-Day Protocol",
+        "Rs.499 - 7-Day Protocol",
+        "Rs.1,299 - 14-Day Protocol",
         "Fark samjhna hai",
         "Sachin Ji se baat"
       ]);
@@ -578,7 +578,7 @@ export default function AIChatbot() {
         setStage('plan_selected');
         const paymentLink = PAYMENT_499;
         await addBotMessage(
-          `Bahut achha decision ${answers.name} Ji \u{1F64F}\u2705\n\nProtocol 1 (\u20B9499 \u2014 7-Day) ke liye payment link:\n${paymentLink}\n\nPayment ke baad screenshot WhatsApp pe bhejein.\n\n\u{1F4F1} ${WHATSAPP_NUM}\n\nSachin Ji kal subah aapko Day 1 routine personally bhejenge \u{1F33F}`,
+          `Bahut achha decision ${answers.name} Ji 🙏✅\n\nProtocol 1 (Rs.499 - 7-Day) ke liye payment link:\n${paymentLink}\n\nPayment ke baad screenshot WhatsApp pe bhejein.\n\n📱 ${WHATSAPP_NUM}\n\nSachin Ji kal subah aapko Day 1 routine personally bhejenge 🌿`,
           [`WhatsApp pe message karein`]
         );
         return;
@@ -591,7 +591,7 @@ export default function AIChatbot() {
         setStage('plan_selected');
         const paymentLink = PAYMENT_1299;
         await addBotMessage(
-          `Bahut achha decision ${answers.name} Ji \u{1F64F}\u2705\n\nProtocol 2 (\u20B91,299 \u2014 14-Day) ke liye payment link:\n${paymentLink}\n\nPayment ke baad screenshot WhatsApp pe bhejein.\n\n\u{1F4F1} ${WHATSAPP_NUM}\n\nSachin Ji kal subah aapko Day 1 routine personally bhejenge \u{1F33F}`,
+          `Bahut achha decision ${answers.name} Ji 🙏✅\n\nProtocol 2 (Rs.1,299 - 14-Day) ke liye payment link:\n${paymentLink}\n\nPayment ke baad screenshot WhatsApp pe bhejein.\n\n📱 ${WHATSAPP_NUM}\n\nSachin Ji kal subah aapko Day 1 routine personally bhejenge 🌿`,
           [`WhatsApp pe message karein`]
         );
         return;
@@ -600,10 +600,10 @@ export default function AIChatbot() {
       // Difference
       if (t === '3' || t.match(/fark|difference|confused|dono mein|samajh|kaun sa/)) {
         await addBotMessage(
-          "Seedhi baat \u{1F447}\n\nProtocol 1 (\u20B9499) \u2014 7 din, 1x daily. Naya problem hai toh yeh sahi hai. Body ko stabilize karta hai.\n\nProtocol 2 (\u20B91,299) \u2014 14 din, 2x daily. Purana ya chronic problem, spray dependency. Root dosha imbalance pe kaam karta hai.\n\nDono fundamentally alag hain \u2014 ek ka extension nahi.\n\nBatayein \u2014 1 ya 2?",
+          "Seedhi baat 👇\n\nProtocol 1 (Rs.499) - 7 din, 1x daily. Naya problem hai toh yeh sahi hai. Body ko stabilize karta hai.\n\nProtocol 2 (Rs.1,299) - 14 din, 2x daily. Purana ya chronic problem, spray dependency. Root dosha imbalance pe kaam karta hai.\n\nDono fundamentally alag hain - ek ka extension nahi.\n\nBatayein - 1 ya 2?",
           [
-            "\u20B9499 \u2014 7-Day Protocol",
-            "\u20B91,299 \u2014 14-Day Protocol"
+            "Rs.499 - 7-Day Protocol",
+            "Rs.1,299 - 14-Day Protocol"
           ]
         );
         return;
@@ -614,7 +614,7 @@ export default function AIChatbot() {
         setStage('human_takeover');
         sendLead({ stage: 'requested_specialist', sinusType: answers.symptom || '', name: answers.name || '', phone: answers.phone || '' });
         await addBotMessage(
-          `Bilkul \u{1F64F} Sachin Ji personally baat karenge.\n\n\u{1F4F1} ${WHATSAPP_NUM}\n\nAyusomam Herbals \u{1F33F}`,
+          `Bilkul 🙏 Sachin Ji personally baat karenge.\n\n📱 ${WHATSAPP_NUM}\n\nAyusomam Herbals 🌿`,
           [`WhatsApp pe message karein`]
         );
         return;
@@ -622,10 +622,10 @@ export default function AIChatbot() {
 
       // Fallback
       await addBotMessage(
-        "Reply karein:\n1 \u2014 Protocol 1 (\u20B9499)\n2 \u2014 Protocol 2 (\u20B91,299)\n3 \u2014 Dono mein kya fark hai?\n4 \u2014 Specialist se baat \u{1F64F}",
+        "Reply karein:\n1 - Protocol 1 (Rs.499)\n2 - Protocol 2 (Rs.1,299)\n3 - Dono mein kya fark hai?\n4 - Specialist se baat 🙏",
         [
-          "\u20B9499 \u2014 7-Day Protocol",
-          "\u20B91,299 \u2014 14-Day Protocol",
+          "Rs.499 - 7-Day Protocol",
+          "Rs.1,299 - 14-Day Protocol",
           "Fark samjhna hai",
           "Sachin Ji se baat"
         ]
@@ -633,19 +633,19 @@ export default function AIChatbot() {
       return;
     }
 
-    // ── ASK NAAM (FIRST STEP) ──
+    // ── ASK NAAM (after symptoms) ──
     if (stage === 'ask_naam') {
       const name = text.trim();
       const newAnswers = { ...answers, name };
       setAnswers(newAnswers);
       setStage('ask_phone');
       await addBotMessage(
-        `${name} Ji \u{1F64F} Aapka WhatsApp number bata dijiye — assessment result wahan bhi bhej denge.`
+        `${name} Ji 🙏 Aapka WhatsApp number bata dijiye - FREE assessment result wahan bhej denge.`
       );
       return;
     }
 
-    // ── ASK PHONE (THEN START ASSESSMENT) ──
+    // ── ASK PHONE (then continue assessment) ──
     if (stage === 'ask_phone') {
       let phone = text.replace(/\D/g, '');
       // Strip country code
@@ -653,22 +653,22 @@ export default function AIChatbot() {
       if (phone.startsWith('091') && phone.length === 13) phone = phone.slice(3);
       if (phone.startsWith('0') && phone.length === 11) phone = phone.slice(1);
       if (phone.length !== 10) {
-        await addBotMessage('Sirf 10 digit ka WhatsApp number daalein \u{1F64F}\n\nJaise: 9876543210');
+        await addBotMessage('Sirf 10 digit ka WhatsApp number daalein 🙏\n\nJaise: 9876543210');
         return;
       }
       const newAnswers = { ...answers, phone };
       setAnswers(newAnswers);
 
-      sendLead({ stage: 'contact_collected_pre_assessment', sinusType: '', name: answers.name || '', phone });
+      sendLead({ stage: 'contact_collected', sinusType: answers.symptom || '', name: answers.name || '', phone });
 
-      setStage('q1_duration');
+      setStage('q3_tried');
       await addBotMessage(
-        `Shukriya ${answers.name} Ji \u2705\n\nAb aapka Ayurvedic sinus assessment shuru karte hain — sirf 4 chhote sawaal hain.\n\nYeh problem kitne samay se hai?`,
+        `Shukriya ${answers.name} Ji ✅ Assessment result aapke WhatsApp pe bhi bhejenge.\n\nBas 2 aur chhote sawaal hain.\n\nIske liye pehle kuch try kiya?`,
         [
-          "1\u20136 mahine",
-          "6 mahine\u20131 saal",
-          "1\u20133 saal",
-          "3 saal se zyada"
+          "Nahi, kuch nahi kiya abhi tak",
+          "Allopathy / antibiotic li",
+          "Nasal spray use ki",
+          "Sab try kiya - kuch permanent nahi hua 😔"
         ]
       );
       return;
@@ -681,7 +681,7 @@ export default function AIChatbot() {
       if (phone.startsWith('091') && phone.length === 13) phone = phone.slice(3);
       if (phone.startsWith('0') && phone.length === 11) phone = phone.slice(1);
       if (phone.length !== 10) {
-        await addBotMessage('Sirf 10 digit ka WhatsApp number daalein \u{1F64F}\n\nJaise: 9876543210');
+        await addBotMessage('Sirf 10 digit ka WhatsApp number daalein 🙏\n\nJaise: 9876543210');
         return;
       }
       const newAnswers = { ...answers, phone };
@@ -690,7 +690,7 @@ export default function AIChatbot() {
 
       const selectedPlan = answers.selectedPlan || '499';
       const paymentLink = selectedPlan === '1299' ? PAYMENT_1299 : PAYMENT_499;
-      const planLabel = selectedPlan === '1299' ? 'Protocol 2 (\u20B91,299 \u2014 14-Day)' : 'Protocol 1 (\u20B9499 \u2014 7-Day)';
+      const planLabel = selectedPlan === '1299' ? 'Protocol 2 (Rs.1,299 - 14-Day)' : 'Protocol 1 (Rs.499 - 7-Day)';
 
       sendLead({
         stage: 'plan_selected_with_contact',
@@ -701,7 +701,7 @@ export default function AIChatbot() {
       });
 
       await addBotMessage(
-        `Shukriya ${answers.name} Ji \u{1F64F}\n\n${planLabel} ke liye payment link:\n${paymentLink}\n\nPayment ke baad screenshot WhatsApp pe bhejein.\n\n\u{1F4F1} ${WHATSAPP_NUM}\n\nSachin Ji kal subah aapko Day 1 routine personally bhejenge \u{1F33F}`,
+        `Shukriya ${answers.name} Ji 🙏\n\n${planLabel} ke liye payment link:\n${paymentLink}\n\nPayment ke baad screenshot WhatsApp pe bhejein.\n\n📱 ${WHATSAPP_NUM}\n\nSachin Ji kal subah aapko Day 1 routine personally bhejenge 🌿`,
         [`WhatsApp pe message karein`]
       );
       return;
@@ -714,16 +714,16 @@ export default function AIChatbot() {
         const sinusType = answers.symptom || 'congestive';
         sendLead({ stage: 'plans_shown_after_try', sinusType, name: answers.name || '', phone: answers.phone || '' });
         await addBotMessage(buildPlanMsg(sinusType), [
-          "\u20B9499 \u2014 7-Day Protocol",
-          "\u20B91,299 \u2014 14-Day Protocol",
+          "Rs.499 - 7-Day Protocol",
+          "Rs.1,299 - 14-Day Protocol",
           "Fark samjhna hai",
           "Sachin Ji se baat"
         ]);
         return;
       }
       await addBotMessage(
-        `Kisi bhi madad ke liye seedha WhatsApp karein:\n\u{1F4F1} ${WHATSAPP_NUM}\n\nJab ready ho protocol ke liye \u2014 yahan "ready" type karein \u{1F64F}`,
-        [`WhatsApp pe message karein`, `Ready \u2014 protocol dekhna hai`]
+        `Kisi bhi madad ke liye seedha WhatsApp karein:\n📱 ${WHATSAPP_NUM}\n\nJab ready ho protocol ke liye - yahan "ready" type karein 🙏`,
+        [`WhatsApp pe message karein`, `Ready - protocol dekhna hai`]
       );
       return;
     }
@@ -731,7 +731,7 @@ export default function AIChatbot() {
     // ── PLAN SELECTED / POST-PAYMENT ──
     if (stage === 'plan_selected' || stage === 'done') {
       await addBotMessage(
-        `Kisi bhi madad ke liye seedha WhatsApp karein:\n\u{1F4F1} ${WHATSAPP_NUM}\nAyusomam Herbals \u{1F33F}`,
+        `Kisi bhi madad ke liye seedha WhatsApp karein:\n📱 ${WHATSAPP_NUM}\nAyusomam Herbals 🌿`,
         [`WhatsApp pe message karein`]
       );
       return;
@@ -740,7 +740,7 @@ export default function AIChatbot() {
     // ── HUMAN TAKEOVER ──
     if (stage === 'human_takeover') {
       await addBotMessage(
-        `Sachin Ji se seedha baat karein:\n\u{1F4F1} ${WHATSAPP_NUM}\nAyusomam Herbals \u{1F33F}`,
+        `Sachin Ji se seedha baat karein:\n📱 ${WHATSAPP_NUM}\nAyusomam Herbals 🌿`,
         [`WhatsApp pe message karein`]
       );
       return;
@@ -748,7 +748,7 @@ export default function AIChatbot() {
 
     // ── FALLBACK ──
     await addBotMessage(
-      `Sachin Ji se seedha baat karein:\n\u{1F4F1} ${WHATSAPP_NUM}\nAyusomam Herbals \u{1F33F}`,
+      `Sachin Ji se seedha baat karein:\n📱 ${WHATSAPP_NUM}\nAyusomam Herbals 🌿`,
       [`WhatsApp pe message karein`]
     );
   };
@@ -759,7 +759,7 @@ export default function AIChatbot() {
       window.open(WHATSAPP_LINK, '_blank');
       return;
     }
-    if (option === 'Ready \u2014 protocol dekhna hai') {
+    if (option === 'Ready - protocol dekhna hai') {
       handleUserMessage('ready');
       return;
     }
@@ -1152,7 +1152,7 @@ export default function AIChatbot() {
         <div className={`ayusomam-window ${isOpen ? 'visible' : ''}`}>
           {/* Header */}
           <div className="ayusomam-header">
-            <div className="ayusomam-header-avatar">{"\u{1F33F}"}</div>
+            <div className="ayusomam-header-avatar">{"🌿"}</div>
             <div className="ayusomam-header-info">
               <h3>Ayusomam Herbals</h3>
               <p>Ayurvedic Sinus Specialist</p>
@@ -1223,7 +1223,7 @@ export default function AIChatbot() {
 
           {/* Footer */}
           <div className="ayusomam-footer">
-            <span>Ayusomam Herbals {"\u{1F33F}"} Ayurvedic Wellness</span>
+            <span>Ayusomam Herbals {"🌿"} Ayurvedic Wellness</span>
           </div>
         </div>
       </div>
