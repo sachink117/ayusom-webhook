@@ -325,15 +325,9 @@ export default function AIChatbot() {
     if (!initialized.current) {
       initialized.current = true;
       sendLead({ stage: 'chat_opened', sinusType: '', name: '', phone: '' });
-      setStage('q1_duration');
+      setStage('ask_naam');
       await addBotMessage(
-        "Namaste \u{1F64F} Ayusomam Herbals mein aapka swagat hai.\n\nSinus ki problem hai? Aap bilkul sahi jagah aaye hain \u2705\n\nPehle aapki condition samajhte hain \u2014 4 chhote sawaal hain, sirf 2 min lagenge.\n\nYeh problem kitne samay se hai?",
-        [
-          "1\u20136 mahine",
-          "6 mahine\u20131 saal",
-          "1\u20133 saal",
-          "3 saal se zyada"
-        ]
+        "Namaste \u{1F64F} Ayusomam Herbals mein aapka swagat hai.\n\nSinus ki problem hai? Aap bilkul sahi jagah aaye hain \u2705\n\nHum aapki condition ka Ayurvedic assessment karenge — sirf 2 min lagenge.\n\nPehle aapka shubh naam bata dijiye \u{1F64F}"
       );
     }
   };
@@ -506,6 +500,19 @@ export default function AIChatbot() {
       const sinusType = answers.symptom || 'congestive';
       const timing = getTimeSlot();
 
+      const ENGLISH_TYPE = {
+        allergic: 'Allergic Rhinosinusitis',
+        congestive: 'Congestive Sinusitis',
+        heat: 'Inflammatory Sinusitis',
+        dependency: 'Chronic Rebound Sinusitis (Spray Dependency)'
+      };
+      const AYURVEDIC_TYPE = {
+        allergic: 'Vataja-Kaphaja Pratishyaya',
+        congestive: 'Kaphaja Pratishyaya',
+        heat: 'Pittaja Pratishyaya',
+        dependency: 'Dushta Pratishyaya'
+      };
+
       sendLead({
         stage: 'assessment_complete',
         sinusType,
@@ -519,6 +526,11 @@ export default function AIChatbot() {
       const msgs = [];
       const sevInsight = SEVERITY_INSIGHT[severity];
       if (sevInsight) msgs.push({ text: sevInsight });
+
+      // Show assessment result with English + Ayurvedic name
+      msgs.push({
+        text: `${answers.name} Ji, aapka assessment complete hua \u2705\n\n\u{1F3AF} Aapki condition:\n\u{1F4CB} English: *${ENGLISH_TYPE[sinusType] || 'Sinusitis'}*\n\u{1F33F} Ayurvedic: *${AYURVEDIC_TYPE[sinusType] || 'Pratishyaya'}*\n\nAb hum aapko aaj ke liye 2 immediate relief steps de rahe hain \u{1F447}`
+      });
 
       const stepMsg = (FREE_STEPS[timing] && FREE_STEPS[timing][sinusType]) || FREE_STEPS[timing]['congestive'];
       msgs.push({ text: stepMsg });
@@ -561,21 +573,26 @@ export default function AIChatbot() {
     if (stage === 'pitched') {
       // Protocol 1
       if (t === '1' || t.match(/\b499\b|protocol 1|plan 1|7.day/i)) {
-        setStage('ask_naam');
-        sendLead({ stage: 'protocol_1_selected', sinusType: answers.symptom || '', name: '', phone: '' });
+        setAnswers(prev => ({ ...prev, selectedPlan: '499' }));
+        sendLead({ stage: 'protocol_1_selected', sinusType: answers.symptom || '', name: answers.name || '', phone: answers.phone || '' });
+        setStage('plan_selected');
+        const paymentLink = PAYMENT_499;
         await addBotMessage(
-          "Bahut achha decision \u{1F64F}\u2705\n\nAapka naam bata dijiye \u2014 taaki protocol personalize kar sakein."
+          `Bahut achha decision ${answers.name} Ji \u{1F64F}\u2705\n\nProtocol 1 (\u20B9499 \u2014 7-Day) ke liye payment link:\n${paymentLink}\n\nPayment ke baad screenshot WhatsApp pe bhejein.\n\n\u{1F4F1} ${WHATSAPP_NUM}\n\nSachin Ji kal subah aapko Day 1 routine personally bhejenge \u{1F33F}`,
+          [`WhatsApp pe message karein`]
         );
         return;
       }
 
       // Protocol 2
       if (t === '2' || t.match(/\b1299\b|protocol 2|plan 2|14.day/i)) {
-        setStage('ask_naam');
         setAnswers(prev => ({ ...prev, selectedPlan: '1299' }));
-        sendLead({ stage: 'protocol_2_selected', sinusType: answers.symptom || '', name: '', phone: '' });
+        sendLead({ stage: 'protocol_2_selected', sinusType: answers.symptom || '', name: answers.name || '', phone: answers.phone || '' });
+        setStage('plan_selected');
+        const paymentLink = PAYMENT_1299;
         await addBotMessage(
-          "Bahut achha decision \u{1F64F}\u2705\n\nAapka naam bata dijiye \u2014 taaki protocol personalize kar sakein."
+          `Bahut achha decision ${answers.name} Ji \u{1F64F}\u2705\n\nProtocol 2 (\u20B91,299 \u2014 14-Day) ke liye payment link:\n${paymentLink}\n\nPayment ke baad screenshot WhatsApp pe bhejein.\n\n\u{1F4F1} ${WHATSAPP_NUM}\n\nSachin Ji kal subah aapko Day 1 routine personally bhejenge \u{1F33F}`,
+          [`WhatsApp pe message karein`]
         );
         return;
       }
@@ -616,23 +633,55 @@ export default function AIChatbot() {
       return;
     }
 
-    // ── ASK NAAM ──
+    // ── ASK NAAM (FIRST STEP) ──
     if (stage === 'ask_naam') {
       const name = text.trim();
       const newAnswers = { ...answers, name };
       setAnswers(newAnswers);
       setStage('ask_phone');
       await addBotMessage(
-        `${name} Ji \u{1F64F} WhatsApp number share karein \u2014 protocol ki guidance wahan bhejenge.`
+        `${name} Ji \u{1F64F} Aapka WhatsApp number bata dijiye — assessment result wahan bhi bhej denge.`
       );
       return;
     }
 
-    // ── ASK PHONE ──
+    // ── ASK PHONE (THEN START ASSESSMENT) ──
     if (stage === 'ask_phone') {
-      const phone = text.replace(/\D/g, '');
-      if (phone.length < 10) {
-        await addBotMessage('Valid WhatsApp number daalein (10 digit) \u{1F64F}');
+      let phone = text.replace(/\D/g, '');
+      // Strip country code
+      if (phone.startsWith('91') && phone.length === 12) phone = phone.slice(2);
+      if (phone.startsWith('091') && phone.length === 13) phone = phone.slice(3);
+      if (phone.startsWith('0') && phone.length === 11) phone = phone.slice(1);
+      if (phone.length !== 10) {
+        await addBotMessage('Sirf 10 digit ka WhatsApp number daalein \u{1F64F}\n\nJaise: 9876543210');
+        return;
+      }
+      const newAnswers = { ...answers, phone };
+      setAnswers(newAnswers);
+
+      sendLead({ stage: 'contact_collected_pre_assessment', sinusType: '', name: answers.name || '', phone });
+
+      setStage('q1_duration');
+      await addBotMessage(
+        `Shukriya ${answers.name} Ji \u2705\n\nAb aapka Ayurvedic sinus assessment shuru karte hain — sirf 4 chhote sawaal hain.\n\nYeh problem kitne samay se hai?`,
+        [
+          "1\u20136 mahine",
+          "6 mahine\u20131 saal",
+          "1\u20133 saal",
+          "3 saal se zyada"
+        ]
+      );
+      return;
+    }
+
+    // ── ASK PHONE FOR PAYMENT (after plan selection) ──
+    if (stage === 'ask_phone_payment') {
+      let phone = text.replace(/\D/g, '');
+      if (phone.startsWith('91') && phone.length === 12) phone = phone.slice(2);
+      if (phone.startsWith('091') && phone.length === 13) phone = phone.slice(3);
+      if (phone.startsWith('0') && phone.length === 11) phone = phone.slice(1);
+      if (phone.length !== 10) {
+        await addBotMessage('Sirf 10 digit ka WhatsApp number daalein \u{1F64F}\n\nJaise: 9876543210');
         return;
       }
       const newAnswers = { ...answers, phone };
@@ -644,7 +693,7 @@ export default function AIChatbot() {
       const planLabel = selectedPlan === '1299' ? 'Protocol 2 (\u20B91,299 \u2014 14-Day)' : 'Protocol 1 (\u20B9499 \u2014 7-Day)';
 
       sendLead({
-        stage: 'contact_collected',
+        stage: 'plan_selected_with_contact',
         sinusType: answers.symptom || '',
         name: answers.name || '',
         phone,
@@ -652,7 +701,7 @@ export default function AIChatbot() {
       });
 
       await addBotMessage(
-        `Shukriya ${answers.name} Ji \u{1F64F}\n\n${planLabel} ke liye payment link:\n${paymentLink}\n\nPayment ke baad screenshot yahan bhejein ya WhatsApp pe share karein.\n\n\u{1F4F1} ${WHATSAPP_NUM}\n\nSachin Ji kal subah aapko Day 1 routine personally bhejenge \u{1F33F}`,
+        `Shukriya ${answers.name} Ji \u{1F64F}\n\n${planLabel} ke liye payment link:\n${paymentLink}\n\nPayment ke baad screenshot WhatsApp pe bhejein.\n\n\u{1F4F1} ${WHATSAPP_NUM}\n\nSachin Ji kal subah aapko Day 1 routine personally bhejenge \u{1F33F}`,
         [`WhatsApp pe message karein`]
       );
       return;
