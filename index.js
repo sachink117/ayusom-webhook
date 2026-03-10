@@ -973,6 +973,50 @@ app.options('/website-lead', (req, res) => {
 });
 
 // ============================================================
+// TRANSLATE ENDPOINT (Claude API)
+// ============================================================
+app.options('/translate', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.sendStatus(200);
+});
+
+const translateCache = {};
+
+app.post('/translate', async (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  try {
+    const { text, lang } = req.body;
+    if (!text || !lang || lang === 'hinglish') return res.json({ translated: text });
+    if (!CLAUDE_API_KEY) return res.json({ translated: text });
+
+    const cacheKey = `${lang}:${text.slice(0, 80)}`;
+    if (translateCache[cacheKey]) return res.json({ translated: translateCache[cacheKey] });
+
+    const langNames = { english: 'English', hindi: 'Hindi (Devanagari script)', telugu: 'Telugu script', tamil: 'Tamil script', kannada: 'Kannada script' };
+    const langName = langNames[lang] || lang;
+
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': CLAUDE_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: `Translate this message to ${langName}. Keep emojis, formatting, numbers, payment links, WhatsApp numbers, Ayurvedic terms (Pratishyaya, dosha, Vata, Pitta, Kapha, srotas, ama, nasya) and brand name "Ayusomam Herbals" exactly as-is. Keep Rs. as-is. Just return the translated text, nothing else:\n\n${text}` }]
+      })
+    });
+    const data = await r.json();
+    const translated = data.content?.[0]?.text || text;
+    translateCache[cacheKey] = translated;
+    res.json({ translated });
+  } catch (e) {
+    console.error('Translate error:', e.message);
+    res.json({ translated: req.body.text });
+  }
+});
+
+// ============================================================
 // WEBSITE CHATBOT ENDPOINT
 // ============================================================
 app.options('/website-chat', (req, res) => {

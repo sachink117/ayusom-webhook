@@ -274,6 +274,29 @@ async function sendLead(data) {
   }
 }
 
+// ── TRANSLATE VIA BACKEND ──
+const TRANSLATE_URL = 'https://bot.ayusomamherbals.com/translate';
+async function translateText(text, lang) {
+  if (!lang || lang === 'hinglish') return text;
+  try {
+    const r = await fetch(TRANSLATE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, lang })
+    });
+    const data = await r.json();
+    return data.translated || text;
+  } catch (e) {
+    return text;
+  }
+}
+
+async function translateOptions(opts, lang) {
+  if (!lang || lang === 'hinglish') return opts;
+  const results = await Promise.all(opts.map(o => translateText(o, lang)));
+  return results;
+}
+
 // ── MAIN COMPONENT ──
 export default function AIChatbot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -281,6 +304,8 @@ export default function AIChatbot() {
   const [input, setInput] = useState('');
   const [stage, setStage] = useState('init');
   const [answers, setAnswers] = useState({});
+  const [lang, setLang] = useState('hinglish');
+  const langRef = useRef('hinglish');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -298,13 +323,18 @@ export default function AIChatbot() {
     }
   }, [isOpen]);
 
-  // Add bot message with typing delay
-  const addBotMessage = (text, options = null, delay = 600) => {
+  // Add bot message with typing delay + auto-translate
+  const addBotMessage = async (text, options = null, delay = 600) => {
+    setIsTyping(true);
+    const curLang = langRef.current;
+    const [translatedText, translatedOpts] = await Promise.all([
+      translateText(text, curLang),
+      options ? translateOptions(options, curLang) : Promise.resolve(null)
+    ]);
     return new Promise((resolve) => {
-      setIsTyping(true);
       setTimeout(() => {
         setIsTyping(false);
-        setMessages(prev => [...prev, { sender: 'bot', text, options }]);
+        setMessages(prev => [...prev, { sender: 'bot', text: translatedText, options: translatedOpts }]);
         resolve();
       }, delay);
     });
@@ -325,16 +355,24 @@ export default function AIChatbot() {
     if (!initialized.current) {
       initialized.current = true;
       sendLead({ stage: 'chat_opened', sinusType: '', name: '', phone: '' });
-      setStage('q1_duration');
-      await addBotMessage(
-        "Namaste 🙏 Ayusomam Herbals mein aapka swagat hai.\n\nSinus ki problem hai? Aap bilkul sahi jagah aaye hain ✅\n\nHum aapki condition ka FREE Ayurvedic assessment karenge - sirf 2 min lagenge.\n\nYeh problem kitne samay se hai?",
-        [
-          "1-6 mahine",
-          "6 mahine-1 saal",
-          "1-3 saal",
-          "3 saal se zyada"
-        ]
-      );
+      setStage('select_lang');
+      // Language selection - don't translate this one
+      setIsTyping(true);
+      setTimeout(() => {
+        setIsTyping(false);
+        setMessages(prev => [...prev, {
+          sender: 'bot',
+          text: "Namaste 🙏 Ayusomam Herbals mein aapka swagat hai.\n\nApni language choose karein / Choose your language:",
+          options: [
+            "Hinglish (Hindi-English)",
+            "English",
+            "हिंदी (Hindi)",
+            "తెలుగు (Telugu)",
+            "தமிழ் (Tamil)",
+            "ಕನ್ನಡ (Kannada)"
+          ]
+        }]);
+      }, 600);
     }
   };
 
@@ -345,6 +383,31 @@ export default function AIChatbot() {
     setInput('');
 
     const t = text.toLowerCase().trim();
+
+    // ── LANGUAGE SELECTION ──
+    if (stage === 'select_lang') {
+      let selectedLang = 'hinglish';
+      if (t.includes('english') && !t.includes('hindi')) selectedLang = 'english';
+      else if (t.includes('हिंदी') || t.includes('hindi)')) selectedLang = 'hindi';
+      else if (t.includes('తెలుగు') || t.includes('telugu')) selectedLang = 'telugu';
+      else if (t.includes('தமிழ்') || t.includes('tamil')) selectedLang = 'tamil';
+      else if (t.includes('ಕನ್ನಡ') || t.includes('kannada')) selectedLang = 'kannada';
+      else if (t.includes('hinglish')) selectedLang = 'hinglish';
+
+      setLang(selectedLang);
+      langRef.current = selectedLang;
+      setStage('q1_duration');
+      await addBotMessage(
+        "Sinus ki problem hai? Aap bilkul sahi jagah aaye hain ✅\n\nHum aapki condition ka FREE Ayurvedic assessment karenge - sirf 2 min lagenge.\n\nYeh problem kitne samay se hai?",
+        [
+          "1-6 mahine",
+          "6 mahine-1 saal",
+          "1-3 saal",
+          "3 saal se zyada"
+        ]
+      );
+      return;
+    }
 
     // ── Q1: DURATION ──
     if (stage === 'q1_duration') {
