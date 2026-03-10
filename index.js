@@ -518,7 +518,7 @@ Jab ready ho, yeh links hain:
       await new Promise((r) => setTimeout(r, 800));
       await sendMessage(
         senderId,
-        `Koi aur sawaal hai toh seedha WhatsApp pe poochho — main personally jawab dunga. 🌿\n\n📱 *85951 60713*`
+        `Tumhara sawaal hamare *Sinus Relief Specialist* tak pahuncha diya hai. 🌿\n\nYahan wait karo — thodi der mein reply aayega.\n\nYa seedha WhatsApp karo:\n📱 *85951 60713*`
       );
       userData.state = "human";
       await logToSheet(senderId, senderName, `Handoff after 2 replies: ${text}`, "HUMAN_TAKEOVER", userData.sinusType);
