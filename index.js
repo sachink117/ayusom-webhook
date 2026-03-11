@@ -10,8 +10,12 @@ const app = express();
 app.use(express.json());
 
 // ─── CONFIG ────────────────────────────────────────────────
-const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
+let PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 const VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN;
+
+if (!PAGE_ACCESS_TOKEN) {
+  console.error("⚠️ WARNING: PAGE_ACCESS_TOKEN is not set! Bot will not be able to send messages.");
+}
 const PAYMENT_1299 = "https://rzp.io/rzp/qu8zhQT";
 const PAYMENT_499 = process.env.PAYMENT_499_LINK || "https://rzp.io/rzp/REPLACE_499"; // Add ₹499 link in env
 const GAS_URL = "https://script.google.com/macros/s/AKfycbwWjnJa2utTx0vQUkjdKtSaVpJBllL1-f-inxEfmxzutyF5GpGS2bChD5qVXkYPwqSbuA/exec";
@@ -256,6 +260,10 @@ async function logToSheet(senderId, name, message, stage, sinusType = "") {
 
 // ─── SEND MESSAGE ───────────────────────────────────────────
 async function sendMessage(recipientId, text) {
+  if (!PAGE_ACCESS_TOKEN) {
+    console.error("❌ Cannot send message — PAGE_ACCESS_TOKEN is missing!");
+    return;
+  }
   try {
     const response = await fetch(
       `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
@@ -270,11 +278,29 @@ async function sendMessage(recipientId, text) {
       }
     );
     const data = await response.json();
-    if (data.error) console.error("Send error:", data.error);
+    if (data.error) {
+      console.error("❌ Send error:", data.error);
+      // Token expired or invalid — log clearly
+      if (data.error.code === 190 || data.error.type === "OAuthException") {
+        console.error("🔴 PAGE_ACCESS_TOKEN expired or invalid! Generate a new one from Facebook Developer Console.");
+      }
+    }
   } catch (e) {
     console.error("Fetch error:", e.message);
   }
 }
+
+// ─── TOKEN REFRESH ENDPOINT — Update token without redeploy ──
+app.get("/update-token", (req, res) => {
+  const newToken = req.query.token;
+  const secret = req.query.secret;
+  if (secret !== VERIFY_TOKEN || !newToken) {
+    return res.sendStatus(403);
+  }
+  PAGE_ACCESS_TOKEN = newToken;
+  console.log("✅ PAGE_ACCESS_TOKEN updated via /update-token endpoint");
+  res.send("Token updated successfully");
+});
 
 // ─── NUMBER EXTRACTOR ───────────────────────────────────────
 function extractFirstNumber(text) {
