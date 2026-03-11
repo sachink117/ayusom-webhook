@@ -20,7 +20,18 @@ const SACHIN_PAGE_ID = process.env.SACHIN_PAGE_ID || ""; // Set in env to enable
 
 // ─── STATE STORE ───────────────────────────────────────────
 // state: 'new' | 'asked_duration' | 'asked_symptoms' | 'pitched' | 'done' | 'human'
-const userState = {}; // { senderId: { state, duration, symptoms, sinusType, hookIndex, postPitchReplies } }
+const userState = {}; // { senderId: { state, duration, symptoms, sinusType, hookIndex, postPitchReplies, lastActive } }
+
+// ─── MEMORY CLEANUP — Remove stale users every 30 min ─────
+const STATE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+setInterval(() => {
+  const now = Date.now();
+  for (const id of Object.keys(userState)) {
+    if (now - (userState[id].lastActive || 0) > STATE_TTL_MS) {
+      delete userState[id];
+    }
+  }
+}, 30 * 60 * 1000);
 
 // ─── HOOK ROTATION (5 hooks, random) ───────────────────────
 const HOOKS = [
@@ -247,7 +258,7 @@ async function logToSheet(senderId, name, message, stage, sinusType = "") {
 async function sendMessage(recipientId, text) {
   try {
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+      `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -282,6 +293,7 @@ async function handleMessage(senderId, messageText, senderName) {
   }
 
   const userData = userState[senderId];
+  userData.lastActive = Date.now();
 
   // ── HUMAN TAKEOVER CHECK ──────────────────────────────────
   if (userData.state === "human") {
@@ -562,9 +574,15 @@ Jab ready ho, yeh links hain:
     return;
   }
 
-  // FALLBACK — restart if stuck
+  // FALLBACK — reset to new and send hook (no recursion)
   userData.state = "new";
-  await handleMessage(senderId, messageText, senderName);
+  const hookIndex = Math.floor(Math.random() * HOOKS.length);
+  userData.hookIndex = hookIndex;
+  userData.state = "asked_duration";
+  await sendMessage(senderId, HOOKS[hookIndex]);
+  await new Promise((r) => setTimeout(r, 1200));
+  await sendMessage(senderId, `Yeh takleef aapko kitne time se hai? 🌿`);
+  await logToSheet(senderId, senderName, "Restart — hook sent", "HOOK", "");
 }
 
 // ─── HUMAN TAKEOVER — Page reply detection ─────────────────
@@ -623,6 +641,24 @@ app.post("/webhook", async (req, res) => {
 // Health check
 app.get("/", (req, res) => res.send("Ayusomam Bot v2.0 — Running 🌿"));
 
+// ─── CRASH PROTECTION ─────────────────────────────────────
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err.message);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Rejection:", reason);
+});
+
 // ─── START ─────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🌿 Ayusomam Bot v2.0 running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🌿 Ayusomam Bot v2.0 running on port ${PORT}`);
+
+  // ─── KEEP-ALIVE SELF-PING (prevents Render free tier sleep) ───
+  const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
+  if (RENDER_URL) {
+    setInterval(() => {
+      fetch(RENDER_URL).catch(() => {});
+    }, 5 * 60 * 1000); // Ping every 5 minutes
+  }
+});
