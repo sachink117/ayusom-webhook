@@ -216,29 +216,106 @@ const HOOKS_ROM = [
 
 const HOOKS_DEV = [
   `😮‍💨 सुबह उठते ही नाक बंद, दिन भर सर भारी...\n\nSinus एक बार पकड़ ले, तो छोड़ता नहीं।\n\nसही जगह आए हैं आप। 🌿`,
-  `Spray use करते हैं? थोड़ी बेर राहत — फिर वही बंद। 😮‍💨\n\nयह cycle कब टूटती है? कभी नहीं — जब तक अंदर की वजह नह treat न हो।\n\nसही जगह आए हैं। 🌿`,
-  `नाक बंद, smell नहीं, दिन भर भारी, नींद भी ख़ऱब... 😮‍💨\n\nSinus सिर्फ़ नाक की नहीं — पूरऀ quality of life की problem है।\n\nAap सही जगह आए हैं। 🌿`,
-  `Doctor क॥प ���������_��<�������ׂ���� ���˂� ����W����l������������������T���Â�炒���P�������������ׂ�炖 ���ׂ�������ゖ���~b��7�~J�q�q�����を˂����<���炖/���������炖 ���W��7�����/����W������を���Â�7����������ѽ�́�ɕ�Ѓ��炖/����� ���炖#�����������������W�� ���ׂ�s��䃂����炖�����q�q���を炖 ���s��_��䃂���<���炖#�������~2���(�����Â��������W��,����������䃂�[��/��ȃ��W�����ゖ/��������炖#������ゖ�����䁙ɕ͠������炖�����'�����������~b��7�~J�q�q�������M���̃��W��������ͥ��ͥ�����炖 ��P���S���������W�� �����を˂� ���ׂ�s��䃂�炒����͔�������������˂�\���炖/����� ���炖#���q�q���を炖 ���s��_��䃂���<���炖#�������~2���)t�((����R�R�R �UIQ%=8�EUMQ%=8��R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R )�չ�ѥ�������Ʌѥ��EՕ�ѥ���͌���(������͌���􀉑�؈���(����ɕ��ɸ��(������ѕ��聃�����䃂����W��˂���������������W��,���W��������������を�������ゖ���炖 ���~2���(������ɕ������l�ă�����炖��������ゖ����؃�����炖��������ゖ����Ĵȃ��を���ȃ��ゖ����Ԭ���を���ȃ��ゖ�t�(������(���(��ɕ��ɸ��(����ѕ��聁e���х��������������ѹ��݅�Ё͔�������~2���(����ɕ������l�ā�������͔����؁�������͔����Ĵȁͅ���͔����Ԭ�ͅ���͔�t�(����)�((����R�R�R �UIQ%=8�5AQ!d�
-,��R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R )�չ�ѥ�������Ʌѥ�����ѕ�а�͌���(������Ё啅�̀����͕%�Р�ѕ�й��э���q��������mt�l�t�������(������ЁѰ��ѕ�йѽ1�ݕ�
-�͔���(������Ё��1�����啅�̀��ԁ����q�����q�����q�����q���͕q����ȼ�ѕ�СѰ��(������Ё��5����啅�̀��ȁ����ͅ���啅��q�����q���͕q����ȼ�ѕ�СѰ��(������Ё��5���􀽵�����񵽹ѡ�q���ɕq�����q�����q����༹ѕ�СѰ��((������͌���􀉑�؈���(����������1�����ɕ��ɸ����啅�́������W�� �􃂒を���ȃ��ゖ������䃂����W��˂����������炖 �����~b��7�~J�q�q��������������を���������������を���Â�7���������������T������炖����P����������������ɝ䰁����̃��を�������Ѓ��炖/���������炖#���q�q������䁍�͔������7������������ゖ��������[��������炖#�������(����������5����ɕ��ɸ����啅�́������W�� �􃂒を���ȃ��ゖ���k��ȃ��Â�炒����炖 ��P���������˂���������ѕ���Ʌ�䃂����炖�����������������W����l�͕Ѓ��炖,���k����W������炖#���q�q�M����������ͥ̃��s���Â���Â� ���炖#�����(����������5����ɕ��ɸ����W��������� ���を�������ゖ���k��ȃ��Â�炖 ���炖 ��P��������х������������を炖 ��ɽѽ������ゖ���s��˂�7����� ��������T���炖,���をW���������炖#�����(����ɕ��ɸ���������T���炖 ����を���t���_���������������炒˂���ɽ��ɱ䁑�����͔���W��Â�������炖#�������(���((��������1�����ɕ��ɸ����啅�́����-����ͅ���͔�啠�х��������������~b��7�~J�q�q�%ѹ��݅�Ё�����ͥɘ������������P�����������ɝ䰁����́ͅ�������ѕ����ф�����q�q�e�����͔���典�͔�����є��������(��������5����ɕ��ɸ����啅�́����-����ͅ���͔������Ʌ��������P���ѱ���啠�ѕ���Ʌ�䁹���������ȁ�Ս��͕Ё�����խ������q�q�M����������ͥ́�ɽ�ɤ�������(��������5����ɕ��ɸ��-�����݅�Ё͔������Ʌ��������P��́�х������ͅ����ɽѽ����͔�������ѡ�������ͅ�ф�������(��ɕ��ɸ��Q����������ͅ�������儸�A������ɽ��ɱ䁑�����͔����є��������)�((����R�R�R �Me5AQ=5L�EUMQ%=8��R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R )�չ�ѥ������M��ѽ��EՕ�ѥ���͌���(������͌���􀉑�؈���(����ɕ��ɸ��(������ѕ��聃�������������������<��P����ѽ�̃��W��7���������炖#������s��,������ ��������炖/���������炖#�����~2���(������ɕ������l���������T������������Â�炒��� ���炖 ����M�Ʌ��͔���W��Â��������炖������M����������炖���������� �����������˂�����炒Â�����͍��ɝ��t�(������(���(��ɕ��ɸ��(����ѕ��聁����х���P����ѽ�́�儁������)�������������ф�������~2���(����ɕ������l�9���������ɕ�Ѥ��������M�Ʌ��͔����ф��ո����M������������Ѥ����A�������Ʉ���͍��ɝ��t�(����)�((����R�R�R �IY0�5MML���������͍ɥ�Ф��R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R )�չ�ѥ������I�ٕ��5��ͅ���������͌���(������Ёɽ����(��������ɝ��聁��������ѕɸ���������ͅ�������儃�P�啠��Y�х���-�����������ɝ����M���̨�������~2�q�q����ե���ѕ�Ё��ɼ聝��ȁ͔�����ȁ����儁����ɔ�ɽ�������������M��ѽ�́݅����ѡ���������ɕ�Ё���������ѽ�������ɴ�����q�q��ȁ�������ȁͥ����P�����������������թ��Ѥ���������������ͅ�Ѡ��
-�����ѥٔ�������������������ф��e���ͥ�������q�q�%́�����������ɥ���ȁ����ѥ�䁡�������ɕ�ձ�́����Ё���Ё���є��������((����������ѥٔ聁��������ѕɸ���������ͅ�������儃�P�啠��-��������
-�����ѥٔ��M���̨�������~2�q�q���ѕ�Ё��ɼ�ͥȁ�������խ��������Ʉ���������ԁ͕���խ���5�ѡ��儁������������ɕ���ɔ���������ѽ�������ɴ�����q�q�MՉ����ѡ������������������ф�ͅ�͔���Ʉ����ф���������
-���ͥ��-��������P�Ʌ�Ё���ȁ�Ս�́�������Ѥ�����q�q��i�ɽ�ɤ訁���䁥́��������ͅ�͔��������͡���������P��ɽѽ�������ͅ�Ѡ��������ɹ�����������((������Ʌ�聁��������ѕɸ���������ͅ�������儃�P�啠���͡�����ͅ�Ѥ��M�Ʌ���������䤨�������~2�q�q���ѕ��聕��Ʌ�Ё��Ʌ䁵�Ё����9�������͡��������P�啠������ɴ����ф�������������ͥ����䁑�������Ё�����խ������q�q�M�Ʌ䁭��ȴ́����є������������͔������兑��������e���ɕ��չ��������ѥ�������q�q��
-������ɭ�䁭�������Ё��ɼ���P�ݽ���ͱ�唁�������ф������Ʌ�Յѕ���ɽѽ������������ф�������((���������ѥٔ聁��������ѕɸ���������ͅ�������儃�P�啠��A��х����%����ѥٔ�!��Ф�M���̨�������~2�q�q������������ȁ�������ѽ���������������ɐ�儁���٥�������ɕ�Ёͥ��́������ѥ�������q�q��ѥ���ѥ��͔�̴Ё����ѡ������������ɼ�ѽ��݅�����	��ѕɥ����危������啠�q�q��
-ɥѥ���聕Ս������́儁������ȁ�ѕ�����������Ё��ɼ���P�A��х��������]=IM����ф������M�ɘ�������݅ѕȹ��((���������聁��������ѕɸ���������ͅ�������儃�P�啠��A�����	��������M���̨�������~2�q�q���ѕ��聱�չ��儁��Ʌ�������������́������P��Ս��͵�������������хɅ����Յ��䁉����q�q���хɅ��������
-�����ѥٔ�������хɅ����Յ��䁉�����A��������ѕɸ������ɴ��q�q�-��������������ɝ����՝���Ё�դ�ѡ���P�����ɔ��ɽѽ����͔���������������ɝ��䁭�����ɽٕ���Ё��������������(����((������Ё��؀��(��������ɝ��聃�������W�������ѕɸ��������X���W�����を���t�����������P������䀩Y�х���-�����������ɝ����M���̨���炖#�����~2�q�q���?��T��ե���ѕ�Ѓ��W��Â���胂�c������ゖ���������炒����s�����?�����������������をÂ��ɽ���������������M��ѽ�̃��ׂ���߂�ゖ/�������-�����ɕ�Ё�������炖,���������,������ɴ���炖#���q�q���?��T�����ȁͥ����P��������[���������� ���[����s��˂������� ���炖#������������T���W�����を������
-�����ѥٔ�����������W����� ������炖�����炖/����������������ͥ�����炖 �q�q���������������������ɥ���ȁ����ѥ�䃂�炖/�������������ɕ�ձ�̃�����炖�������Ѓ��������˂�������炖#�������((����������ѥٔ聃�������W�������ѕɸ��������X���W�����を���t�����������P������䀩-��������
-�����ѥٔ��M���̨���炖#�����~2�q�q���?��T�ѕ�Ѓ��W��Â���胂�を���������_�����w����W�����?������k����炒Â����������k����ԁ͕����Â���W�����������������������������_�����˂�/������������ɕ���ɔ��������炖,������,������ɴ���炖#���q�q���ゖ�����䃂�'�����W��������炒˂��������������c����������を���ゖ��������Â�����˂�_���������炖 ���������
-���ͥ��-��������P���Â��������������Ս�̃��s������s�������� ���炖#���q�q����s���Â���Â� 訁���䃂������������W������を���ゖ�������������������ۂ�7���������炖 ��P��ɽѽ������W�����を����������������W��Â���� ������������_�������((������Ʌ�聃�������W�������ѕɸ��������X���W�����を���t�����������P������䀩�͡�����ͅ�Ѥ��M�Ʌ���������䤨���炖#�����~2�q�q���?��T�ѕ��胂�?��T���Â��������Ʌ䃂��������˂�/����������������������ۂ�7��W�����ȃ��炖,��P������䁍����ɴ���W��Â��������炖 ���������T����ͥ����䁑�������Ѓ��炖,���k����W�� ���炖#���q�q�M�Ʌ䃂�W���ȴ̃��c����������������������炒˂����ゖ������ ���s���7�����������������������I���չ��������ѥ�����炖 ������炖�q�q��
-������ɭ�䃂�W����� ����������W��Â�,���P���ׂ�,�����を˂����<��������炖/���������炖#����Ʌ�Յѕ���ɽѽ������W���������W��Â��������炖#�����((���������ѥٔ聃�������W�������ѕɸ��������X���W�����を���t�����������P������䀩A��х����%����ѥٔ�!��Ф�M���̨���炖#�����~2�q�q���?��T������胂�+���������W����������������/�������������炒˂�7��W���������Â�7��������������٥�������ɕ�Ёͥ��́������ѥ�����炖#���q�q��ѥ���ѥ����ゖ�̴Ѓ�����������������T�������������W��Â�,������,���ׂ����������	��ѕɥ����危����炖 ������炖�q�q��
-ɥѥ���聕Ս������̃�������������ȁ�ѕ�����W����� ����������W��Â�,���P�A��х�����������]=IM���W��Â��������炖#������を���Â�7�������������݅ѕ˂����((���������聃�������W�������ѕɸ��������X���W�����を���t�����������P������䀩A�����	��������M���̨���炖#�����~2�q�q���?��T�ѕ��胂�˂�3����\���������������Â�T���������T���W���������������˂����L��P���W����l�͵�������������������/�����/��������Â�����Յ��䃂��������q�q���?��T������Â�������������
-�����ѥٗ����������/�����/��������Â�����Յ��䃂���������A��������ѕɸ������ɷ����q�q���W�� ���˂�/��_��/�����W��,���ɝ����՝���Ѓ��炖�� ������ ��P���炒������Â���ɽѽ������ゖ���W�� ����������������������ɝ��䃂�W������ɽٕ���Ё�������W�� ���炖#�����(����((������Ё�Ɍ��͌���􀉑�؈�����؀�ɽ��(��ɕ��ɸ��ɍm����t�����ɍl�������ѥٔ�t�)�((����R�R�R �A%Q
- �5MML��R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R�R (����х����������Ѽ�չ����х�����ᅍѱ�ݡ�Ёѡ�䁝��)�չ�ѥ������A�э�5��ͅ���������͌���(������Ё����9���̀��(��������ɝ��耀��ɽ�耉���ɝ���M���̈�������耉���ɝ���M���̈���(����������ѥٔ��ɽ�耉
-�����ѥٔ�M���̈�����耉
-�����ѥٔ�M���̈���(������Ʌ�耀�����ɽ�耉M�Ʌ���������䈰����耉M�Ʌ���������䈁��(���������ѥٔ老�ɽ�耉%����ѥٔ�M���̈������耉%����ѥٔ�M���̈���(���������耀�����ɽ�耉A�����M���̈����������耉A�����M���̈���(����((������Ёѹ���������9����m����t��������9����l�������ѥٔ�t�m͌���􀉑�؈������؈�耉ɽ��t�((������͌���􀉑�؈���(����ɕ��ɸ���������W������ѹ��������W�����˂����<�������ͽ����镐��з�����������ɽ�Ʌ����炖#�����~2�q�q�ȁ��ѥ��̃��炖#���q�q��~2Ā��
-���䃊P�Mх�ѕȁ-�Щq��������W���ͥ��́�������W����͕����ե�����ɽѽ����]������������Â�����[��������W��Â�������炒���ե�����W��Â�������炖#�����q�q����q�q��~2����
-�İ��䃊P��з����������9�ͅ��I��ѽɅѥ���Aɽ�Ʌ��q���@�|���を���ゖ���s���7���������������˂�����������s������������炖 �}q�q���������W��,��ᅍѱ䃂����䃂�������˂���_����q��r���ă�P��������W�� ��������Â� ����ѽ�䰁�ɥ����́���ͽ����䃂�を���w������_����]��������������q��r��������W���ͥ��́�������W�����˂����<����ѽ��ɽ�ѥ����P���ゖ��������������������|�����Â�������ԃ�����������}q��r��Ѓ������������Â�/��s�����������Â���]�����������������P������p���W��#��を����Â�炒�������ͽ�����q��r���W��/�� ������������ɽ�������炖,��P���'��ゖ ������������ɽѽ���������Ѓ��炖/��_���q��r���܀�����Ѓ�P��ɽ�ɕ�́ɕ٥�܁���ͽ�����q��r�Aɽ�Ʌ����[�����7������炖/��������W�����������������ѕ�������ե�������ɕ�q�q����q�q�9P����ѽȃ��?��T�٥ͥЃ���������
-�İ����Ȱ��Â�˂����������炖 ��P���S������ׂ�,���Â�/��s���������������炖������रता।\nयहाँ 14 दिन रोज़ personal attention — सिर्फ़ ₹1,299 एक बार। 🌿\n\nकौनसा option सही लगता है?`;
+  `Spray use करते हैं? थोड़ी देर राहत — फिर वही बंद। 😮‍💨\n\nयह cycle कब टूटती है? कभी नहीं — जब तक अंदर की वजह treat न हो।\n\nसही जगह आए हैं। 🌿`,
+  `नाक बंद, smell नहीं, दिन भर भारी, नींद भी ख़राब... 😮‍💨\n\nSinus सिर्फ़ नाक की नहीं — पूरी quality of life की problem है।\n\nआप सही जगह आए हैं। 🌿`,
+  `Doctor के पास गए, दवाई ली, कुछ दिन ठीक रहा — फिर वही वापस। 😮‍💨\n\nइसलिए होता है क्योंकि सिर्फ़ symptoms treat होती हैं, अंदर की वजह नहीं।\n\nसही जगह आए हैं। 🌿`,
+  `रात को मुँह खोल के सोते हैं? सुबह fresh नहीं उठते? 😮‍💨\n\nयह Sinus का classic sign है — और इसकी असली वजह हर case में अलग होती है।\n\nसही जगह आए हैं। 🌿`,
+];
+
+// ─── DURATION QUESTION ────────────────────────────────────────
+function getDurationQuestion(sc) {
+  if (sc === "dev") {
+    return {
+      text: `यह तकलीफ़ आपको कितने समय से है? 🌿`,
+      replies: ["1 महीने से", "6 महीने से", "1-2 साल से", "5+ साल से"],
+    };
+  }
+  return {
+    text: `Yeh takleef aapko kitne waqt se hai? 🌿`,
+    replies: ["1 mahine se", "6 mahine se", "1-2 saal se", "5+ saal se"],
+  };
+}
+
+// ─── DURATION EMPATHY ACK ─────────────────────────────────────
+function getDurationAck(text, sc) {
+  const years = parseInt((text.match(/\d+/) || [])[0]) || 0;
+  const tl = text.toLowerCase();
+  const isLong = years >= 5 || /\u0032\u0020\u0938\u093e\u0932/.test(tl);
+  const isMid = years >= 2 || /saal|year|\u0938\u093e\u0932/.test(tl);
+  const isMon = /mahine|month|\u092e\u0939\u0940\u0928/.test(tl);
+
+  if (sc === "dev") {
+    if (isLong) return `${years || "कई"} साल से यह तकलीफ़ है... 😮‍💨\n\nइतने समय में सिर्फ़ नाक नहीं — नींद, energy, focus सब affect होता है।\n\nयह case ध्यान से देखते हैं।`;
+    if (isMid) return `${years || "कई"} साल से चल रहा है — मतलब यह temporary नहीं, अंदर कुछ set हो चुका है।\n\nSahi diagnosis ज़रूरी है।`;
+    if (isMon) return `काफ़ी समय से चल रही है — इस stage पर सही protocol से जल्दी ठीक हो सकता है।`;
+    return `ठीक है, समझ गया। पहले properly diagnose करते हैं।`;
+  }
+
+  if (isLong) return `${years || "Kai"} saal se yeh takleef hai... 😮‍💨\n\nItne waqt mein sirf naak nahi — neend, energy, focus sab affected hota hai.\n\nYeh case dhyan se dekhte hain.`;
+  if (isMid) return `${years || "Kai"} saal se chal raha hai — matlab yeh temporary nahi, andar kuch set ho chuka hai.\n\nSahi diagnosis zaroori hai.`;
+  if (isMon) return `Kaafi waqt se chal rahi hai — is stage pe sahi protocol se jaldi theek ho sakta hai.`;
+  return `Theek hai, samajh gaya. Pehle properly diagnose karte hain.`;
+}
+
+// ─── SYMPTOMS QUESTION ────────────────────────────────────────
+function getSymptomsQuestion(sc) {
+  if (sc === "dev") {
+    return {
+      text: `अब बताइए — symptoms क्या हैं? जो भी feel होता है। 🌿`,
+      replies: ["नाक बंद रहती है", "Spray use करता हूँ", "Smell नहीं आती", "पीला/हरा discharge"],
+    };
+  }
+  return {
+    text: `Ab batao — symptoms kya hain? Jo bhi feel hota hai. 🌿`,
+    replies: ["Naak band rehti hai", "Spray use karta hun", "Smell nahi aati", "Peela/hara discharge"],
+  };
+}
+
+// ─── REVEAL MESSAGES (type + script) ─────────────────────────
+function getRevealMessage(type, sc) {
+  const rom = {
+    allergic: `Aapka pattern dekh ke samajh aaya — yeh *Vataja-Kaphaja (Allergic) Sinus* hai. 🌿\n\nEk quick test karo: ghar se bahar jao ya doosre room mein jao. Symptoms wahan thoda different feel hon toh confirm hai.\n\nAur ek clear sign — *aankhein bhi khujlati hain* naak ke saath? Congestive mein kabhi nahi hota. Yeh sign hai?\n\nIs type mein trigger identify hone pe results bahut fast milte hain.`,
+
+    congestive: `Aapka pattern dekh ke samajh aaya — yeh *Kaphaja (Congestive) Sinus* hai. 🌿\n\nEk test karo: sir aage jhukao, chehra neeche, 5 sec ruko. Mathe ya galon mein pressure feel ho toh confirm hai.\n\nSubah uthke pehla adha ghanta sabse bura lagta hai na? Classic Kaphaja — raat bhar mucus jam jaati hai.\n\n*Zaroori:* Dairy is type ka sabse bada dushman hai — protocol ke saath band karni padegi.`,
+
+    spray: `Aapka pattern dekh ke samajh aaya — yeh *Aushadha Asakti (Spray Dependency)* hai. 🌿\n\nEk test: ek raat spray mat lo. Neend mushkil ho — yeh confirm karta hai naak physically dependent ho chuki hai.\n\nSpray ke 2-3 ghante baad pehle se bhi zyada band? Yeh rebound congestion hai.\n\n*Cold turkey kabhi mat karo* — woh isliye fail hota hai. Graduated protocol kaam karta hai.`,
+
+    infective: `Aapka pattern dekh ke samajh aaya — yeh *Pittaja (Infective/Heat) Sinus* hai. 🌿\n\nEk check: upar ke daanton mein halka dard ya heaviness? Direct sinus connection hai.\n\nAntibiotic se 3-4 din theek, band karo toh wapas? Bacterial cycle hai yeh.\n\n*Critical: eucalyptus ya camphor steam kabhi mat karo* — Pittaja mein WORSE karta hai. Sirf plain water.`,
+
+    polyp: `Aapka pattern dekh ke samajh aaya — yeh *Polyp/Blockage Sinus* hai. 🌿\n\nEk test: laung ya adrak naak ke paas laao — kuch smell aaya? Dono taraf equally band?\n\nEk taraf band = Congestive. *Dono taraf equally band = Polyp pattern confirm.*\n\nKai logon ko surgery suggest hui thi — hamare protocol se kai ne bina surgery ke improvement feel ki hai.`,
+  };
+
+  const dev = {
+    allergic: `आपका pattern देख के समझ आया — यह *Vataja-Kaphaja (Allergic) Sinus* है। 🌿\n\nएक quick test करें: घर से बाहर जाएँ या दूसरे room में। Symptoms वहाँ थोड़े different feel हों तो confirm है।\n\nएक clear sign — *आँखें भी खुजलाती हैं* नाक के साथ? Congestive में कभी नहीं होता। यह sign है?\n\nइस type में trigger identify होने पर results बहुत fast मिलते हैं।`,
+
+    congestive: `आपका pattern देख के समझ आया — यह *Kaphaja (Congestive) Sinus* है। 🌿\n\nएक test करें: सिर आगे झुकाएँ, चेहरा नीचे, 5 sec रुकें। माथे या गालों में pressure feel हो तो confirm है।\n\nसुबह उठके पहला आधा घंटा सबसे बुरा लगता है ना? Classic Kaphaja — रात भर mucus जम जाती है।\n\n*ज़रूरी:* Dairy इस type का सबसे बड़ा दुश्मन है — protocol के साथ बंद करनी पड़ेगी।`,
+
+    spray: `आपका pattern देख के समझ आया — यह *Aushadha Asakti (Spray Dependency)* है। 🌿\n\nएक test: एक रात spray मत लो। नींद मुश्किल हो — यह confirm करता है नाक physically dependent हो चुकी है।\n\nSpray के 2-3 घंटे बाद पहले से भी ज़्यादा बंद? Rebound congestion है यह।\n\n*Cold turkey कभी मत करो* — वो इसलिए fail होता है। Graduated protocol काम करता है।`,
+
+    infective: `आपका pattern देख के समझ आया — यह *Pittaja (Infective/Heat) Sinus* है। 🌿\n\nएक check: ऊपर के दाँतों में हल्का दर्द या heaviness? Direct sinus connection है।\n\nAntibiotic से 3-4 दिन ठीक, बंद करो तो वापस? Bacterial cycle है यह।\n\n*Critical: eucalyptus या camphor steam कभी मत करो* — Pittaja में WORSE करता है। सिर्फ़ plain water।`,
+
+    polyp: `आपका pattern देख के समझ आया — यह *Polyp/Blockage Sinus* है। 🌿\n\nएक test: लौंग या अदरक नाक के पास लाओ — कुछ smell आया? दोनों तरफ equally बंद?\n\nएक तरफ बंद = Congestive। *दोनों तरफ equally बंद = Polyp pattern confirm।*\n\nकई लोगों को surgery suggest हुई थी — हमारे protocol से कई ने बिना surgery के improvement feel की है।`,
+  };
+
+  const src = sc === "dev" ? dev : rom;
+  return src[type] || src["congestive"];
+}
+
+// ─── PITCH MESSAGES ──────────────────────────────────────────
+// Detailed, easy to understand, exactly what they get
+function getPitchMessage(type, sc) {
+  const typeNames = {
+    allergic:   { rom: "Allergic Sinus",   dev: "Allergic Sinus" },
+    congestive: { rom: "Congestive Sinus", dev: "Congestive Sinus" },
+    spray:      { rom: "Spray Dependency", dev: "Spray Dependency" },
+    infective:  { rom: "Infective Sinus",  dev: "Infective Sinus" },
+    polyp:      { rom: "Polyp Sinus",      dev: "Polyp Sinus" },
+  };
+
+  const tname = (typeNames[type] || typeNames["congestive"])[sc === "dev" ? "dev" : "rom"];
+
+  if (sc === "dev") {
+    return `आपके *${tname}* के लिए ek personalized 14-दिन program है। 🌿\n\n2 options हैं:\n\n🌱 *₹499 — Starter Kit*\nआपके sinus type का self-guided protocol WhatsApp पर। खुद करें, हम guide करते हैं।\n\n---\n\n🌿 *₹1,299 — 14-दिन Nasal Restoration Program*\n⭐ _(सबसे ज़्यादा लिया जाता है)_\n\n*आपको exactly यह मिलेगा:*\n✅ Day 1 — आपकी पूरी history, triggers personally समझेंगे (WhatsApp पर)\n✅ आपके sinus type के लिए custom routine — सुबह 20 मिनट + रात 15 मिनट\n✅ 14 दिन रोज़ मेरा WhatsApp check-in — "आज कैसा रहा?" personally\n✅ कोई दिन problem हो — उसी दिन protocol adjust होगा\n✅ Day 7 + Day 14 — progress review personally\n✅ Program खत्म होने के बाद maintenance guidance free\n\n---\n\nENT doctor एक visit में ₹1,000-2,000 लेता है — और वो रोज़ check नहीं करता।\nयहाँ 14 दिन रोज़ personal attention — सिर्फ़ ₹1,299 एक बार। 🌿\n\nकौनसा option सही लगता है?`;
   }
 
   return `Aapke *${tname}* ke liye ek personalized 14-din program hai. 🌿\n\n2 options hain:\n\n🌱 *Rs.499 — Starter Kit*\nAapke sinus type ka self-guided protocol WhatsApp pe. Khud karo, hum guide karte hain.\n\n---\n\n🌿 *Rs.1,299 — 14-Din Nasal Restoration Program*\n⭐ _(Sabse zyada liya jaata hai)_\n\n*Exactly yeh milega aapko:*\n✅ Day 1 — Aapki poori history, triggers personally samjhunga (WhatsApp pe)\n✅ Aapke sinus type ki custom routine — subah 20 min + raat 15 min\n✅ 14 din roz mera WhatsApp check-in — "aaj kaisa raha?" personally\n✅ Koi din problem ho — usi din protocol adjust hoga\n✅ Day 7 + Day 14 — progress review personally\n✅ Program ke baad maintenance guidance free\n\n---\n\nENT doctor ek visit mein Rs.1,000-2,000 leta hai — aur woh roz check nahi karta.\nYahan 14 din roz personal attention — sirf Rs.1,299 ek baar. 🌿\n\nKaunsa option sahi lagta hai?`;
@@ -441,7 +518,7 @@ async function handleMessage(senderId, messageText, senderName) {
     }
 
     // YES DETECTION → Send payment links (only place they're sent)
-    const userSaidYes = /haan|ha |yes|theek|ok\b|okay|shuru|karein|karna|chahta|chahti|le leta|le lungi|lena\b|interested|1299|499|full program|starter|bhejo|link bhejo|link do|send link|\u0939\u093e\u0902|\u0920\u0940\u0915|\u0932\u0947\u0928\u093e\u00a0|\u0932\u0947\u0928\u093a/.test(textLower);
+    const userSaidYes = /haan|ha |yes|theek|ok\b|okay|shuru|karein|karna|chahta|chahti|le leta|le lungi|lena\b|interested|1299|499|full program|starter|bhejo|link bhejo|link do|send link|\u0939\u093e\u0902|\u0920\u0940\u0915|\u0932\u0947\u0928\u093e\u00a0|\u0932\u0947\u0928\u093e/.test(textLower);
 
     if (userSaidYes) {
       userData.postPitchReplies = (userData.postPitchReplies || 0) + 1;
