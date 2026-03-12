@@ -8,6 +8,11 @@ const express = require("express");
 const fetch = require("node-fetch");
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: false })); // Twilio sends form-encoded data
+
+// ─── WHATSAPP BOT (Twilio + Claude API) ─────────────────────
+const { setupWhatsAppRoutes } = require("./whatsapp-bot");
+setupWhatsAppRoutes(app);
 
 // ─── CONFIG ────────────────────────────────────────────────
 let PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
