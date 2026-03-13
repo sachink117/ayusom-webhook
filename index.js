@@ -934,6 +934,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .tkbtn.bot{background:#4caf50;color:white;}
 .nobg{background:#efeae2!important;padding:0!important;border-radius:0!important;}
 </style></head><body>
+.bc-bar{padding:8px;border-top:1px solid #333;flex-shrink:0;}
+.bc-bar button{width:100%;padding:7px;background:#2a2a4a;color:#e0e0e0;border:1px solid #555;border-radius:5px;cursor:pointer;font-size:12px;}
+.bc-bar button:hover{background:#3a3a5a;}
+.bc-panel{display:none;padding:8px;border-top:1px solid #333;flex-shrink:0;}
+.bc-panel.open{display:block;}
+.bc-panel textarea{width:100%;height:70px;background:#1a1a2e;color:#e0e0e0;border:1px solid #444;border-radius:4px;padding:6px;font-size:12px;resize:vertical;box-sizing:border-box;}
+.bc-send{width:100%;margin-top:5px;padding:7px;background:#c0392b;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;}
+.bc-send:hover{background:#a93226;}
 <div class="header">
   <div><div class="uname" style="font-size:17px;font-weight:600;color:white;">\uD83C\uDF3F SALESOM Dashboard</div><div class="sub">Ayusomam Herbals \u2014 Live Conversations</div></div>
   <div id="statsBar">Loading...</div>
@@ -942,6 +950,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="left">
     <div class="search-wrap"><input type="text" id="search" placeholder="\uD83D\uDD0D Search..." oninput="render()"></div>
     <div class="ulist" id="ulist"></div>
+    <div class="bc-bar"><button onclick="toggleBC()">📢 Broadcast to All</button></div>
+    <div class="bc-panel" id="bcPanel"><textarea id="bcMsg" placeholder="Sabhi users ko message bhejo..."></textarea><button class="bc-send" onclick="broadcast()">Send to All</button></div>
   </div>
   <div class="right" id="right">
     <div class="empty"><div class="ico">\uD83D\uDCAC</div><div>Koi conversation select karein</div></div>
@@ -1040,6 +1050,8 @@ async function toggle(id){
 }
 function hk(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}
 load();setInterval(load,5000);
+function toggleBC(){const p=document.getElementById('bcPanel');p.classList.toggle('open');}
+async function broadcast(){const msg=document.getElementById('bcMsg').value.trim();if(!msg){alert('Message likhein!');return;}if(!confirm('Sabhi WhatsApp/Instagram users ko bhejein?\n"'+msg+'"'))return;const r=await fetch('/admin/api/broadcast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});const d=await r.json();if(d.ok){alert(d.sent+' users ko bheja!');document.getElementById('bcMsg').value='';document.getElementById('bcPanel').classList.remove('open');}else alert('Error: '+(d.error||'unknown'));}
 </script></body></html>`;
 
 // ─── ADMIN API ROUTES ─────────────────────────────────────────
@@ -1076,6 +1088,19 @@ app.post("/admin/api/send", async (req, res) => {
     logConversation(userId, "admin", text);
     const chName = ch === "twilio" ? "WhatsApp" : ch === "instagram" ? "Instagram" : ch === "website" ? "Website (saved only)" : "Messenger";
     res.json({ ok: true, channel: ch, channelName: chName });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Broadcast to all non-website users
+app.post("/admin/api/broadcast", async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message) return res.status(400).json({ error: "message required" });
+    let sent = 0;
+    for (const [userId, ch] of Object.entries(userChannels || {})) {
+      if (ch !== "website") { try { await sendMessage(userId, message); sent++; } catch(e) {} }
+    }
+    res.json({ ok: true, sent });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
