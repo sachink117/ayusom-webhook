@@ -1,6 +1,6 @@
 // ============================================================
 // AYUSOMAM MESSENGER BOT
-// Version 2.4 — Human-like typing + One-message-per-turn + Devanagari
+// Version 2.5 — Human-like typing + One-message-per-turn + Devanagari + Twilio WhatsApp
 // Flow: Hook → [wait] → Duration → [wait] → Symptoms → [wait]
 //       → Reveal → [wait] → Pitch → Claude AI handles rest
 // ============================================================
@@ -10,6 +10,7 @@ const fetch = require("node-fetch");
 const Anthropic = require("@anthropic-ai/sdk");
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: false })); // ← Twilio ke liye
 
 // ─── CONFIG ──────────────────────────────────────────────────
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
@@ -17,6 +18,10 @@ const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const PAYMENT_1299 = "https://rzp.io/rzp/qu8zhQT";
 const PAYMENT_499 = process.env.PAYMENT_499_LINK || "https://rzp.io/rzp/REPLACE_499";
 const GAS_URL = "https://script.google.com/macros/s/AKfycbwWjnJa2utTx0vQUkjdKtSaVpJBllL1-f-inxEfmxzutyF5GpGS2bChD5qVXkYPwqSbuA/exec";
+
+// ← Twilio config
+const userChannels = {}; // track: 'twilio' ya 'messenger'
+const TWILIO_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || "whatsapp:+15559069156";
 
 // ─── ANTHROPIC CLIENT ─────────────────────────────────────────
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -107,7 +112,6 @@ CRITICAL INSTRUCTION FOR THIS DEPLOYMENT:
 - If user says yes/wants to buy — respond warmly but NO payment links. System handles.`;
 
 // ─── SCRIPT DETECTION ─────────────────────────────────────────
-// Returns 'dev' if Devanagari Unicode chars present, else 'rom'
 function detectScript(text) {
   return /[\u0900-\u097F]/.test(text) ? "dev" : "rom";
 }
@@ -124,6 +128,8 @@ function detectSinusType(text) {
 
 // ─── SEND TYPING INDICATOR ────────────────────────────────────
 async function sendTypingOn(recipientId) {
+  // Skip typing indicator for Twilio channel
+  if (userChannels[recipientId] === "twilio") return;
   try {
     await fetch(
       `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
@@ -136,11 +142,17 @@ async function sendTypingOn(recipientId) {
         }),
       }
     );
-  } catch (e) { /* silent fail — typing indicator is best-effort */ }
+  } catch (e) { /* silent fail */ }
 }
 
 // ─── SEND MESSAGE (raw) ────────────────────────────────────────
 async function sendMessage(recipientId, text) {
+  // ← Twilio channel check
+  if (userChannels[recipientId] === "twilio") {
+    await sendTwilioMessage(recipientId, text);
+    return;
+  }
+
   try {
     const res = await fetch(
       `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
@@ -161,8 +173,43 @@ async function sendMessage(recipientId, text) {
   }
 }
 
+// ─── TWILIO SEND MESSAGE ──────────────────────────────────────
+async function sendTwilioMessage(to, text) {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`;
+  const params = new URLSearchParams({
+    From: TWILIO_NUMBER,
+    To: `whatsapp:${to}`,
+    Body: text,
+  });
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: "Basic " + Buffer.from(`${sid}:${token}`).toString("base64"),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params.toString(),
+    });
+    const data = await res.json();
+    if (data.error_code) console.error("Twilio error:", data.message);
+    else console.log(`✅ Twilio sent to ${to}: ${text.substring(0, 50)}...`);
+  } catch (e) {
+    console.error("Twilio send failed:", e.message);
+  }
+}
+
 // ─── SEND QUICK REPLIES (raw) ─────────────────────────────────
+// Note: Twilio doesn't support quick replies — sends as plain text list
 async function sendQuickReplies(recipientId, text, replies) {
+  // Twilio: send as plain text with numbered options
+  if (userChannels[recipientId] === "twilio") {
+    const optionsText = text + "\n\n" + replies.map((r, i) => `${i + 1}. ${r}`).join("\n");
+    await sendTwilioMessage(recipientId, optionsText);
+    return;
+  }
+
   try {
     const quick_replies = replies.map((r) => ({
       content_type: "text",
@@ -188,9 +235,7 @@ async function sendQuickReplies(recipientId, text, replies) {
   }
 }
 
-// ─── HUMAN-LIKE SEND: typing indicator → realistic delay → send ──────────────
-// Delay = 900ms base + 25ms per char, capped at 3000ms
-// This makes the bot feel like a real person typing
+// ─── HUMAN-LIKE SEND ──────────────────────────────────────────
 async function sendWithTyping(recipientId, text) {
   await sendTypingOn(recipientId);
   const delay = Math.min(900 + text.length * 25, 3000);
@@ -205,7 +250,7 @@ async function sendQRWithTyping(recipientId, text, replies) {
   await sendQuickReplies(recipientId, text, replies);
 }
 
-// ─── HOOKS (one sent per new user, picked randomly) ──────────
+// ─── HOOKS ────────────────────────────────────────────────────
 const HOOKS_ROM = [
   `😮‍💨 Subah uthte hi naak band, din bhar sar bhaari...\n\nSinus ek baar pakad le, toh chhod nahi deta.\n\nSahi jagah aaye hain aap. 🌿`,
   `Spray use karte hain? Thodi der rahat — phir wahi band. 😮‍💨\n\nYeh cycle kab tooti hai? Kabhi nahi — jab tak andar ki wajah treat na ho.\n\nSahi jagah aaye hain. 🌿`,
@@ -271,29 +316,21 @@ function getSymptomsQuestion(sc) {
   };
 }
 
-// ─── REVEAL MESSAGES (type + script) ─────────────────────────
+// ─── REVEAL MESSAGES ─────────────────────────────────────────
 function getRevealMessage(type, sc) {
   const rom = {
     allergic: `Aapka pattern dekh ke samajh aaya — yeh *Vataja-Kaphaja (Allergic) Sinus* hai. 🌿\n\nEk quick test karo: ghar se bahar jao ya doosre room mein jao. Symptoms wahan thoda different feel hon toh confirm hai.\n\nAur ek clear sign — *aankhein bhi khujlati hain* naak ke saath? Congestive mein kabhi nahi hota. Yeh sign hai?\n\nIs type mein trigger identify hone pe results bahut fast milte hain.`,
-
     congestive: `Aapka pattern dekh ke samajh aaya — yeh *Kaphaja (Congestive) Sinus* hai. 🌿\n\nEk test karo: sir aage jhukao, chehra neeche, 5 sec ruko. Mathe ya galon mein pressure feel ho toh confirm hai.\n\nSubah uthke pehla adha ghanta sabse bura lagta hai na? Classic Kaphaja — raat bhar mucus jam jaati hai.\n\n*Zaroori:* Dairy is type ka sabse bada dushman hai — protocol ke saath band karni padegi.`,
-
     spray: `Aapka pattern dekh ke samajh aaya — yeh *Aushadha Asakti (Spray Dependency)* hai. 🌿\n\nEk test: ek raat spray mat lo. Neend mushkil ho — yeh confirm karta hai naak physically dependent ho chuki hai.\n\nSpray ke 2-3 ghante baad pehle se bhi zyada band? Yeh rebound congestion hai.\n\n*Cold turkey kabhi mat karo* — woh isliye fail hota hai. Graduated protocol kaam karta hai.`,
-
     infective: `Aapka pattern dekh ke samajh aaya — yeh *Pittaja (Infective/Heat) Sinus* hai. 🌿\n\nEk check: upar ke daanton mein halka dard ya heaviness? Direct sinus connection hai.\n\nAntibiotic se 3-4 din theek, band karo toh wapas? Bacterial cycle hai yeh.\n\n*Critical: eucalyptus ya camphor steam kabhi mat karo* — Pittaja mein WORSE karta hai. Sirf plain water.`,
-
     polyp: `Aapka pattern dekh ke samajh aaya — yeh *Polyp/Blockage Sinus* hai. 🌿\n\nEk test: laung ya adrak naak ke paas laao — kuch smell aaya? Dono taraf equally band?\n\nEk taraf band = Congestive. *Dono taraf equally band = Polyp pattern confirm.*\n\nKai logon ko surgery suggest hui thi — hamare protocol se kai ne bina surgery ke improvement feel ki hai.`,
   };
 
   const dev = {
     allergic: `आपका pattern देख के समझ आया — यह *Vataja-Kaphaja (Allergic) Sinus* है। 🌿\n\nएक quick test करें: घर से बाहर जाएँ या दूसरे room में। Symptoms वहाँ थोड़े different feel हों तो confirm है।\n\nएक clear sign — *आँखें भी खुजलाती हैं* नाक के साथ? Congestive में कभी नहीं होता। यह sign है?\n\nइस type में trigger identify होने पर results बहुत fast मिलते हैं।`,
-
     congestive: `आपका pattern देख के समझ आया — यह *Kaphaja (Congestive) Sinus* है। 🌿\n\nएक test करें: सिर आगे झुकाएँ, चेहरा नीचे, 5 sec रुकें। माथे या गालों में pressure feel हो तो confirm है।\n\nसुबह उठके पहला आधा घंटा सबसे बुरा लगता है ना? Classic Kaphaja — रात भर mucus जम जाती है।\n\n*ज़रूरी:* Dairy इस type का सबसे बड़ा दुश्मन है — protocol के साथ बंद करनी पड़ेगी।`,
-
     spray: `आपका pattern देख के समझ आया — यह *Aushadha Asakti (Spray Dependency)* है। 🌿\n\nएक test: एक रात spray मत लो। नींद मुश्किल हो — यह confirm करता है नाक physically dependent हो चुकी है।\n\nSpray के 2-3 घंटे बाद पहले से भी ज़्यादा बंद? Rebound congestion है यह।\n\n*Cold turkey कभी मत करो* — वो इसलिए fail होता है। Graduated protocol काम करता है।`,
-
     infective: `आपका pattern देख के समझ आया — यह *Pittaja (Infective/Heat) Sinus* है। 🌿\n\nएक check: ऊपर के दाँतों में हल्का दर्द या heaviness? Direct sinus connection है।\n\nAntibiotic से 3-4 दिन ठीक, बंद करो तो वापस? Bacterial cycle है यह।\n\n*Critical: eucalyptus या camphor steam कभी मत करो* — Pittaja में WORSE करता है। सिर्फ़ plain water।`,
-
     polyp: `आपका pattern देख के समझ आया — यह *Polyp/Blockage Sinus* है। 🌿\n\nएक test: लौंग या अदरक नाक के पास लाओ — कुछ smell आया? दोनों तरफ equally बंद?\n\nएक तरफ बंद = Congestive। *दोनों तरफ equally बंद = Polyp pattern confirm।*\n\nकई लोगों को surgery suggest हुई थी — हमारे protocol से कई ने बिना surgery के improvement feel की है।`,
   };
 
@@ -302,7 +339,6 @@ function getRevealMessage(type, sc) {
 }
 
 // ─── PITCH MESSAGES ──────────────────────────────────────────
-// Detailed, easy to understand, exactly what they get
 function getPitchMessage(type, sc) {
   const typeNames = {
     allergic:   { rom: "Allergic Sinus",   dev: "Allergic Sinus" },
@@ -399,14 +435,11 @@ async function handleMessage(senderId, messageText, senderName) {
   }
   const userData = userState[senderId];
 
-  // Update script if user writes in Devanagari — mirror immediately
   if (detectScript(text) === "dev") userData.script = "dev";
   const sc = userData.script || "rom";
 
-  // ── HUMAN TAKEOVER CHECK ─────────────────────────────────────
   if (userData.state === "human") return;
 
-  // ── REACTIVATION COMMAND (admin) ─────────────────────────────
   if (text.startsWith("BOT_ON_")) {
     const targetId = text.replace("BOT_ON_", "").trim();
     if (userState[targetId]) {
@@ -416,7 +449,6 @@ async function handleMessage(senderId, messageText, senderName) {
     return;
   }
 
-  // ── PAYMENT CONFIRMATION (any state) ─────────────────────────
   if (/payment|paid|pay kar|pay kiya|bhej diya|transfer|\u092d\u0941\u0917\u0924\u093e\u0928|\u092a\u0947\u092e\u0947\u0902\u091f/.test(textLower)) {
     userData.state = "done";
     const msg = sc === "dev"
@@ -427,13 +459,6 @@ async function handleMessage(senderId, messageText, senderName) {
     return;
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // STATE MACHINE — One message per turn, wait for response
-  // Each state sends ONE message (or 2 where logically inseparable)
-  // then stops and waits for user to reply
-  // ═══════════════════════════════════════════════════════════
-
-  // STATE: NEW → Send hook only, then wait
   if (userData.state === "new") {
     const idx = Math.floor(Math.random() * HOOKS_ROM.length);
     const hook = sc === "dev" ? HOOKS_DEV[idx] : HOOKS_ROM[idx];
@@ -443,7 +468,6 @@ async function handleMessage(senderId, messageText, senderName) {
     return;
   }
 
-  // STATE: HOOK_SENT → User responded to hook → Ask duration, then wait
   if (userData.state === "hook_sent") {
     const dq = getDurationQuestion(sc);
     userData.state = "asked_duration";
@@ -451,15 +475,11 @@ async function handleMessage(senderId, messageText, senderName) {
     return;
   }
 
-  // STATE: ASKED_DURATION → Store duration, empathy ack + ask symptoms, then wait
-  // (2 messages here: empathy validates them, then question — feels natural)
   if (userData.state === "asked_duration") {
     userData.duration = text;
     userData.state = "asked_symptoms";
 
     await sendWithTyping(senderId, getDurationAck(text, sc));
-
-    // Brief pause between empathy and symptoms question
     await new Promise((r) => setTimeout(r, 800));
 
     const sq = getSymptomsQuestion(sc);
@@ -469,7 +489,6 @@ async function handleMessage(senderId, messageText, senderName) {
     return;
   }
 
-  // STATE: ASKED_SYMPTOMS → Detect type, send reveal only, then wait for response
   if (userData.state === "asked_symptoms") {
     userData.symptoms = text;
     const sinusType = detectSinusType(text);
@@ -478,26 +497,21 @@ async function handleMessage(senderId, messageText, senderName) {
     userData.postPitchReplies = 0;
     userData.history = [];
 
-    // Brief "analysing" message to set expectation
     const analysing = sc === "dev" ? `देख रहे हैं... 🌿` : `Dekh rahe hain... 🌿`;
     await sendWithTyping(senderId, analysing);
     await new Promise((r) => setTimeout(r, 700));
 
-    // Send reveal — user reads it, then responds
     await sendWithTyping(senderId, getRevealMessage(sinusType, sc));
-
     await logToSheet(senderId, senderName, `Symptoms: ${text}`, "REVEALED", sinusType);
     return;
   }
 
-  // STATE: REVEALED → User responded to reveal → Send pitch, then wait
   if (userData.state === "revealed") {
     userData.state = "pitched";
 
     await sendWithTyping(senderId, getPitchMessage(userData.sinusType, sc));
-
-    // Short pause then options
     await new Promise((r) => setTimeout(r, 700));
+
     const qr = sc === "dev"
       ? { text: `कौनसा option सही लगता है? 🌿`, replies: ["Full Program (₹1,299)", "Starter Kit (₹499)", "पहले सवाल है"] }
       : { text: `Kaunsa option sahi lagta hai? 🌿`, replies: ["Full Program (₹1,299)", "Starter Kit (₹499)", "Pehle sawaal hai"] };
@@ -507,17 +521,14 @@ async function handleMessage(senderId, messageText, senderName) {
     return;
   }
 
-  // ── STATE: PITCHED → Claude / Payment ────────────────────────
   if (userData.state === "pitched") {
 
-    // Auto handoff if exceeded 2 AI replies
     if (userData.postPitchReplies >= 2) {
       userData.state = "human";
       await logToSheet(senderId, senderName, `Auto handoff`, "HUMAN_TAKEOVER", userData.sinusType);
       return;
     }
 
-    // YES DETECTION → Send payment links (only place they're sent)
     const userSaidYes = /haan|ha |yes|theek|ok\b|okay|shuru|karein|karna|chahta|chahti|le leta|le lungi|lena\b|interested|1299|499|full program|starter|bhejo|link bhejo|link do|send link|\u0939\u093e\u0902|\u0920\u0940\u0915|\u0932\u0947\u0928\u093e\u00a0|\u0932\u0947\u0928\u093e/.test(textLower);
 
     if (userSaidYes) {
@@ -533,10 +544,8 @@ async function handleMessage(senderId, messageText, senderName) {
       return;
     }
 
-    // ALL OTHER → Claude AI (Salesom) handles
     userData.postPitchReplies = (userData.postPitchReplies || 0) + 1;
 
-    // Show typing while Claude thinks
     await sendTypingOn(senderId);
     await new Promise((r) => setTimeout(r, 900));
 
@@ -544,14 +553,12 @@ async function handleMessage(senderId, messageText, senderName) {
     await sendWithTyping(senderId, aiReply);
 
     if (userData.postPitchReplies < 2) {
-      // Still have budget — show nudge buttons
       await new Promise((r) => setTimeout(r, 600));
       const nudgeReplies = sc === "dev"
         ? ["हाँ, शुरू करना है", "एक और सवाल है", "सोचना है थोड़ा"]
         : ["Haan, shuru karna hai", "Ek aur sawaal hai", "Sochna hai thoda"];
       await sendQRWithTyping(senderId, `🌿`, nudgeReplies);
     } else {
-      // Last AI reply — hand off to Sachin
       await new Promise((r) => setTimeout(r, 800));
       const handoffMsg = sc === "dev"
         ? `आपका सवाल हमारे *Sinus Relief Specialist* तक पहुँचा दिया है। 🌿\n\nयहाँ wait करें — थोड़ी देर में reply आएगा।\n\nया सीधे WhatsApp करें: 📱 *85951 60713*`
@@ -565,7 +572,6 @@ async function handleMessage(senderId, messageText, senderName) {
     return;
   }
 
-  // STATE: DONE → Warm reply
   if (userData.state === "done") {
     const msg = sc === "dev"
       ? `Protocol चल रहा है! 🌿 कोई सवाल हो तो WhatsApp पर पूछो — 85951 60713`
@@ -574,13 +580,12 @@ async function handleMessage(senderId, messageText, senderName) {
     return;
   }
 
-  // FALLBACK — reset
   userData.state = "new";
   userData.history = [];
   await handleMessage(senderId, messageText, senderName);
 }
 
-// ─── HUMAN TAKEOVER — Page reply detection ─────────────────
+// ─── HUMAN TAKEOVER ───────────────────────────────────────────
 async function handlePageMessage(senderId, sendingPageId) {
   if (sendingPageId && userState[senderId]) {
     userState[senderId].state = "human";
@@ -609,14 +614,12 @@ app.post("/webhook", async (req, res) => {
         const senderId = event.sender?.id;
         if (!senderId) continue;
 
-        // Skip old messages (prevents bulk replay on restart)
         const MSG_AGE_LIMIT_MS = 5 * 60 * 1000;
         if (event.timestamp && Date.now() - event.timestamp > MSG_AGE_LIMIT_MS) {
           console.log(`⏭️ Skipped old message (${Math.round((Date.now() - event.timestamp) / 1000)}s old) from ${senderId}`);
           continue;
         }
 
-        // Deduplication
         if (event.message?.mid) {
           if (processedMessages.has(event.message.mid)) {
             console.log(`⏭️ Duplicate skipped: ${event.message.mid}`);
@@ -625,7 +628,6 @@ app.post("/webhook", async (req, res) => {
           processedMessages.add(event.message.mid);
         }
 
-        // Page reply → human takeover
         if (event.sender?.id === entry.id) {
           await handlePageMessage(event.recipient?.id, event.sender?.id);
           continue;
@@ -641,7 +643,23 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-app.get("/", (req, res) => res.send("Ayusomam Bot v2.4 — Human-like + Devanagari 🌿"));
+// ─── TWILIO WHATSAPP ROUTE ────────────────────────────────────
+app.post("/twilio", async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const from = req.body.From; // e.g. 'whatsapp:+919XXXXXXXXX'
+    const text = req.body.Body;
+    if (!from || !text) return;
+    const senderId = from.replace("whatsapp:", "");
+    userChannels[senderId] = "twilio"; // mark as Twilio channel
+    console.log(`📱 Twilio message from ${senderId}: ${text.substring(0, 50)}`);
+    await handleMessage(senderId, text, "User");
+  } catch (err) {
+    console.error("Twilio webhook error:", err);
+  }
+});
+
+app.get("/", (req, res) => res.send("Ayusomam Bot v2.5 — Messenger + Twilio WhatsApp 🌿"));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🌿 Ayusomam Bot v2.4 running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🌿 Ayusomam Bot v2.5 running on port ${PORT}`));
