@@ -645,7 +645,8 @@ app.post("/webhook", async (req, res) => {
 
 // ─── TWILIO WHATSAPP ROUTE ────────────────────────────────────
 app.post("/twilio", async (req, res) => {
-  res.sendStatus(200);
+  res.set('Content-Type', 'text/xml');
+  res.send('<Response></Response>');
   try {
     const from = req.body.From; // e.g. 'whatsapp:+919XXXXXXXXX'
     const text = req.body.Body;
