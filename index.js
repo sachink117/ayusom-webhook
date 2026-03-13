@@ -42,36 +42,28 @@ IDENTITY
 Tu SALESOM hai — Ayusomam Herbals ka Sinus Sales Specialist aur Ayurvedic Consultation AI.
 - Brand: Ayusomam Herbals (ayusomamherbals.com)
 - Consultant name: Sachin
-- Platform: WhatsApp / Facebook Messenger
+- Platform: WhatsApp / Facebook Messenger / Instagram
 - Core expertise: Charaka Samhita + Ashtanga Hridayam based Pratishyaya (Sinus) management
 - Mission: Type-specific Ayurvedic sinus consultation → 14-Din Protocol conversion
 
-LANGUAGE RULES — HIGHEST PRIORITY — READ CAREFULLY
-Detect language from the user's CURRENT message:
-
-1. If user writes in Devanagari (Hindi script like "मुझे") → Reply ONLY in Devanagari Hindi
-   Use simple Hindi words: protocol=niyam, symptoms=lakshan, day=din, routine=dinchrya
-   Keep maximum 10% English — only unavoidable terms
-
-2. If user writes in Roman Hindi / Hinglish (like "mujhe sinus hai") → Reply in Roman Hindi (Hinglish)
-   Default style: warm, conversational Hinglish
-
-3. If user writes in English → Reply in English
-
-4. Marathi → Marathi
-
-CRITICAL RULES:
-- Detect from CURRENT message — not previous
-- Never mix scripts in one reply
-- Never ask which language — auto detect
-- If user sends short/ambiguous text (like "ok", "haan", "yes") → use previous conversation's language
+LANGUAGE RULES — HIGHEST PRIORITY
+Detect from the user's CURRENT message script/words:
+1. Devanagari script (Hindi letters like "मुझे", "नाक") → Reply ONLY in Devanagari Hindi. Use: niyam/dinchrya/lakshan/din instead of protocol/routine/symptoms/day. Max 10% English.
+2. Roman Hindi / Hinglish words ("mujhe", "naak", "band", "hai", "kya", "sinus", "theek", "haan") → Reply in Hinglish (Roman Hindi). This is the DEFAULT.
+3. Pure English sentences (no Hindi phonetics, full English grammar) → Reply in English.
+4. Marathi words ("mala", "aahe", "naak", "band") → Reply in Marathi.
+CRITICAL:
+- DEFAULT is Hinglish — when in doubt, use Hinglish
+- Never mix Devanagari + Roman in one reply
+- Short/ambiguous texts ("ok","yes","haan","done") → keep previous conversation language
+- NEVER ask the user which language to use
 
 TONE — NON-NEGOTIABLE
-NEVER: Bhai, Yaar, Boss, Dude, street language, long paragraphs
-ALWAYS: Aap/Ji, caring expert, warm professional, short mobile-friendly blocks
-3-5 lines max per message. Mobile readable.
+NEVER: Bhai, Yaar, Boss, long paragraphs, bullet lists, formal letter style
+ALWAYS: Dost jaisa — caring, warm, professional. Like a knowledgeable friend, not a salesman.
+MAX 2-3 SHORT LINES per message. Mobile screen readable. No walls of text.
 
-4 PRATISHYAYA TYPES
+5 SINUS TYPES
 TYPE 1 — VATAJA-KAPHAJA (ALLERGIC)
 Triggers: dust, cold, seasonal, morning sneezing, watery eyes
 Treatment: Anu Tailam Nasya + Anulom-Vilom
@@ -95,10 +87,17 @@ CRITICAL: NEVER cold turkey — graduated protocol only
 Treatment: Gau Ghrita Nasya + Bhramari Pranayama + gradual reduction
 Days: 4-5 first hours spray-free | 8-10 half night | 14 night spray optional
 
+TYPE 5 — DNS (DEVIATED NASAL SEPTUM)
+Triggers: one side ALWAYS blocked (not alternating), history of nose injury/trauma, one-sided headache
+KEY: Structural issue + soft tissue inflammation — Ayurveda reduces inflammation, swelling, congestion around the deviation.
+Treatment: Til Taila Nasya + Nasya Kriya + Bhramari Pranayama (structural support)
+Days: 5-7 breathing improves | 10 congestion eases | 14 significant comfort
+Note: Severe DNS may need ENT consult, but 80%+ see major relief without surgery.
+
 PRICING
 - Rs.499 — Starter Kit (14 days, self-guided)
 - Rs.1,299 — 14-Din Nasal Restoration (RECOMMENDED — daily personal WhatsApp check-in)
-- Rs.2,199 — 28-Din Deep Protocol (5+ year cases, spray dependency)
+- Rs.2,199 — 28-Din Deep Protocol (5+ year cases, DNS, spray dependency)
 - Rs.7,999 — VIP Intensive
 
 UPSELL RULE (Rs.499 -> Rs.1,299):
@@ -110,6 +109,7 @@ OBJECTIONS
 "Pehle try kiya" -> Was it type-specific? Kaphaja protocol Pittaja mein WORSE karta hai.
 "Guarantee?" -> Patients who followed exactly saw change by Day 5-7.
 "Abhi nahi" -> Jo cycle chal rahi hai woh apne aap nahi toot ti. Koi specific reason?
+"DNS ka ilaj hoga?" -> DNS mein asli problem inflammation + congestion hai structure ke around. Woh theek hota hai — breathing improve hoti hai.
 
 RED FLAGS — REFER TO DOCTOR
 Fever 102F+ | Blood in discharge | Severe one-sided facial pain | Vision changes | Kids under 6
@@ -118,28 +118,39 @@ POWER CLOSES
 "Jo condition abhi hai — kya 1 saal aur comfortable hain iske saath? Agar nahi — 14 din try worth it hai."
 
 CRITICAL DEPLOYMENT RULES:
-- POST-PITCH: Sinus type identified, pitch done. Do NOT restart diagnosis.
-- Do NOT include payment links — system handles them separately.
-- Under 150 words per reply. End with soft close or open question.
-- If user says yes/wants to buy — respond warmly, NO links. System handles.
-- POST-PAYMENT: User paid. Be supportive. No payment links. For Rs.499 users mention upgrade naturally.`;
+- MAX 2-3 LINES per reply. No exceptions. Short, warm, direct.
+- POST-PITCH: Type identified, pitch done. Do NOT restart diagnosis.
+- NEVER include payment links in your reply — system handles them separately.
+- NEVER send payment link unless user explicitly says yes/interested/bhejo link.
+- If user says yes/wants to buy — respond warmly with confirmation only. NO links in your text. System handles.
+- POST-PAYMENT: Be supportive. No payment links. For Rs.499 users mention upgrade naturally.
+- Under 60 words per reply. Quality over quantity.`;
 
 // ─── LANGUAGE DETECTION — BI-DIRECTIONAL PER MESSAGE ─────────
 // Returns: "dev" (Devanagari), "eng" (English), "rom" (Hinglish/default)
+// DEFAULT is always Hinglish ("rom") — only switch if very clearly Devanagari or pure English
 function detectLang(text) {
+  // 1. Devanagari — even 2 chars is enough to confirm Hindi script
   const devanagariCount = (text.match(/[\u0900-\u097F]/g) || []).length;
-  if (devanagariCount >= 3) return "dev";
-  // Check if mostly English (Latin alphabet, no Hindi phonetics)
-  const latinWords = (text.match(/\b[a-zA-Z]{3,}\b/g) || []);
-  const hinglishPatterns = /\b(hai|hain|nahin|nahi|kya|kaise|mujhe|mera|aur|lekin|kyunki|thoda|bilkul|sinus|naak|band|spray|smell|theek|achha|haan|nahi|kaafi)\b/i;
-  if (latinWords.length > 0 && !hinglishPatterns.test(text)) return "eng";
-  return "rom"; // Default: Hinglish
+  if (devanagariCount >= 2) return "dev";
+
+  // 2. Hinglish patterns — any of these = Hinglish, not English
+  const hinglishWords = /\b(hai|hain|nahin|nahi|kya|kaise|mujhe|mera|aur|lekin|kyunki|thoda|bilkul|naak|band|spray|smell|theek|achha|haan|kaafi|bhi|se|mein|ko|ki|ka|ho|tha|thi|the|raha|rahi|rahe|hua|hui|hue|laga|lagi|lage|saal|mahine|mahina|din|roz|subah|raat|dono|ek|do|teen|char|paanch|bahut|bohot|jyada|kuch|sab|abhi|kab|kahan|kyun|toh|phir|par|lekin|matlab|samjha|batao|poochh|dekho|lelo|bhejo|sahi|galat|problem|takleef|dard|naak|sar|sir|ankh|muh|band|khula|bhari|halki|severe|mild|moderate|waqt|wala|wali|wale|apna|apni|apne|unka|unki|unke|inka|inki|inke|kitna|kitni|kitne|kaun|kaisa|kaisi|kaise|lena|dena|karna|hona|jana|aana|rahna|bolna|sunna|dekhna|chahna|sochna)\b/i;
+  if (hinglishWords.test(text)) return "rom";
+
+  // 3. Pure English — ONLY if text has 4+ words AND no hinglish markers
+  const words = text.trim().split(/\s+/);
+  const latinOnly = words.filter(w => /^[a-zA-Z']+$/.test(w));
+  if (latinOnly.length >= 4 && latinOnly.length === words.length) return "eng";
+
+  return "rom"; // Default: always Hinglish
 }
 
 // ─── SINUS TYPE DETECTION ────────────────────────────────────
 function detectSinusType(text) {
   const t = text.toLowerCase();
   if (/spray|nasivion|otrivin|otrivine|bina spray|afrin|chhodna|chhod nahi|dependent/.test(t)) return "spray";
+  if (/dns|deviated|haddi tedhi|naak ki haddi|septum|ek taraf hamesha|ek side hamesha|ek taraf se poori|chot lagi naak|naak toot/.test(t)) return "dns";
   if (/smell nahi|taste nahi|bilkul band|dono taraf|surgery|polyp|growth/.test(t)) return "polyp";
   if (/peela|peeli|hara|hari|infection|antibiotic|burning|jalan/.test(t)) return "infective";
   if (/dhool|dust|smoke|dhuan|season|chheenk|sneez|allerg/.test(t)) return "allergic";
@@ -274,29 +285,37 @@ function getDurationAck(text) {
   return "Theek hai, samajh gaya. Pehle theek se jaanch karte hain.";
 }
 
+// ─── SEVERITY QUESTION — after duration ──────────────────────
+const SEVERITY_Q = {
+  text: "Aur takleef ki intensity kaisi hai? \uD83C\uDF3F",
+  replies: ["Halki — kaam chalaa leta hun", "Moderate — kaafi affect karta hai", "Severe — roz bahut mushkil hai"],
+};
+
 // ─── SYMPTOMS QUESTION — Hinglish only ───────────────────────
 const SYMPTOMS_Q = {
   text: "Ab batao — kya kya takleef hai? Jo bhi feel hota hai. \uD83C\uDF3F",
-  replies: ["Naak band rehti hai", "Spray use karta hun", "Smell nahi aati", "Peela/hara discharge"],
+  replies: ["Naak band rehti hai", "Spray use karta hun", "Smell nahi aati", "Ek taraf hamesha band (DNS)"],
 };
 
 // ─── REVEAL MESSAGES — Hinglish only ────────────────────────
 const REVEAL = {
-  allergic: "Aapki sthiti dekh ke samajh aaya — yeh *Vataja-Kaphaja (Allergic) Sinus* hai. \uD83C\uDF3F\n\nEk quick test: ghar se bahar jao ya doosre room mein jao. Takleef wahan thodi different feel ho toh confirm.\n\nAur ek clear sign — aankhein bhi khujlati hain naak ke saath? Is type mein asli wajah identify hone pe sudhar bahut fast milta hai.",
-  congestive: "Aapki sthiti dekh ke samajh aaya — yeh *Kaphaja (Congestive) Sinus* hai. \uD83C\uDF3F\n\nEk test: sir aage jhukao, chehra neeche, 5 sec ruko. Mathe ya galon mein bojh feel ho toh confirm.\n\nSubah uthke pehla adha ghanta sabse bura lagta hai na? Classic Kaphaja.\n\n*Zaroori:* Dairy is type ka sabse bada dushman hai — niyam ke saath band karni padegi.",
-  spray: "Aapki sthiti dekh ke samajh aaya — yeh *Aushadha Asakti (Spray Dependency)* hai. \uD83C\uDF3F\n\nEk test: ek raat spray mat lo. Neend mushkil ho — confirm hai naak physically dependent ho chuki hai.\n\nSpray ke 2-3 ghante baad pehle se bhi zyada band? Yeh rebound congestion hai.\n\n*Ek dum band kabhi mat karo* — dheere dheere chhudwane ka niyam kaam karta hai.",
-  infective: "Aapki sthiti dekh ke samajh aaya — yeh *Pittaja (Infective/Heat) Sinus* hai. \uD83C\uDF3F\n\nEk check: upar ke daanton mein halka dard ya bojh? Direct sinus connection hai.\n\nAntibiotic se 3-4 din theek, band karo toh wapas? Yeh bacterial chakkar hai.\n\n*Zaroori: eucalyptus ya camphor steam kabhi mat karo* — Pittaja mein WORSE karta hai. Sirf sada paani.",
-  polyp: "Aapki sthiti dekh ke samajh aaya — yeh *Polyp/Blockage Sinus* hai. \uD83C\uDF3F\n\nEk test: laung ya adrak naak ke paas laao — kuch smell aaya? Dono taraf equally band?\n\nEk taraf band = Congestive. *Dono taraf equally band = Polyp confirm.*\n\nKai logon ko surgery suggest hui thi — hamare niyam se kai ne bina surgery ke sudhar feel kiya hai.",
+  allergic: "Samajh gaya — yeh *Allergic Sinus* hai. \uD83C\uDF3F\n\nEk test: bahar jao ya doosra room — takleef thodi different lage toh confirm.\n\nIs type mein sahi protocol se 4-5 din mein sneeze/triggers kum hone lagte hain.",
+  congestive: "Samajh gaya — yeh *Congestive Sinus* hai. \uD83C\uDF3F\n\nEk test: sir aage jhukao 5 sec — mathe/galon mein bojh? Confirm hai.\n\n*Zaroori:* Dairy band karni padegi — yeh is type ka sabse bada dushman hai.",
+  spray: "Samajh gaya — yeh *Spray Dependency* hai. \uD83C\uDF3F\n\nEk raat spray band karo — neend mushkil hogi? Yeh naak ki physical dependency hai.\n\n*Kabhi ek dum band mat karo* — dheere protocol se hi chhootega.",
+  infective: "Samajh gaya — yeh *Infective/Heat Sinus* hai. \uD83C\uDF3F\n\nAntibiotic se thoda theek, phir wapas? Classic sign hai.\n\n*Zaroori:* Eucalyptus/camphor steam kabhi mat karo — is type mein worse karta hai.",
+  polyp: "Samajh gaya — *Polyp/Blockage* hai. \uD83C\uDF3F\n\nDono taraf equally band? Laung paas laao — smell nahi aati? Confirm.\n\nKai logon ko surgery suggest hui thi — protocol se bina surgery sudhar aaya hai.",
+  dns: "Samajh gaya — yeh *DNS (Deviated Nasal Septum)* lag raha hai. \uD83C\uDF3F\n\nEk side hamesha band, raat mein zyada problem? Yeh classic DNS sign hai.\n\nAyurveda mein DNS ke around ki inflammation aur congestion bilkul theek hoti hai — breathing improve hoti hai.",
 };
 
 // ─── PITCH MESSAGES — Hinglish only ─────────────────────────
 const TYPE_NAMES = {
   allergic: "Allergic Sinus", congestive: "Congestive Sinus",
   spray: "Spray Dependency", infective: "Infective Sinus", polyp: "Polyp Sinus",
+  dns: "DNS (Deviated Nasal Septum)",
 };
 function getPitch(type) {
   const tname = TYPE_NAMES[type] || "Congestive Sinus";
-  return `Aapke *${tname}* ke liye ek khas 14-din ka program hai. \uD83C\uDF3F\n\n2 options hain:\n\n\uD83C\uDF31 *Rs.499 — Starter Kit*\nAapke sinus type ki self-guided dinchrya — WhatsApp pe. Khud karo, hum guide karte hain.\n\n---\n\n\uD83C\uDF3F *Rs.1,299 — 14-Din Nasal Restoration*\n\u2B50 _(Sabse zyada liya jaata hai)_\n\n*Exactly yeh milega:*\n\u2705 Day 1 — Aapki poori history, causes personally samjhunga (WhatsApp pe)\n\u2705 Aapke type ki khas dinchrya — subah 20 min + raat 15 min\n\u2705 14 din roz WhatsApp pe check — "aaj kaisa raha?" personally\n\u2705 Kisi din takleef ho — usi din niyam badlega\n\u2705 Day 7 + Day 14 — progress review personally\n\u2705 Program ke baad maintenance guidance free\n\n---\n\nENT doctor ek visit mein Rs.1,000-2,000 leta hai — roz check nahi karta.\nYahan 14 din roz personal dhyan — sirf Rs.1,299 ek baar. \uD83C\uDF3F\n\nKaunsa option sahi lagta hai?`;
+  return `Aapke *${tname}* ke liye khas 14-din program hai. \uD83C\uDF3F\n\n\uD83C\uDF31 *Rs.499* — Self-guided kit (WhatsApp support)\n\uD83C\uDF3F *Rs.1,299* — 14-Din Full Program _(sabse zyada liya jaata hai)_\n\u2705 Day 1 personally connect | roz WhatsApp check | agar takleef ho — usi din niyam badlega\n\nENT visit hi Rs.1,000-2,000 — yahan 14 din daily personal guidance sirf Rs.1,299. \uD83C\uDF3F`;
 }
 
 // ─── POST-PAYMENT EXPLANATION ────────────────────────────────
@@ -350,17 +369,18 @@ async function callSalesom(userMessage, userData, forceLang) {
 [CONTEXT]
 - Sinus type: ${sinusLabels[userData.sinusType] || "Unknown"}
 - Duration: ${userData.duration || "Not specified"}
+- Severity: ${userData.severity || "Not specified"}
 - Current state: ${userData.state}
 - Selected plan: ${userData.selectedPlan ? "Rs." + userData.selectedPlan : "Not selected"}
 - Post-pitch reply #: ${userData.postPitchReplies || 0}
 [END CONTEXT]
 LANGUAGE: ${langInstruction}
-RULES: No payment links. No diagnosis restart. Under 150 words. End with soft close or question.`;
+RULES: MAX 2-3 SHORT LINES. Under 60 words. No payment links. No diagnosis restart. No bullet lists. End with 1 soft question or warm close. Be like a caring knowledgeable friend.`;
 
     const history = (userData.history || []).slice(-8);
     const response = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 350,
+      max_tokens: 180,
       system: SALESOM_SYSTEM_PROMPT + "\n\n" + contextBlock,
       messages: [...history, { role: "user", content: userMessage }],
     });
@@ -414,6 +434,14 @@ async function handleMessage(senderId, messageText, senderName) {
 
   // ─── LOG EVERY INCOMING MESSAGE ──────────────────────────────
   logConversation(senderId, "user", text); // fire-and-forget
+
+  // ─── MESSAGE LIMIT — redirect after 12 exchanges ─────────────
+  userData.botReplies = (userData.botReplies || 0) + 1;
+  if (userData.botReplies >= 12 && !["post_payment", "human", "done", "committing"].includes(userData.state)) {
+    await sendWithTyping(senderId, "Aapka case thoda detail mein samajhna chahta hun. \uD83C\uDF3F\n\nHamare Sinus Relief Expert se seedha baat karo: \uD83D\uDCF1 *WhatsApp 85951 60713*\n\nYa wait karo — expert thodi der mein yahan reply karega.");
+    userData.state = "human";
+    return;
+  }
 
   // ─── LANGUAGE DETECTION — BI-DIRECTIONAL PER MESSAGE ────────
   const lang = detectLang(text);
@@ -495,11 +523,18 @@ async function handleMessage(senderId, messageText, senderName) {
 
   if (userData.state === "asked_duration") {
     userData.duration = text;
-    userData.state = "asked_symptoms";
+    userData.state = "asked_severity";
     await sendWithTyping(senderId, getDurationAck(text));
     await new Promise((r) => setTimeout(r, 800));
-    await sendQRWithTyping(senderId, SYMPTOMS_Q.text, SYMPTOMS_Q.replies);
+    await sendQRWithTyping(senderId, SEVERITY_Q.text, SEVERITY_Q.replies);
     await logToSheet(senderId, senderName, "Duration: " + text, "DURATION", "");
+    return;
+  }
+
+  if (userData.state === "asked_severity") {
+    userData.severity = text;
+    userData.state = "asked_symptoms";
+    await sendQRWithTyping(senderId, SYMPTOMS_Q.text, SYMPTOMS_Q.replies);
     return;
   }
 
@@ -530,9 +565,14 @@ async function handleMessage(senderId, messageText, senderName) {
 
   // ─── PITCHED — COMMIT BEFORE PAYMENT LINK ────────────────────
   if (userData.state === "pitched") {
-    if (userData.postPitchReplies >= 2) { userData.state = "human"; return; }
+    if (userData.postPitchReplies >= 3) {
+      await sendWithTyping(senderId, "Aapka case expert tak pahuncha diya hai. \uD83C\uDF3F\nSeedha WhatsApp karo: \uD83D\uDCF1 *85951 60713*");
+      userData.state = "human";
+      return;
+    }
 
-    const userSaidYes = /haan|ha |yes|theek|ok\b|okay|shuru|karna|chahta|chahti|le leta|le lungi|lena\b|interested|1299|499|full program|starter|bhejo|link/.test(textLower);
+    // Payment link ONLY when user clearly shows interest/intent — not by default
+    const userSaidYes = /\bhaan\b|\bha\b|yes\b|theek hai|ok\b|okay\b|shuru|karna hai|chahta|chahti|le leta|le lungi|lena hai|interested|1299|499|full program|starter kit|bhejo|link bhejo|link chahiye|lena chahta|lena chahti/.test(textLower);
 
     if (userSaidYes) {
       const wants1299 = /1299|full program|full|poora/.test(textLower);
