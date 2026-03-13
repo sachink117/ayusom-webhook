@@ -160,7 +160,10 @@ async function sendTypingOn(recipientId) {
 
 // ─── SEND MESSAGE ────────────────────────────────────────────
 async function sendMessage(recipientId, text) {
-  if (userChannels[recipientId] === "twilio") { await sendTwilioMessage(recipientId, text); return; }
+  const ch = userChannels[recipientId] || "messenger";
+  if (ch === "twilio") { await sendTwilioMessage(recipientId, text); return; }
+  if (ch === "website") { console.log(`Website lead ${recipientId} — message saved (no API reply): ${text.substring(0,60)}`); return; }
+  if (ch === "instagram") { await sendInstagramMessage(recipientId, text); return; }
   try {
     const res = await fetch(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
       method: "POST",
@@ -190,6 +193,21 @@ async function sendTwilioMessage(to, text) {
     if (data.error_code) console.error("Twilio error:", data.message);
     else console.log(`Twilio sent to ${to}: ${text.substring(0, 60)}...`);
   } catch (e) { console.error("Twilio send failed:", e.message); }
+}
+
+// ─── INSTAGRAM SEND ──────────────────────────────────────────
+async function sendInstagramMessage(recipientId, text) {
+  const igToken = process.env.INSTAGRAM_ACCESS_TOKEN || PAGE_ACCESS_TOKEN;
+  try {
+    const res = await fetch(`https://graph.facebook.com/v18.0/me/messages?access_token=${igToken}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipient: { id: recipientId }, message: { text }, messaging_type: "RESPONSE" }),
+    });
+    const data = await res.json();
+    if (data.error) console.error("Instagram send error:", data.error);
+    else console.log(`Instagram sent to ${recipientId}: ${text.substring(0, 60)}`);
+  } catch (e) { console.error("Instagram send failed:", e.message); }
 }
 
 // ─── QUICK REPLIES ───────────────────────────────────────────
@@ -358,7 +376,9 @@ RULES: No payment links. No diagnosis restart. Under 150 words. End with soft cl
 // ─── GOOGLE SHEET LOGGING ─────────────────────────────────────
 async function logToSheet(senderId, name, message, stage, sinusType = "") {
   try {
-    const params = new URLSearchParams({ platform: "Messenger", senderId, name: name || "Unknown", message: message.substring(0, 200), status: "\uD83D\uDFE1", stage, symptom: sinusType });
+    const chPlatform = userChannels[senderId] || "messenger";
+    const platform = chPlatform === "twilio" ? "WhatsApp" : chPlatform === "instagram" ? "Instagram" : chPlatform === "website" ? "Website" : "Messenger";
+    const params = new URLSearchParams({ platform, senderId, name: name || "Unknown", message: message.substring(0, 200), status: "\uD83D\uDFE1", stage, symptom: sinusType });
     await fetch(`${GAS_URL}?${params.toString()}`, { method: "GET" });
   } catch (e) { console.error("Sheet log error:", e.message); }
 }
@@ -599,8 +619,9 @@ app.post("/webhook", async (req, res) => {
   res.sendStatus(200);
   try {
     const body = req.body;
-    if (body.object !== "page") return;
-    for (const entry of body.entry) {
+    const isInstagram = body.object === "instagram";
+    if (!isInstagram && body.object !== "page") return;
+    for (const entry of body.entry || []) {
       for (const event of entry.messaging || []) {
         const senderId = event.sender?.id;
         if (!senderId) continue;
@@ -609,8 +630,11 @@ app.post("/webhook", async (req, res) => {
           if (processedMessages.has(event.message.mid)) continue;
           processedMessages.add(event.message.mid);
         }
-        if (event.sender?.id === entry.id) { await handlePageMessage(event.recipient?.id, event.sender?.id); continue; }
-        if (event.message?.text) await handleMessage(senderId, event.message.text, "User");
+        if (!isInstagram && event.sender?.id === entry.id) { await handlePageMessage(event.recipient?.id, event.sender?.id); continue; }
+        if (event.message?.text) {
+          if (isInstagram) userChannels[senderId] = "instagram";
+          await handleMessage(senderId, event.message.text, "User");
+        }
       }
     }
   } catch (err) { console.error("Webhook error:", err); }
@@ -664,6 +688,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .s-hook_sent,.s-asked_duration,.s-asked_symptoms{background:#e8f4f8;color:#0277bd;}
 .ch-wa{background:#dcf8c6;color:#128C7E;font-size:9px;}
 .ch-fb{background:#e8eaf6;color:#3949ab;font-size:9px;}
+.ch-ig{background:#fce4ec;color:#ad1457;font-size:9px;}
+.ch-web{background:#fff3e0;color:#e65100;font-size:9px;}
 .right{flex:1;display:flex;flex-direction:column;background:#efeae2;min-width:0;}
 .chat-header{background:white;padding:10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #e9edef;flex-shrink:0;}
 .chat-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
@@ -724,9 +750,9 @@ function render(){
   document.getElementById('ulist').innerHTML=fl.map(u=>{
     const lm=u.lastMessage;
     const pre=lm?(lm.role==='user'?'\uD83D\uDDE3 ':'\uD83E\uDD16 ')+lm.text.replace(/\\n/g,' ').substring(0,38):'No messages';
-    const av=u.channel==='twilio'?'#128C7E':'#3b5998';
-    const ico=u.channel==='twilio'?'\uD83D\uDCF1':'\uD83D\uDCAC';
-    const ch=u.channel==='twilio'?'<span class="badge ch-wa">WA</span>':'<span class="badge ch-fb">FB</span>';
+    const av=u.channel==='twilio'?'#128C7E':u.channel==='instagram'?'#833AB4':u.channel==='website'?'#FF5722':'#3b5998';
+    const ico=u.channel==='twilio'?'\uD83D\uDCF1':u.channel==='instagram'?'\uD83D\uDCF8':u.channel==='website'?'\uD83C\uDF10':'\uD83D\uDCAC';
+    const ch=u.channel==='twilio'?'<span class="badge ch-wa">WA</span>':u.channel==='instagram'?'<span class="badge ch-ig">IG</span>':u.channel==='website'?'<span class="badge ch-web">WEB</span>':'<span class="badge ch-fb">FB</span>';
     return '<div class="uitem'+(sel===u.id?' active':'')+'" data-uid="'+u.id+'" onclick="pick(this.dataset.uid)">'+
       '<div class="avatar" style="background:'+av+'">'+ico+'</div>'+
       '<div class="uinfo">'+
@@ -744,8 +770,8 @@ async function loadMsgs(id){
 function drawChat(id){
   const u=users.find(x=>x.id===id);if(!u)return;
   const m=msgs[id]||[];
-  const av=u.channel==='twilio'?'#128C7E':'#3b5998';
-  const ico=u.channel==='twilio'?'\uD83D\uDCF1':'\uD83D\uDCAC';
+  const av=u.channel==='twilio'?'#128C7E':u.channel==='instagram'?'#833AB4':u.channel==='website'?'#FF5722':'#3b5998';
+  const ico=u.channel==='twilio'?'\uD83D\uDCF1':u.channel==='instagram'?'\uD83D\uDCF8':u.channel==='website'?'\uD83C\uDF10':'\uD83D\uDCAC';
   const info=[u.sinusType?'\uD83C\uDF3F '+u.sinusType:'',u.duration?'\u23F1 '+u.duration:'',u.selectedPlan?'\uD83D\uDCB0 Rs.'+u.selectedPlan:''].filter(Boolean).join(' \u00B7 ')||SL[u.state]||u.state;
   const isFree=u.state!=='human';
   document.getElementById('right').innerHTML=
@@ -761,6 +787,9 @@ function drawChat(id){
         '<div class="msg '+x.role+'">'+x.text.replace(/\\n/g,'<br>').replace(/\\*(.*?)\\*/g,'<b>$1</b>')+
         '<div class="msg-time">'+new Date(x.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})+'</div></div>'
       ).join(''):'<div style="text-align:center;color:#999;padding:20px">No messages yet</div>')+
+    '</div>'+
+    '<div id="ch-notice" style="background:white;border-top:1px solid #e9edef;padding:5px 14px;font-size:11px;color:#667781;display:flex;align-items:center;gap:5px">'+
+      (u.channel==='twilio'?'\uD83D\uDCF1 Reply jayega: <b>WhatsApp</b>':u.channel==='instagram'?'\uD83D\uDCF8 Reply jayega: <b>Instagram</b>':u.channel==='website'?'\uD83C\uDF10 <b>Website lead</b> \u2014 message dashboard mein save hoga only (user ko nahi jayega)':'\uD83D\uDCAC Reply jayega: <b>Messenger</b>')+
     '</div>'+
     '<div class="inp-area">'+
       '<textarea id="mi" placeholder="Message likhein... (Enter = send)" rows="1" onkeydown="hk(event)"></textarea>'+
@@ -816,9 +845,11 @@ app.post("/admin/api/send", async (req, res) => {
   const { userId, text } = req.body || {};
   if (!userId || !text) return res.status(400).json({ error: "userId and text required" });
   try {
+    const ch = userChannels[userId] || "messenger";
     await sendMessage(userId, text);
     logConversation(userId, "admin", text);
-    res.json({ ok: true });
+    const chName = ch === "twilio" ? "WhatsApp" : ch === "instagram" ? "Instagram" : ch === "website" ? "Website (saved only)" : "Messenger";
+    res.json({ ok: true, channel: ch, channelName: chName });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -884,6 +915,14 @@ async function loadHistoryFromSheet() {
             if (!userState[lead.senderId].name) userState[lead.senderId].name = lead.name;
             if (!userState[lead.senderId].symptom) userState[lead.senderId].symptom = lead.symptom;
             if (!userState[lead.senderId].temperature) userState[lead.senderId].temperature = lead.temperature;
+          }
+          // Set channel based on platform column in Leads sheet
+          if (!userChannels[lead.senderId]) {
+            const platformLower = (lead.platform || "").toLowerCase();
+            if (platformLower.includes("whatsapp") || platformLower.includes("twilio")) userChannels[lead.senderId] = "twilio";
+            else if (platformLower.includes("instagram")) userChannels[lead.senderId] = "instagram";
+            else if (platformLower.includes("website") || platformLower.includes("web")) userChannels[lead.senderId] = "website";
+            else userChannels[lead.senderId] = "messenger";
           }
         }
         console.log(`Old leads loaded: ${leads.length} leads`);
