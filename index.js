@@ -954,12 +954,14 @@ function sc(s){const m={new:'s-new',hook_sent:'s-hook_sent',asked_duration:'s-as
 function ta(ts){if(!ts)return'';const d=Date.now()-new Date(ts).getTime(),m=Math.floor(d/60000);if(m<1)return'Abhi';if(m<60)return m+'m';const h=Math.floor(m/60);if(h<24)return h+'h';return Math.floor(h/24)+'d';}
 async function load(){
   try{
+    const inp=document.getElementById('mi');
+    const draft=inp?inp.value:'';
+    const wasFocused=inp&&document.activeElement===inp;
     const r=await fetch('/admin/api/users');users=await r.json();
     users.sort((a,b)=>{const ta=a.lastMessage?new Date(a.lastMessage.ts):0,tb=b.lastMessage?new Date(b.lastMessage.ts):0;return tb-ta;});
-    const inp=document.getElementById('mi');
-    const isTyping=inp&&document.activeElement===inp&&inp.value.trim().length>0;
-    if(!isTyping){render();stats();}
-    if(sel)loadMsgs(sel);
+    render();stats();
+    if(sel)await loadMsgs(sel);
+    if(draft){const inp2=document.getElementById('mi');if(inp2){inp2.value=draft;if(wasFocused)inp2.focus();}}
   }catch(e){}
 }
 function stats(){
