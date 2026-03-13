@@ -266,21 +266,19 @@ const HOOKS = [
 // ─── DURATION QUESTION — Hinglish only ───────────────────────
 const DURATION_Q = {
   text: "Yeh takleef aapko kitne waqt se hai? \uD83C\uDF3F",
-  replies: ["1 mahine se", "6 mahine se", "1-2 saal se", "5+ saal se"],
+  replies: ["6 mahine se kum", "1-2 saal se", "3-4 saal se", "5-10 saal se", "10+ saal se"],
 };
 
-// ─── DURATION ACK — FIX: months check before years ───────────
+// ─── DURATION ACK — handles all 5 options ─────────────────────
 function getDurationAck(text) {
-  const num = parseInt((text.match(/\d+/) || [])[0]) || 0;
   const tl = text.toLowerCase();
-  const isMon = /mahine|mahina|month/.test(tl);
-  const years = isMon ? 0 : num;
-  const isLong = !isMon && years >= 5;
-  const isMid = !isMon && (years >= 2 || /saal|year/.test(tl));
-  if (isMon) return `${num} mahine se chal rahi hai — abhi sahi waqt hai.\nPehle theek se samajhte hain.`;
-  if (isLong) return `${years} saal se yeh takleef hai... \uD83D\uDE2E\u200D\uD83D\uDCA8\nItne waqt mein neend, energy, focus — sab affected ho chuka hai.\nYeh case dhyan se dekhte hain.`;
-  if (isMid) return `${years} saal se chal raha hai — matlab yeh temporary nahi, andar kuch set ho chuka hai.\nSahi diagnosis zaroori hai.`;
-  return "Theek hai, samajh gaya. Pehle theek se jaanch karte hain.";
+  const isMon = /mahine|mahina|month|kum|6 mah/.test(tl);
+  if (isMon) return "Theek hai — abhi bahut sahi waqt hai shuru karne ka. \uD83C\uDF3F\nYeh stage mein results bahut fast milte hain.";
+  const num = parseInt((text.match(/\d+/) || [])[0]) || 0;
+  if (/10\+|10 saal|das saal/.test(tl) || num >= 10) return "10+ saal... \uD83D\uDE2E\u200D\uD83D\uDCA8\nItne waqt mein body adjust ho chuki hai — lekin andar ki wajah abhi bhi treat ho sakti hai.\nDhyan se dekhte hain aapka case.";
+  if (/5|6|7|8|9/.test(text) || num >= 5) return `${num || 5}+ saal se hai — matlab andar kuch set ho chuka hai. \uD83D\uDE2E\u200D\uD83D\uDCA8\nSahi protocol se fark padta hai — pehle type samajhte hain.`;
+  if (/3|4/.test(text) || num >= 3) return `${num || 3}-4 saal se chal raha hai — temporary nahi raha ab yeh. \uD83C\uDF3F\nSahi jagah aaye hain.`;
+  return `${num || 1}-2 saal se hai — abhi bhi theek ho sakta hai completely. \uD83C\uDF3F\nPehle type identify karte hain.`;
 }
 
 // ─── SEVERITY QUESTION — after duration ──────────────────────
@@ -507,12 +505,15 @@ async function handleMessage(senderId, messageText, senderName) {
   // ─── SEQUENTIAL FLOW ─────────────────────────────────────────
   if (userData.state === "new") {
     const idx = Math.floor(Math.random() * HOOKS.length);
-    userData.state = "hook_sent";
+    userData.state = "asked_duration";
     await sendWithTyping(senderId, HOOKS[idx]);
+    await new Promise((r) => setTimeout(r, 900));
+    await sendQRWithTyping(senderId, DURATION_Q.text, DURATION_Q.replies);
     await logToSheet(senderId, senderName, "Hook sent", "HOOK", "");
     return;
   }
 
+  // hook_sent — legacy fallback for users mid-flow
   if (userData.state === "hook_sent") {
     userData.state = "asked_duration";
     await sendQRWithTyping(senderId, DURATION_Q.text, DURATION_Q.replies);
