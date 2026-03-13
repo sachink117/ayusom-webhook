@@ -838,24 +838,66 @@ app.get("/", (req, res) => res.send("Ayusomam Bot v3.2 — Website trust integra
 async function loadHistoryFromSheet() {
   try {
     console.log("Loading conversation history from Google Sheet...");
-    const params = new URLSearchParams({ action: "getConversations" });
-    const res = await fetch(`${GAS_URL}?${params.toString()}`);
-    const rows = await res.json();
-    if (!Array.isArray(rows)) { console.log("No history rows returned"); return; }
-    for (const row of rows) {
-      if (!row.senderId || !row.text) continue;
-      if (!conversationLog[row.senderId]) conversationLog[row.senderId] = [];
-      conversationLog[row.senderId].push({ role: row.role || "user", text: row.text, ts: row.ts });
-      // Rebuild basic userState so dashboard shows user in list
-      if (!userState[row.senderId]) userState[row.senderId] = { state: "done", history: [] };
-    }
+
+    // 1. Load recent conversation messages (Conversations sheet)
+    try {
+      const params = new URLSearchParams({ action: "getConversations" });
+      const res = await fetch(`${GAS_URL}?${params.toString()}`);
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        for (const row of rows) {
+          if (!row.senderId || !row.text) continue;
+          if (!conversationLog[row.senderId]) conversationLog[row.senderId] = [];
+          conversationLog[row.senderId].push({ role: row.role || "user", text: row.text, ts: row.ts });
+          if (!userState[row.senderId]) userState[row.senderId] = { state: "done", history: [] };
+        }
+        console.log(`Conversations loaded: ${rows.length} messages`);
+      } else {
+        console.log("No conversation messages found");
+      }
+    } catch (e1) { console.error("getConversations failed:", e1.message); }
+
+    // 2. Load old Leads sheet data (purana data — old chats)
+    try {
+      const leadsParams = new URLSearchParams({ action: "getLeads" });
+      const leadsRes = await fetch(`${GAS_URL}?${leadsParams.toString()}`);
+      const leads = await leadsRes.json();
+      if (Array.isArray(leads) && leads.length > 0) {
+        for (const lead of leads) {
+          if (!lead.senderId) continue;
+          if (!conversationLog[lead.senderId]) conversationLog[lead.senderId] = [];
+          const alreadyHasLead = conversationLog[lead.senderId].some(m => m._isLead);
+          if (!alreadyHasLead) {
+            if (lead.message) {
+              conversationLog[lead.senderId].unshift({ role: "user", text: lead.message, ts: lead.ts });
+            }
+            conversationLog[lead.senderId].unshift({
+              role: "bot",
+              text: `\uD83D\uDCCB Purana Lead — Naam: ${lead.name || "?"} | Symptom: ${lead.symptom || "?"} | Temperature: ${lead.temperature || "?"} | Stage: ${lead.stage || "?"}`,
+              ts: lead.ts,
+              _isLead: true
+            });
+          }
+          if (!userState[lead.senderId]) {
+            userState[lead.senderId] = { state: lead.stage || "done", history: [], name: lead.name, symptom: lead.symptom, temperature: lead.temperature, sinusType: lead.symptom };
+          } else {
+            if (!userState[lead.senderId].name) userState[lead.senderId].name = lead.name;
+            if (!userState[lead.senderId].symptom) userState[lead.senderId].symptom = lead.symptom;
+            if (!userState[lead.senderId].temperature) userState[lead.senderId].temperature = lead.temperature;
+          }
+        }
+        console.log(`Old leads loaded: ${leads.length} leads`);
+      } else {
+        console.log("No old leads found");
+      }
+    } catch (e2) { console.error("getLeads failed:", e2.message); }
+
     // Sort each user's messages chronologically
     for (const id of Object.keys(conversationLog)) {
       conversationLog[id].sort((a, b) => new Date(a.ts) - new Date(b.ts));
     }
     const users = Object.keys(conversationLog).length;
-    const total = rows.length;
-    console.log(`History loaded: ${total} messages across ${users} users`);
+    console.log(`Dashboard ready: ${users} total users loaded`);
   } catch (e) {
     console.error("loadHistoryFromSheet failed:", e.message);
   }
