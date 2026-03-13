@@ -1,5 +1,5 @@
 // ============================================================
-// AYUSOMAM MESSENGER BOT — Version 3.3
+// AYUSOMAM MESSENGER BOT — Version 3.4
 // Fix: Language detection per-message bi-directional
 //      All hardcoded strings Hinglish only (no encoding issues)
 //      AI handles Devanagari / English / Hinglish automatically
@@ -7,6 +7,8 @@
 // New: Follow-up diagnostic questions after symptom selection
 //      (naak band → discharge type | smell nahi → when it happened)
 //      Refines sinus type: allergic / congestive / infective / polyp
+// Fix: Remove "Bhai/Yaar" from AI responses (stricter prompt + post-filter)
+// New: Free relief steps when user says no money / baad mein / free tips
 // ============================================================
 const express = require("express");
 const fetch = require("node-fetch");
@@ -62,8 +64,10 @@ CRITICAL:
 - NEVER ask the user which language to use
 
 TONE — NON-NEGOTIABLE
-NEVER: Bhai, Yaar, Boss, long paragraphs, bullet lists, formal letter style
-ALWAYS: Dost jaisa — caring, warm, professional. Like a knowledgeable friend, not a salesman.
+❌ NEVER address user as: Bhai, Yaar, Boss, Dost — ZERO TOLERANCE. Not even once.
+❌ NEVER use bullet lists, long paragraphs, formal letter style.
+✅ ALWAYS: Caring, warm, professional. Like a knowledgeable friend, not a salesman.
+✅ Address the user with "Aap" if needed — never Bhai/Yaar/Boss.
 MAX 2-3 SHORT LINES per message. Mobile screen readable. No walls of text.
 
 5 SINUS TYPES
@@ -411,6 +415,55 @@ function getWebsiteLine(context, lang) {
 }
 
 // ─── SALESOM AI ──────────────────────────────────────────────
+// ─── FREE RELIEF STEPS (for "no money / free tips / baad mein") ──
+function getFreeReliefSteps(sinusType) {
+  const s = {
+    allergic: {
+      title: "2 free steps hain — abhi try karo, fark feel hoga 🌿",
+      step1: "🌿 *Step 1 — Tulsi Steam* (8-10 min)\nGaram paani mein 4-5 tulsi leaves daalo. Towel sir pe daal ke naak se steam lo. Yeh nasal passage khol dega.",
+      gap: "⏳ 5 min rukko — naak khuli rahegi...",
+      step2: "🌿 *Step 2 — Anulom-Vilom* (5 min)\nAbhi naak khuli hai to yeh breathing 3x zyada kaam karti hai. Alternate nostril — slow deep breaths.",
+      note: "Steam naak kholti hai, exercise us open state ka pura fayda uthati hai. ✅",
+    },
+    congestive: {
+      title: "2 free steps — aaj raat hi fark feel karoge 🌿",
+      step1: "🌿 *Step 1 — Plain Water Steam* (10 min)\nSirf garam paani — kuch mat daalo. Towel se cover karo. Mucus loose hoga, airway clear hoga.",
+      gap: "⏳ 2-3 min break lo, naak saaf karo...",
+      step2: "🌿 *Step 2 — Smell Activation* (3-4 min)\nThodi si coffee ya adrak powder apne paas rakho. Aankhein band karo, slowly smell karo — 5 deep breaths. Yeh smell nerve activate karta hai.",
+      note: "Steam airway kholta hai, smell exercise usmein nerve signal strengthen karti hai. ✅",
+    },
+    infective: {
+      title: "2 free steps — burning aur irritation mein relief 🌿",
+      step1: "🌿 *Step 1 — Plain Water Steam* (5-7 min)\nSirf plain water — eucalyptus NAHI dalna (infection mein worsen karta hai). Towel se cover.",
+      gap: "⏳ 3 min steam ko kaam karne do...",
+      step2: "🌿 *Step 2 — Sheetali Pranayama* (5 min)\nJeebh slightly roll karke, thandi hawa andar kheencho naak se baahaar nikalo. 8-10 rounds. Burning cool hogi.",
+      note: "Steam drainage improve karta hai, Sheetali cooling action add karta hai. ✅",
+    },
+    spray: {
+      title: "2 free steps — aaj raat spray se thoda break lo 🌿",
+      step1: "🌿 *Step 1 — Warm Saline Rinse* (2 min)\nEk glass garam paani mein half teaspoon namak. Ek nostril mein dheeray lo, doosray se nikalo.",
+      gap: "⏳ 5 min rukko...",
+      step2: "🌿 *Step 2 — Bhramari Pranayama* (5-7 min)\nAankhein band, haath se kaan dhak lo. Naak se andar lo — baahaar 'hmmm' humming ke saath nikalo. 7-8 rounds.",
+      note: "Saline passage clear karta hai, Bhramari vibration swelling reduce karti hai. ✅",
+    },
+    dns: {
+      title: "2 free steps — DNS mein bhi isse fark padta hai 🌿",
+      step1: "🌿 *Step 1 — Warm Steam* (8-10 min)\nGaram paani ka steam — towel se cover. Soft tissue inflammation reduce hoti hai.",
+      gap: "⏳ 5 min break...",
+      step2: "🌿 *Step 2 — Bhramari Pranayama* (5-7 min)\nAndar lo naak se, baahaar 'hmmm' humming ke saath. Nasal vibration soft tissue inflammation reduce karti hai.",
+      note: "Steam tissue loosen karta hai, Bhramari vibration inflammation calm karti hai. ✅",
+    },
+    polyp: {
+      title: "2 free steps — blockage se thoda relief 🌿",
+      step1: "🌿 *Step 1 — Plain Warm Steam* (10 min)\nSirf plain steam. Polyp ke aas paas ki inflammation loose hogi, thoda airflow milega.",
+      gap: "⏳ 5 min rukko...",
+      step2: "🌿 *Step 2 — Anulom-Vilom* (5-7 min)\nAbhi jab nasal passage slightly open hai — alternate nostril breathing. Slow, deep. Circulation badhta hai.",
+      note: "Steam inflammation loose karta hai, Anulom-Vilom us open window ka fayda uthata hai. ✅",
+    },
+  };
+  return s[sinusType] || s.congestive;
+}
+
 async function callSalesom(userMessage, userData, forceLang) {
   try {
     const sinusLabels = {
@@ -442,7 +495,14 @@ RULES: MAX 2-3 SHORT LINES. Under 60 words. No payment links. No diagnosis resta
       system: SALESOM_SYSTEM_PROMPT + "\n\n" + contextBlock,
       messages: [...history, { role: "user", content: userMessage }],
     });
-    const reply = response.content[0].text;
+    // Safety filter: strip informal address words even if AI slips
+    const reply = response.content[0].text
+      .replace(/\bbhai\b/gi, "")
+      .replace(/\byaar\b/gi, "")
+      .replace(/\bboss\b/gi, "")
+      .replace(/(,\s*)bhai\b/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
     userData.history = [...history, { role: "user", content: userMessage }, { role: "assistant", content: reply }];
     return reply;
   } catch (err) {
@@ -662,7 +722,25 @@ async function handleMessage(senderId, messageText, senderName) {
       return;
     }
 
-    // Payment link ONLY when user clearly shows interest/intent — not by default
+    // ── Free tips / no money / later ─────────────────────────────────
+    const wantsFree = /paise nahi|paisa nahi|\bfree\b|free tips|free bata|gharelu|ghar pe|ghar ka|nahi lena|nahi kharidna|baad mein|baad me|abhi nahi|budget nahi|afford nahi|mehenga|mahanga hai|costly|expensive|kal dekhenge|sochta hun|sochti hun/.test(textLower);
+    if (wantsFree) {
+      const fs = getFreeReliefSteps(userData.sinusType || "congestive");
+      await sendWithTyping(senderId, fs.title);
+      await new Promise((r) => setTimeout(r, 700));
+      await sendWithTyping(senderId, fs.step1);
+      await new Promise((r) => setTimeout(r, 900));
+      await sendWithTyping(senderId, fs.gap);
+      await new Promise((r) => setTimeout(r, 1100));
+      await sendWithTyping(senderId, fs.step2);
+      await new Promise((r) => setTimeout(r, 700));
+      await sendWithTyping(senderId, fs.note);
+      await new Promise((r) => setTimeout(r, 600));
+      await sendWithTyping(senderId, "Yeh try karo aaj — koi sawaal ho toh batao. 🌿");
+      return;
+    }
+
+        // Payment link ONLY when user clearly shows interest/intent — not by default
     const userSaidYes = /\bhaan\b|\bha\b|yes\b|theek hai|ok\b|okay\b|shuru|karna hai|chahta|chahti|le leta|le lungi|lena hai|interested|1299|499|full program|starter kit|bhejo|link bhejo|link chahiye|lena chahta|lena chahti/.test(textLower);
 
     if (userSaidYes) {
