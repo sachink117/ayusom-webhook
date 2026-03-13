@@ -1,8 +1,9 @@
 // ============================================================
-// AYUSOMAM MESSENGER BOT — Version 3.1
+// AYUSOMAM MESSENGER BOT — Version 3.2
 // Fix: Language detection per-message bi-directional
 //      All hardcoded strings Hinglish only (no encoding issues)
 //      AI handles Devanagari / English / Hinglish automatically
+// New: Website trust mentions at 2 key touchpoints (reveal + link)
 // ============================================================
 const express = require("express");
 const fetch = require("node-fetch");
@@ -294,6 +295,20 @@ function getUpsell(lang) {
   return "Ek baat batata hun — \uD83C\uDF3F\n\nRs.1,299 wale program mein *7 din bilkul free* milte hain -> total *21 din*, wahi specialist, wahi WhatsApp support.\n\nSirf Rs.800 zyada mein 50% zyada waqt. Jo log lambe waqt se pareshan hain, unhe yeh extra time bahut kaam aata hai.\n\nSochna hai? Bas *upgrade* likho — link bhej deta hun. \uD83C\uDF3F";
 }
 
+// ─── WEBSITE TRUST MENTIONS ──────────────────────────────────
+// Context: "trust" = after diagnosis reveal | "confirm" = with payment link
+function getWebsiteLine(context, lang) {
+  if (context === "trust") {
+    if (lang === "eng") return "Want to verify us or learn more about your sinus type? \uD83C\uDF3F\nayusomamherbals.com";
+    if (lang === "dev") return "\u0939\u092E\u093E\u0930\u0947 \u092C\u093E\u0930\u0947 \u092E\u0947\u0902 \u091C\u093E\u0928\u0928\u093E \u091A\u093E\u0939\u0924\u0947 \u0939\u0948\u0902? \uD83C\uDF3F\nayusomamherbals.com";
+    return "Hamare baare mein jaanna ho ya results dekhne ho? \uD83C\uDF3F\nayusomamherbals.com";
+  }
+  // context === "confirm" — shown alongside payment link
+  if (lang === "eng") return "You can check our protocol & patient results here: ayusomamherbals.com \uD83C\uDF3F";
+  if (lang === "dev") return "\u0939\u092E\u093E\u0930\u0947 \u092A\u094D\u0930\u094B\u091F\u094B\u0915\u0949\u0932 \u0914\u0930 \u0930\u093F\u091C\u0932\u094D\u091F\u094D\u0938: ayusomamherbals.com \uD83C\uDF3F";
+  return "Hamare protocol aur real results dekhne ho: ayusomamherbals.com \uD83C\uDF3F";
+}
+
 // ─── SALESOM AI ──────────────────────────────────────────────
 async function callSalesom(userMessage, userData, forceLang) {
   try {
@@ -448,6 +463,8 @@ async function handleMessage(senderId, messageText, senderName) {
     await sendWithTyping(senderId, "Dekh rahe hain... \uD83C\uDF3F");
     await new Promise((r) => setTimeout(r, 700));
     await sendWithTyping(senderId, REVEAL[sinusType] || REVEAL["congestive"]);
+    await new Promise((r) => setTimeout(r, 600));
+    await sendWithTyping(senderId, getWebsiteLine("trust", sc));
     await logToSheet(senderId, senderName, "Symptoms: " + text, "REVEALED", sinusType);
     return;
   }
@@ -508,9 +525,10 @@ async function handleMessage(senderId, messageText, senderName) {
     if (wants499) userData.selectedPlan = 499;
 
     if (confirmed || wants1299 || wants499) {
+      const websiteLine = getWebsiteLine("confirm", sc);
       const linkMsg = userData.selectedPlan === 499
-        ? `Rs.499 Starter Kit\n\nPayment link:\n\uD83C\uDF31 ${PAYMENT_499}\n\nPayment ke baad yahan *done* likhna — agla step batata hun. \uD83C\uDF3F`
-        : `Rs.1,299 — 14-Din Nasal Restoration\n\nPayment link:\n\uD83C\uDF3F ${PAYMENT_1299}\n\nPayment ke baad yahan *done* likhna — personally connect honge. \uD83C\uDF3F`;
+        ? `Rs.499 Starter Kit\n\nPayment link:\n\uD83C\uDF31 ${PAYMENT_499}\n\n${websiteLine}\n\nPayment ke baad yahan *done* likhna — agla step batata hun. \uD83C\uDF3F`
+        : `Rs.1,299 — 14-Din Nasal Restoration\n\nPayment link:\n\uD83C\uDF3F ${PAYMENT_1299}\n\n${websiteLine}\n\nPayment ke baad yahan *done* likhna — personally connect honge. \uD83C\uDF3F`;
       userData.state = "pitched";
       userData.postPitchReplies = 0;
       await sendWithTyping(senderId, linkMsg);
@@ -582,6 +600,6 @@ app.post("/twilio", async (req, res) => {
   } catch (err) { console.error("Twilio webhook error:", err); }
 });
 
-app.get("/", (req, res) => res.send("Ayusomam Bot v3.1 — Language fix deployed \uD83C\uDF3F"));
+app.get("/", (req, res) => res.send("Ayusomam Bot v3.2 — Website trust integration deployed \uD83C\uDF3F"));
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("Ayusomam Bot v3.1 running on port " + PORT));
