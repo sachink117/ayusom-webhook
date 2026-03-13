@@ -1,5 +1,5 @@
 // ============================================================
-// AYUSOMAM MESSENGER BOT — Version 3.4
+// AYUSOMAM MESSENGER BOT — Version 3.5
 // Fix: Language detection per-message bi-directional
 //      All hardcoded strings Hinglish only (no encoding issues)
 //      AI handles Devanagari / English / Hinglish automatically
@@ -9,6 +9,7 @@
 //      Refines sinus type: allergic / congestive / infective / polyp
 // Fix: Remove "Bhai/Yaar" from AI responses (stricter prompt + post-filter)
 // New: Free relief steps when user says no money / baad mein / free tips
+// Fix: Restore /website-chat endpoint (lost in v3.x rewrites)
 // ============================================================
 const express = require("express");
 const fetch = require("node-fetch");
@@ -32,6 +33,7 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ─── STATE + DEDUP ───────────────────────────────────────────
 const userState = {};
+const webReplies = {};  // collects bot replies for /website-chat requests
 const processedMessages = new Set();
 setInterval(() => processedMessages.clear(), 10 * 60 * 1000);
 
@@ -165,6 +167,7 @@ function detectSinusType(text) {
 // ─── SEND TYPING INDICATOR ───────────────────────────────────
 async function sendTypingOn(recipientId) {
   if (userChannels[recipientId] === "twilio") return;
+  if (userChannels[recipientId] === "website") return;
   try {
     await fetch(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
       method: "POST",
@@ -178,7 +181,11 @@ async function sendTypingOn(recipientId) {
 async function sendMessage(recipientId, text) {
   const ch = userChannels[recipientId] || "messenger";
   if (ch === "twilio") { await sendTwilioMessage(recipientId, text); return; }
-  if (ch === "website") { console.log(`Website lead ${recipientId} — message saved (no API reply): ${text.substring(0,60)}`); return; }
+  if (ch === "website") {
+    if (webReplies[recipientId]) webReplies[recipientId].push(text);
+    console.log(`[Web] ${recipientId}: ${text.substring(0, 60)}`);
+    return;
+  }
   if (ch === "instagram") { await sendInstagramMessage(recipientId, text); return; }
   try {
     const res = await fetch(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
@@ -249,6 +256,12 @@ async function sendQuickReplies(recipientId, text, replies) {
 
 // ─── HUMAN-LIKE SEND ─────────────────────────────────────────
 async function sendWithTyping(recipientId, text) {
+  if (userChannels[recipientId] === "website") {
+    // No delays for HTTP requests — widget shows its own typing indicator
+    await sendMessage(recipientId, text);
+    logConversation(recipientId, "bot", text);
+    return;
+  }
   await sendTypingOn(recipientId);
   await new Promise((r) => setTimeout(r, Math.min(900 + text.length * 25, 3000)));
   await sendMessage(recipientId, text);
@@ -1071,7 +1084,39 @@ app.post("/admin/api/state", (req, res) => {
   res.json({ ok: true, state: userState[userId].state });
 });
 
-app.get("/", (req, res) => res.send("Ayusomam Bot v3.2 — Website trust integration deployed \uD83C\uDF3F"));
+// ─── WEBSITE CHATBOT ENDPOINT ────────────────────────────────
+app.options("/website-chat", (req, res) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  res.sendStatus(200);
+});
+
+app.post("/website-chat", async (req, res) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  try {
+    const { senderId, message } = req.body;
+    if (!senderId || !message) {
+      return res.status(400).json({ error: "senderId and message required" });
+    }
+    const webSenderId = `WEB_${senderId}`;
+    userChannels[webSenderId] = "website";
+    webReplies[webSenderId] = [];
+
+    await handleMessage(webSenderId, message.trim(), "Website Visitor");
+
+    const replies = webReplies[webSenderId] || [];
+    delete webReplies[webSenderId];
+    res.json({ replies });
+  } catch (e) {
+    console.error("Website chat error:", e.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.get("/", (req, res) => res.send("Ayusomam Bot v3.5 — Website chat restored 🌿"));
 // ─── LOAD HISTORY FROM SHEET ON STARTUP ──────────────────────
 // Fetches all rows from "Conversations" tab and populates conversationLog
 // So dashboard shows historical data even after a server restart
