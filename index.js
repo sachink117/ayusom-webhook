@@ -30,6 +30,10 @@ const userState = {};
 const processedMessages = new Set();
 setInterval(() => processedMessages.clear(), 10 * 60 * 1000);
 
+// ─── IN-MEMORY CONVERSATION LOG (for dashboard) ──────────────
+// Google Sheet = permanent | conversationLog = fast in-memory for UI
+const conversationLog = {}; // { senderId: [{role, text, ts}] }
+
 // ─── SALESOM SYSTEM PROMPT ───────────────────────────────────
 const SALESOM_SYSTEM_PROMPT = `SALESOM — MASTER SYSTEM PROMPT
 Ayusomam Herbals | Sinus Sales Specialist
@@ -359,19 +363,25 @@ async function logToSheet(senderId, name, message, stage, sinusType = "") {
   } catch (e) { console.error("Sheet log error:", e.message); }
 }
 
-// ─── CONVERSATION LOGGING (permanent, per-message) ────────────
-// Writes every user + bot message to "Conversations" sheet tab
+// ─── CONVERSATION LOGGING (permanent + in-memory) ─────────────
+// Stores in conversationLog (fast, for dashboard) + Google Sheet (permanent)
 async function logConversation(senderId, role, text) {
+  // 1. Store in memory for dashboard (keep last 300 per user)
+  if (!conversationLog[senderId]) conversationLog[senderId] = [];
+  conversationLog[senderId].push({ role, text, ts: new Date().toISOString() });
+  if (conversationLog[senderId].length > 300) conversationLog[senderId] = conversationLog[senderId].slice(-300);
+
+  // 2. Fire-and-forget to Google Sheet (permanent)
   try {
     const params = new URLSearchParams({
       action: "conversation",
       senderId,
-      role,           // "user" or "bot"
+      role,
       message: text.substring(0, 500),
       ts: new Date().toISOString(),
     });
-    await fetch(`${GAS_URL}?${params.toString()}`, { method: "GET" });
-  } catch (e) { /* silent — don't break bot on log failure */ }
+    fetch(`${GAS_URL}?${params.toString()}`, { method: "GET" }).catch(() => {});
+  } catch (e) { /* silent */ }
 }
 
 // ─── MAIN MESSAGE HANDLER ─────────────────────────────────────
@@ -618,6 +628,207 @@ app.post("/twilio", async (req, res) => {
     console.log("Twilio from " + senderId + ": " + text.substring(0, 50));
     await handleMessage(senderId, text, "User");
   } catch (err) { console.error("Twilio webhook error:", err); }
+});
+
+// ─── ADMIN DASHBOARD HTML ─────────────────────────────────────
+const ADMIN_HTML = `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SALESOM Dashboard \uD83C\uDF3F</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+.header{background:#075E54;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.header h1{font-size:17px;font-weight:600;}
+.header .sub{font-size:11px;opacity:.8;margin-top:1px;}
+#statsBar{font-size:12px;opacity:.9;text-align:right;}
+.main{display:flex;flex:1;overflow:hidden;}
+.left{width:340px;background:white;border-right:1px solid #e9edef;display:flex;flex-direction:column;flex-shrink:0;}
+.search-wrap{padding:8px 10px;background:#f0f2f5;}
+.search-wrap input{width:100%;padding:7px 12px;border-radius:8px;border:none;background:white;font-size:13px;outline:none;}
+.ulist{flex:1;overflow-y:auto;}
+.uitem{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f5f5f5;cursor:pointer;}
+.uitem:hover,.uitem.active{background:#f0f2f5;}
+.avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
+.uinfo{flex:1;min-width:0;}
+.uname{font-size:14px;font-weight:500;color:#111;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.ulast{font-size:12px;color:#667781;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+.umeta{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;}
+.utime{font-size:10px;color:#999;}
+.badge{font-size:10px;font-weight:600;padding:2px 5px;border-radius:8px;}
+.s-new{background:#e3f2fd;color:#1565c0;}
+.s-revealed{background:#f3e5f5;color:#6a1b9a;}
+.s-pitched,.s-committing{background:#fff3e0;color:#e65100;}
+.s-post_payment{background:#e8f5e9;color:#2e7d32;}
+.s-human{background:#fce4ec;color:#c62828;}
+.s-hook_sent,.s-asked_duration,.s-asked_symptoms{background:#e8f4f8;color:#0277bd;}
+.ch-wa{background:#dcf8c6;color:#128C7E;font-size:9px;}
+.ch-fb{background:#e8eaf6;color:#3949ab;font-size:9px;}
+.right{flex:1;display:flex;flex-direction:column;background:#efeae2;min-width:0;}
+.chat-header{background:white;padding:10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #e9edef;flex-shrink:0;}
+.chat-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.chat-info h2{font-size:14px;font-weight:600;}
+.chat-info p{font-size:12px;color:#667781;}
+.msgs{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:5px;}
+.msg{max-width:65%;padding:7px 11px;border-radius:8px;font-size:13px;line-height:1.45;word-break:break-word;}
+.msg.user{background:white;align-self:flex-start;border-radius:0 8px 8px 8px;}
+.msg.bot{background:#dcf8c6;align-self:flex-end;border-radius:8px 0 8px 8px;}
+.msg.admin{background:#e3f2fd;align-self:flex-end;border-radius:8px 0 8px 8px;border:1px solid #90caf9;}
+.msg-time{font-size:10px;color:#999;margin-top:3px;text-align:right;}
+.empty{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:#999;}
+.empty .ico{font-size:56px;opacity:.25;}
+.inp-area{background:#f0f2f5;padding:10px 14px;display:flex;align-items:flex-end;gap:10px;flex-shrink:0;}
+.inp-area textarea{flex:1;padding:9px 13px;border-radius:20px;border:none;background:white;font-size:13px;outline:none;resize:none;max-height:80px;font-family:inherit;line-height:1.4;}
+.send-btn{width:44px;height:44px;border-radius:50%;background:#075E54;border:none;color:white;font-size:18px;cursor:pointer;flex-shrink:0;}
+.send-btn:hover{background:#064e45;}
+.tkbtn{margin-left:auto;padding:5px 12px;border-radius:12px;border:none;font-size:12px;font-weight:600;cursor:pointer;}
+.tkbtn.human{background:#ffc107;color:#000;}
+.tkbtn.bot{background:#4caf50;color:white;}
+.nobg{background:#efeae2!important;padding:0!important;border-radius:0!important;}
+</style></head><body>
+<div class="header">
+  <div><div class="uname" style="font-size:17px;font-weight:600;color:white;">\uD83C\uDF3F SALESOM Dashboard</div><div class="sub">Ayusomam Herbals \u2014 Live Conversations</div></div>
+  <div id="statsBar">Loading...</div>
+</div>
+<div class="main">
+  <div class="left">
+    <div class="search-wrap"><input type="text" id="search" placeholder="\uD83D\uDD0D Search..." oninput="render()"></div>
+    <div class="ulist" id="ulist"></div>
+  </div>
+  <div class="right" id="right">
+    <div class="empty"><div class="ico">\uD83D\uDCAC</div><div>Koi conversation select karein</div></div>
+  </div>
+</div>
+<script>
+let users=[],msgs={},sel=null;
+const SL={new:'New',hook_sent:'Hook',asked_duration:'Duration',asked_symptoms:'Symptoms',revealed:'Revealed',pitched:'Pitched',committing:'Commit',post_payment:'Paid \u2705',human:'Human \uD83D\uDC64',done:'Done'};
+function sc(s){const m={new:'s-new',hook_sent:'s-hook_sent',asked_duration:'s-asked_duration',asked_symptoms:'s-asked_symptoms',revealed:'s-revealed',pitched:'s-pitched',committing:'s-committing',post_payment:'s-post_payment',human:'s-human',done:'s-new'};return m[s]||'s-new';}
+function ta(ts){if(!ts)return'';const d=Date.now()-new Date(ts).getTime(),m=Math.floor(d/60000);if(m<1)return'Abhi';if(m<60)return m+'m';const h=Math.floor(m/60);if(h<24)return h+'h';return Math.floor(h/24)+'d';}
+async function load(){
+  try{
+    const r=await fetch('/admin/api/users');users=await r.json();
+    users.sort((a,b)=>{const ta=a.lastMessage?new Date(a.lastMessage.ts):0,tb=b.lastMessage?new Date(b.lastMessage.ts):0;return tb-ta;});
+    render();stats();
+    if(sel)loadMsgs(sel);
+  }catch(e){}
+}
+function stats(){
+  const paid=users.filter(u=>u.state==='post_payment').length;
+  const pitched=users.filter(u=>u.state==='pitched'||u.state==='committing').length;
+  const active=users.filter(u=>!['new','human','done'].includes(u.state)).length;
+  document.getElementById('statsBar').innerHTML='\uD83D\uDC65 '+users.length+' total &nbsp;\u2502&nbsp; \uD83D\uDD25 '+active+' active &nbsp;\u2502&nbsp; \uD83D\uDCB0 '+pitched+' pitched &nbsp;\u2502&nbsp; \u2705 '+paid+' paid';
+}
+function render(){
+  const q=document.getElementById('search').value.toLowerCase();
+  const fl=users.filter(u=>!q||u.id.toLowerCase().includes(q));
+  document.getElementById('ulist').innerHTML=fl.map(u=>{
+    const lm=u.lastMessage;
+    const pre=lm?(lm.role==='user'?'\uD83D\uDDE3 ':'\uD83E\uDD16 ')+lm.text.replace(/\n/g,' ').substring(0,38):'No messages';
+    const av=u.channel==='twilio'?'#128C7E':'#3b5998';
+    const ico=u.channel==='twilio'?'\uD83D\uDCF1':'\uD83D\uDCAC';
+    const ch=u.channel==='twilio'?'<span class="badge ch-wa">WA</span>':'<span class="badge ch-fb">FB</span>';
+    return '<div class="uitem'+(sel===u.id?' active':'')+'" onclick="pick(\''+u.id+'\')">'+
+      '<div class="avatar" style="background:'+av+'">'+ico+'</div>'+
+      '<div class="uinfo">'+
+        '<div class="uname">'+u.id.substring(0,15)+(u.id.length>15?'...:':'')+' <span class="badge '+sc(u.state)+'">'+(SL[u.state]||u.state)+'</span></div>'+
+        '<div class="ulast">'+pre+'</div>'+
+      '</div>'+
+      '<div class="umeta"><div class="utime">'+ta(lm&&lm.ts)+'</div>'+ch+'</div>'+
+    '</div>';
+  }).join('');
+}
+async function pick(id){sel=id;render();await loadMsgs(id);}
+async function loadMsgs(id){
+  try{const r=await fetch('/admin/api/messages/'+encodeURIComponent(id));msgs[id]=await r.json();drawChat(id);}catch(e){}
+}
+function drawChat(id){
+  const u=users.find(x=>x.id===id);if(!u)return;
+  const m=msgs[id]||[];
+  const av=u.channel==='twilio'?'#128C7E':'#3b5998';
+  const ico=u.channel==='twilio'?'\uD83D\uDCF1':'\uD83D\uDCAC';
+  const info=[u.sinusType?'\uD83C\uDF3F '+u.sinusType:'',u.duration?'\u23F1 '+u.duration:'',u.selectedPlan?'\uD83D\uDCB0 Rs.'+u.selectedPlan:''].filter(Boolean).join(' \u00B7 ')||SL[u.state]||u.state;
+  const isFree=u.state!=='human';
+  document.getElementById('right').innerHTML=
+    '<div class="chat-header">'+
+      '<div class="chat-av" style="background:'+av+'">'+ico+'</div>'+
+      '<div class="chat-info"><h2>'+id+'</h2><p>'+info+'</p></div>'+
+      '<button class="tkbtn '+(isFree?'human':'bot')+'" onclick="toggle(\''+id+'\')">'+
+        (isFree?'\uD83D\uDC64 Human ON':'\uD83E\uDD16 Bot ON')+
+      '</button>'+
+    '</div>'+
+    '<div class="msgs" id="ma">'+
+      (m.length?m.map(x=>
+        '<div class="msg '+x.role+'">'+x.text.replace(/\n/g,'<br>').replace(/\*(.*?)\*/g,'<b>$1</b>')+
+        '<div class="msg-time">'+new Date(x.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})+'</div></div>'
+      ).join(''):'<div style="text-align:center;color:#999;padding:20px">No messages yet</div>')+
+    '</div>'+
+    '<div class="inp-area">'+
+      '<textarea id="mi" placeholder="Message likhein... (Enter = send)" rows="1" onkeydown="hk(event)"></textarea>'+
+      '<button class="send-btn" onclick="send()">\u27A4</button>'+
+    '</div>';
+  const ma=document.getElementById('ma');if(ma)ma.scrollTop=ma.scrollHeight;
+  document.getElementById('mi')&&document.getElementById('mi').focus();
+}
+async function send(){
+  const inp=document.getElementById('mi');
+  const t=inp&&inp.value.trim();
+  if(!t||!sel)return;
+  inp.value='';
+  try{
+    await fetch('/admin/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:sel,text:t})});
+    await loadMsgs(sel);
+  }catch(e){alert('Send failed');}
+}
+async function toggle(id){
+  await fetch('/admin/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:id})});
+  await load();drawChat(id);
+}
+function hk(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}
+load();setInterval(load,5000);
+</script></body></html>`;
+
+// ─── ADMIN API ROUTES ─────────────────────────────────────────
+app.get("/admin", (req, res) => res.send(ADMIN_HTML));
+
+// List all users with their state, last message etc.
+app.get("/admin/api/users", (req, res) => {
+  const list = Object.entries(userState).map(([id, d]) => ({
+    id,
+    state: d.state,
+    sinusType: d.sinusType || null,
+    duration: d.duration || null,
+    selectedPlan: d.selectedPlan || null,
+    lastLang: d.lastLang || "rom",
+    channel: userChannels[id] || "messenger",
+    messageCount: (conversationLog[id] || []).length,
+    lastMessage: (conversationLog[id] || []).slice(-1)[0] || null,
+  }));
+  res.json(list);
+});
+
+// Full conversation for one user
+app.get("/admin/api/messages/:userId", (req, res) => {
+  res.json(conversationLog[req.params.userId] || []);
+});
+
+// Send a message from dashboard (human operator)
+app.post("/admin/api/send", async (req, res) => {
+  const { userId, text } = req.body || {};
+  if (!userId || !text) return res.status(400).json({ error: "userId and text required" });
+  try {
+    await sendMessage(userId, text);
+    logConversation(userId, "admin", text);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Toggle human/bot mode for a user
+app.post("/admin/api/state", (req, res) => {
+  const { userId } = req.body || {};
+  if (!userId) return res.status(400).json({ error: "userId required" });
+  if (!userState[userId]) userState[userId] = { state: "new", history: [] };
+  userState[userId].state = userState[userId].state === "human" ? "pitched" : "human";
+  res.json({ ok: true, state: userState[userId].state });
 });
 
 app.get("/", (req, res) => res.send("Ayusomam Bot v3.2 — Website trust integration deployed \uD83C\uDF3F"));
