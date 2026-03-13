@@ -956,7 +956,9 @@ async function load(){
   try{
     const r=await fetch('/admin/api/users');users=await r.json();
     users.sort((a,b)=>{const ta=a.lastMessage?new Date(a.lastMessage.ts):0,tb=b.lastMessage?new Date(b.lastMessage.ts):0;return tb-ta;});
-    render();stats();
+    const inp=document.getElementById('mi');
+    const isTyping=inp&&document.activeElement===inp&&inp.value.trim().length>0;
+    if(!isTyping){render();stats();}
     if(sel)loadMsgs(sel);
   }catch(e){}
 }
