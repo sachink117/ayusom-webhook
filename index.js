@@ -97,8 +97,6 @@ Note: Severe DNS may need ENT consult, but 80%+ see major relief without surgery
 PRICING
 - Rs.499 — Starter Kit (14 days, self-guided)
 - Rs.1,299 — 14-Din Nasal Restoration (RECOMMENDED — daily personal WhatsApp check-in)
-- Rs.2,199 — 28-Din Deep Protocol (5+ year cases, DNS, spray dependency)
-- Rs.7,999 — VIP Intensive
 
 UPSELL RULE (Rs.499 -> Rs.1,299):
 Rs.1,299 mein 7 din FREE extra milte hain = 21 din total. Sirf Rs.800 zyada.
