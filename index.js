@@ -723,7 +723,7 @@ function render(){
   const fl=users.filter(u=>!q||u.id.toLowerCase().includes(q));
   document.getElementById('ulist').innerHTML=fl.map(u=>{
     const lm=u.lastMessage;
-    const pre=lm?(lm.role==='user'?'\uD83D\uDDE3 ':'\uD83E\uDD16 ')+lm.text.replace(/\n/g,' ').substring(0,38):'No messages';
+    const pre=lm?(lm.role==='user'?'\uD83D\uDDE3 ':'\uD83E\uDD16 ')+lm.text.replace(/\\n/g,' ').substring(0,38):'No messages';
     const av=u.channel==='twilio'?'#128C7E':'#3b5998';
     const ico=u.channel==='twilio'?'\uD83D\uDCF1':'\uD83D\uDCAC';
     const ch=u.channel==='twilio'?'<span class="badge ch-wa">WA</span>':'<span class="badge ch-fb">FB</span>';
@@ -758,7 +758,7 @@ function drawChat(id){
     '</div>'+
     '<div class="msgs" id="ma">'+
       (m.length?m.map(x=>
-        '<div class="msg '+x.role+'">'+x.text.replace(/\n/g,'<br>').replace(/\*(.*?)\*/g,'<b>$1</b>')+
+        '<div class="msg '+x.role+'">'+x.text.replace(/\\n/g,'<br>').replace(/\\*(.*?)\\*/g,'<b>$1</b>')+
         '<div class="msg-time">'+new Date(x.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})+'</div></div>'
       ).join(''):'<div style="text-align:center;color:#999;padding:20px">No messages yet</div>')+
     '</div>'+
