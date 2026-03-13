@@ -832,5 +832,37 @@ app.post("/admin/api/state", (req, res) => {
 });
 
 app.get("/", (req, res) => res.send("Ayusomam Bot v3.2 — Website trust integration deployed \uD83C\uDF3F"));
+// ─── LOAD HISTORY FROM SHEET ON STARTUP ──────────────────────
+// Fetches all rows from "Conversations" tab and populates conversationLog
+// So dashboard shows historical data even after a server restart
+async function loadHistoryFromSheet() {
+  try {
+    console.log("Loading conversation history from Google Sheet...");
+    const params = new URLSearchParams({ action: "getConversations" });
+    const res = await fetch(`${GAS_URL}?${params.toString()}`);
+    const rows = await res.json();
+    if (!Array.isArray(rows)) { console.log("No history rows returned"); return; }
+    for (const row of rows) {
+      if (!row.senderId || !row.text) continue;
+      if (!conversationLog[row.senderId]) conversationLog[row.senderId] = [];
+      conversationLog[row.senderId].push({ role: row.role || "user", text: row.text, ts: row.ts });
+      // Rebuild basic userState so dashboard shows user in list
+      if (!userState[row.senderId]) userState[row.senderId] = { state: "done", history: [] };
+    }
+    // Sort each user's messages chronologically
+    for (const id of Object.keys(conversationLog)) {
+      conversationLog[id].sort((a, b) => new Date(a.ts) - new Date(b.ts));
+    }
+    const users = Object.keys(conversationLog).length;
+    const total = rows.length;
+    console.log(`History loaded: ${total} messages across ${users} users`);
+  } catch (e) {
+    console.error("loadHistoryFromSheet failed:", e.message);
+  }
+}
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Ayusomam Bot v3.1 running on port " + PORT));
+app.listen(PORT, () => {
+  console.log("Ayusomam Bot v3.2 running on port " + PORT);
+  loadHistoryFromSheet(); // Load historical conversations into dashboard
+});
