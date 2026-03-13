@@ -1,9 +1,12 @@
 // ============================================================
-// AYUSOMAM MESSENGER BOT — Version 3.2
+// AYUSOMAM MESSENGER BOT — Version 3.3
 // Fix: Language detection per-message bi-directional
 //      All hardcoded strings Hinglish only (no encoding issues)
 //      AI handles Devanagari / English / Hinglish automatically
 // New: Website trust mentions at 2 key touchpoints (reveal + link)
+// New: Follow-up diagnostic questions after symptom selection
+//      (naak band → discharge type | smell nahi → when it happened)
+//      Refines sinus type: allergic / congestive / infective / polyp
 // ============================================================
 const express = require("express");
 const fetch = require("node-fetch");
@@ -293,6 +296,65 @@ const SYMPTOMS_Q = {
   replies: ["Naak band rehti hai", "Spray use karta hun", "Smell nahi aati", "Ek taraf hamesha band (DNS)"],
 };
 
+// ─── FOLLOW-UP DIAGNOSTIC QUESTIONS ──────────────────────────
+// Called after initial symptom selection to refine sinus type
+function getFollowupQ(initialType, symptomsText) {
+  const tl = symptomsText.toLowerCase();
+
+  // Spray / DNS — already clear, no follow-up needed
+  if (initialType === "spray" || initialType === "dns") return null;
+
+  // "Naak band" or congestive/allergic — ask discharge type
+  if (initialType === "congestive" || initialType === "allergic" || /naak band|band rehti|blocked/.test(tl)) {
+    return {
+      text: "Naak se kuch nikalta hai? \uD83C\uDF3F",
+      replies: [
+        "Paani jaisi patli (watery)",
+        "Thick safed ya creamy",
+        "Peela ya hara discharge",
+        "Nahi — sirf band rehti hai",
+      ],
+    };
+  }
+
+  // Smell loss — ask when it happened
+  if (initialType === "polyp" || /smell nahi|smell kum|khushbu nahi/.test(tl)) {
+    return {
+      text: "Smell kab se gayi? \uD83C\uDF3F",
+      replies: [
+        "Ek cold/infection ke baad",
+        "Dheere dheere hua",
+        "Hamesha se hi kum thi",
+        "Naak band ke saath gayi",
+      ],
+    };
+  }
+
+  // Infective already clear from yellow discharge mention — no follow-up
+  if (initialType === "infective") return null;
+
+  return null;
+}
+
+// ─── REFINE TYPE FROM FOLLOW-UP ANSWER ───────────────────────
+function refineTypeFromFollowup(initialType, followupText) {
+  const tl = followupText.toLowerCase();
+
+  // Discharge-based refinement (naak band follow-up)
+  if (/paani|patli|watery/.test(tl)) return "allergic";         // Watery = allergic
+  if (/thick|safed|creamy|white/.test(tl)) return "congestive"; // Thick white = congestive
+  if (/peela|hara|yellow|green/.test(tl)) return "infective";   // Yellow/green = infective
+  if (/sirf band|nahi nikalta|no discharge/.test(tl)) return "congestive"; // Just blocked = congestive
+
+  // Smell-loss refinement (polyp follow-up)
+  if (/cold|infection|ke baad/.test(tl)) return "congestive";   // Post-cold smell loss = congestive
+  if (/dheere|gradually|धीरे/.test(tl)) return "polyp";         // Gradual = polyp more likely
+  if (/hamesha|always|always kum/.test(tl)) return "polyp";     // Always had less smell = polyp
+  if (/naak band ke saath/.test(tl)) return initialType;        // Tied to blockage — keep type
+
+  return initialType; // No match — keep initial
+}
+
 // ─── REVEAL MESSAGES — Hinglish only ────────────────────────
 const REVEAL = {
   allergic: "Samajh gaya — yeh *Allergic Sinus* hai. \uD83C\uDF3F\n\nEk test: bahar jao ya doosra room — takleef thodi different lage toh confirm.\n\nIs type mein sahi protocol se 4-5 din mein sneeze/triggers kum hone lagte hain.",
@@ -541,6 +603,19 @@ async function handleMessage(senderId, messageText, senderName) {
     userData.symptoms = text;
     const sinusType = detectSinusType(text);
     userData.sinusType = sinusType;
+
+    // Check if a follow-up diagnostic question is needed
+    const followupQ = getFollowupQ(sinusType, text);
+    if (followupQ) {
+      userData.state = "asked_followup";
+      await sendWithTyping(senderId, "Theek hai — ek aur cheez puchna tha. \uD83C\uDF3F");
+      await new Promise((r) => setTimeout(r, 600));
+      await sendQRWithTyping(senderId, followupQ.text, followupQ.replies);
+      await logToSheet(senderId, senderName, "Symptoms: " + text, "FOLLOWUP_Q", sinusType);
+      return;
+    }
+
+    // No follow-up needed — go straight to reveal
     userData.state = "revealed";
     userData.postPitchReplies = 0;
     userData.history = [];
@@ -550,6 +625,23 @@ async function handleMessage(senderId, messageText, senderName) {
     await new Promise((r) => setTimeout(r, 600));
     await sendWithTyping(senderId, getWebsiteLine("trust", sc));
     await logToSheet(senderId, senderName, "Symptoms: " + text, "REVEALED", sinusType);
+    return;
+  }
+
+  if (userData.state === "asked_followup") {
+    // Refine the sinus type based on follow-up answer
+    const refinedType = refineTypeFromFollowup(userData.sinusType, text);
+    userData.sinusType = refinedType;
+    userData.followupAnswer = text;
+    userData.state = "revealed";
+    userData.postPitchReplies = 0;
+    userData.history = [];
+    await sendWithTyping(senderId, "Samajh gaya — ab clear picture aa gayi. \uD83C\uDF3F");
+    await new Promise((r) => setTimeout(r, 700));
+    await sendWithTyping(senderId, REVEAL[refinedType] || REVEAL["congestive"]);
+    await new Promise((r) => setTimeout(r, 600));
+    await sendWithTyping(senderId, getWebsiteLine("trust", sc));
+    await logToSheet(senderId, senderName, "Followup: " + text, "REVEALED", refinedType);
     return;
   }
 
