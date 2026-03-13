@@ -727,7 +727,7 @@ function render(){
     const av=u.channel==='twilio'?'#128C7E':'#3b5998';
     const ico=u.channel==='twilio'?'\uD83D\uDCF1':'\uD83D\uDCAC';
     const ch=u.channel==='twilio'?'<span class="badge ch-wa">WA</span>':'<span class="badge ch-fb">FB</span>';
-    return '<div class="uitem'+(sel===u.id?' active':'')+'" onclick="pick(\''+u.id+'\')">'+
+    return '<div class="uitem'+(sel===u.id?' active':'')+'" data-uid="'+u.id+'" onclick="pick(this.dataset.uid)">'+
       '<div class="avatar" style="background:'+av+'">'+ico+'</div>'+
       '<div class="uinfo">'+
         '<div class="uname">'+u.id.substring(0,15)+(u.id.length>15?'...:':'')+' <span class="badge '+sc(u.state)+'">'+(SL[u.state]||u.state)+'</span></div>'+
@@ -752,7 +752,7 @@ function drawChat(id){
     '<div class="chat-header">'+
       '<div class="chat-av" style="background:'+av+'">'+ico+'</div>'+
       '<div class="chat-info"><h2>'+id+'</h2><p>'+info+'</p></div>'+
-      '<button class="tkbtn '+(isFree?'human':'bot')+'" onclick="toggle(\''+id+'\')">'+
+      '<button class="tkbtn '+(isFree?'human':'bot')+'" data-uid="'+id+'" onclick="toggle(this.dataset.uid)">'+
         (isFree?'\uD83D\uDC64 Human ON':'\uD83E\uDD16 Bot ON')+
       '</button>'+
     '</div>'+
