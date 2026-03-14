@@ -933,7 +933,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .tkbtn.human{background:#ffc107;color:#000;}
 .tkbtn.bot{background:#4caf50;color:white;}
 .nobg{background:#efeae2!important;padding:0!important;border-radius:0!important;}
-</style></head><body>
 .bc-bar{padding:8px;border-top:1px solid #333;flex-shrink:0;}
 .bc-bar button{width:100%;padding:7px;background:#2a2a4a;color:#e0e0e0;border:1px solid #555;border-radius:5px;cursor:pointer;font-size:12px;}
 .bc-bar button:hover{background:#3a3a5a;}
@@ -942,12 +941,42 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .bc-panel textarea{width:100%;height:70px;background:#1a1a2e;color:#e0e0e0;border:1px solid #444;border-radius:4px;padding:6px;font-size:12px;resize:vertical;box-sizing:border-box;}
 .bc-send{width:100%;margin-top:5px;padding:7px;background:#c0392b;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;}
 .bc-send:hover{background:#a93226;}
+.ins-wrap{background:#111827;padding:8px;border-bottom:1px solid #2a2a3a;}
+.ins-row{display:flex;gap:5px;margin-bottom:5px;}
+.ins-card{flex:1;background:#1a1a2e;border:1px solid #2d3748;border-radius:7px;padding:7px 4px;text-align:center;}
+.ins-v{font-size:17px;font-weight:700;color:#4ade80;line-height:1;}
+.ins-v.warn{color:#fbbf24;}
+.ins-l{font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;}
+.ins-ch{display:flex;gap:4px;}
+.ins-ch-card{flex:1;background:#1a1a2e;border:1px solid #2d3748;border-radius:5px;padding:4px 2px;text-align:center;}
+.ins-ch-card b{display:block;font-size:14px;color:#60a5fa;font-weight:700;}
+.ins-ch-card span{font-size:9px;color:#6b7280;}
+.ins-foot{display:flex;justify-content:space-between;align-items:center;margin-top:4px;}
+.ins-upd{font-size:9px;color:#4b5563;}
+.ins-refresh{background:none;border:none;color:#60a5fa;cursor:pointer;font-size:11px;padding:2px 6px;border-radius:3px;border:1px solid #2d3748;}
+.ins-refresh:hover{background:#1a2744;}
+</style></head><body>
 <div class="header">
   <div><div class="uname" style="font-size:17px;font-weight:600;color:white;">\uD83C\uDF3F SALESOM Dashboard</div><div class="sub">Ayusomam Herbals \u2014 Live Conversations</div></div>
   <div id="statsBar">Loading...</div>
 </div>
 <div class="main">
   <div class="left">
+    <div class="ins-wrap">
+      <div class="ins-row">
+        <div class="ins-card"><div class="ins-v" id="ins-web">—</div><div class="ins-l">Web Today</div></div>
+        <div class="ins-card"><div class="ins-v" id="ins-act">—</div><div class="ins-l">Active 4hr</div></div>
+        <div class="ins-card"><div class="ins-v warn" id="ins-hum">—</div><div class="ins-l">Human Mode</div></div>
+        <div class="ins-card"><div class="ins-v" id="ins-tot">—</div><div class="ins-l">Total Users</div></div>
+      </div>
+      <div class="ins-ch">
+        <div class="ins-ch-card"><b id="ins-msg">—</b><span>Msg</span></div>
+        <div class="ins-ch-card"><b id="ins-ig">—</b><span>Insta</span></div>
+        <div class="ins-ch-card"><b id="ins-wa">—</b><span>WA</span></div>
+        <div class="ins-ch-card"><b id="ins-wb">—</b><span>Web</span></div>
+      </div>
+      <div class="ins-foot"><span class="ins-upd" id="ins-upd">Loading...</span><button class="ins-refresh" onclick="loadInsights()" title="Refresh now">↻ Refresh</button></div>
+    </div>
     <div class="search-wrap"><input type="text" id="search" placeholder="\uD83D\uDD0D Search..." oninput="render()"></div>
     <div class="ulist" id="ulist"></div>
     <div class="bc-bar"><button onclick="toggleBC()">📢 Broadcast to All</button></div>
@@ -1049,6 +1078,26 @@ async function toggle(id){
   await load();drawChat(id);
 }
 function hk(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}
+async function loadInsights(){
+  try{
+    const [ur,sr]=await Promise.all([fetch('/admin/api/users'),fetch('/admin/api/insights')]);
+    const users=await ur.json();const stats=await sr.json();
+    const now=new Date();const today=new Date(now);today.setHours(0,0,0,0);
+    const hr4=new Date(now-4*3600000);
+    const webToday=users.filter(u=>u.channel==='website'&&u.lastMessage&&new Date(u.lastMessage.ts)>=today).length;
+    const act4=users.filter(u=>u.lastMessage&&new Date(u.lastMessage.ts)>=hr4).length;
+    document.getElementById('ins-web').textContent=webToday;
+    document.getElementById('ins-act').textContent=act4;
+    document.getElementById('ins-hum').textContent=stats.humanMode||0;
+    document.getElementById('ins-tot').textContent=stats.total||users.length;
+    document.getElementById('ins-msg').textContent=(stats.channels&&stats.channels.messenger)||0;
+    document.getElementById('ins-ig').textContent=(stats.channels&&stats.channels.instagram)||0;
+    document.getElementById('ins-wa').textContent=(stats.channels&&stats.channels.twilio)||0;
+    document.getElementById('ins-wb').textContent=(stats.channels&&stats.channels.website)||0;
+    document.getElementById('ins-upd').textContent='Updated: '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){const el=document.getElementById('ins-upd');if(el)el.textContent='Error loading';}
+}
+loadInsights();setInterval(loadInsights,4*60*60*1000);
 load();setInterval(load,5000);
 function toggleBC(){const p=document.getElementById('bcPanel');p.classList.toggle('open');}
 async function broadcast(){const msg=document.getElementById('bcMsg').value.trim();if(!msg){alert('Message likhein!');return;}if(!confirm('Sabhi WhatsApp/Instagram users ko bhejein?\n"'+msg+'"'))return;const r=await fetch('/admin/api/broadcast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});const d=await r.json();if(d.ok){alert(d.sent+' users ko bheja!');document.getElementById('bcMsg').value='';document.getElementById('bcPanel').classList.remove('open');}else alert('Error: '+(d.error||'unknown'));}
@@ -1101,6 +1150,20 @@ app.post("/admin/api/broadcast", async (req, res) => {
       if (ch !== "website") { try { await sendMessage(userId, message); sent++; } catch(e) {} }
     }
     res.json({ ok: true, sent });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// Insights aggregated stats
+app.get("/admin/api/insights", (req, res) => {
+  try {
+    const allIds = Object.keys(userChannels || {});
+    const channels = {};
+    let humanMode = 0;
+    allIds.forEach(id => {
+      const ch = userChannels[id] || "unknown";
+      channels[ch] = (channels[ch] || 0) + 1;
+      if (userState[id] && userState[id].state === "human") humanMode++;
+    });
+    res.json({ ok: true, total: allIds.length, channels, humanMode, botMode: allIds.length - humanMode });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
