@@ -274,19 +274,31 @@ async function sendQRWithTyping(recipientId, text, replies) {
   logConversation(recipientId, "bot", text + " [options: " + replies.join(" | ") + "]");
 }
 
-// ─── HOOKS — Hinglish only (safe encoding, understood by all) ─
-const HOOKS = [
-  "Subah uthte hi naak band, din bhar sar bhaari... \uD83D\uDE2E\u200D\uD83D\uDCA8\n\nSinus ek baar pakad le, toh chhod nahi deta.\n\nSahi jagah aaye hain aap. \uD83C\uDF3F",
-  "Spray use karte hain? Thodi der rahat — phir wahi band. \uD83D\uDE2E\u200D\uD83D\uDCA8\n\nYeh cycle kab tooti hai? Kabhi nahi — jab tak andar ki wajah treat na ho.\n\nSahi jagah aaye hain. \uD83C\uDF3F",
-  "Naak band, smell nahi, din bhar bhaari, neend bhi kharab... \uD83D\uDE2E\u200D\uD83D\uDCA8\n\nSinus sirf naak ki nahi — poori zindagi ki dikkat hai.\n\nAap sahi jagah aaye hain. \uD83C\uDF3F",
-  "Doctor ke paas gaye, dawai li, kuch dino theek raha — phir wahi wapas. \uD83D\uDE2E\u200D\uD83D\uDCA8\n\nIsliye hota hai kyunki sirf upar ki takleef theek hoti hai, andar ki wajah nahi.\n\nSahi jagah aaye hain. \uD83C\uDF3F",
-  "Raat ko muh khol ke sote hain? Subah taaza nahi uthte? \uD83D\uDE2E\u200D\uD83D\uDCA8\n\nYeh sinus ki jaani-pehchani nishan hai — aur iski asli wajah har case mein alag hoti hai.\n\nSahi jagah aaye hain. \uD83C\uDF3F",
-];
+// ─── HOOKS — Multilingual ─────────────────────────────────────
+const HOOKS = {
+  rom: [
+    "Naak band rehti hai, sar bhaari rehta hai...\n\nSinus ek baar pakad le, toh chhod nahi deta.\n\nSahi jagah aaye hain aap. \uD83C\uDF3F",
+    "Spray use karte hain? Thodi der rahat — phir wahi band.\n\nYeh cycle jab tak andar ki wajah treat na ho, nahi toot ti.\n\nSahi jagah aaye hain. \uD83C\uDF3F",
+    "Naak band, smell nahi, din bhar bhaari, neend kharab...\n\nSinus sirf naak ki nahi — poori life ki dikkat hai.\n\nAap sahi jagah aaye hain. \uD83C\uDF3F",
+    "Doctor ke paas gaye, dawai li, kuch dino theek raha — phir wahi wapas.\n\nAndar ki wajah treat nahi hui — isliye wapas aata hai.\n\nSahi jagah aaye hain. \uD83C\uDF3F",
+  ],
+  eng: [
+    "Blocked nose, heavy head every day...\n\nOnce sinus takes hold, it doesn't let go easily.\n\nYou've come to the right place. \uD83C\uDF3F",
+    "Using a nasal spray? Brief relief — then blocked again.\n\nThis cycle only breaks when the root cause is treated.\n\nYou're in the right place. \uD83C\uDF3F",
+    "Blocked nose, no smell, heavy all day, poor sleep...\n\nSinus affects far more than just your nose.\n\nYou're in the right place. \uD83C\uDF3F",
+    "Tried medicines, felt better for a few days — then back again.\n\nThat's because only the symptom was treated, not the cause.\n\nYou're in the right place. \uD83C\uDF3F",
+  ],
+  dev: [
+    "\u0928\u093E\u0915 \u092C\u0902\u0926 \u0930\u0939\u0924\u0940 \u0939\u0948, \u0938\u093F\u0930 \u092D\u093E\u0930\u0940 \u0930\u0939\u0924\u093E \u0939\u0948...\n\nSinus \u090F\u0915 \u092C\u093E\u0930 \u092A\u0915\u095C \u0932\u0947, \u0924\u094B \u091B\u094B\u095C\u0924\u093E \u0928\u0939\u0940\u0902 \u0939\u0948\u0964\n\n\u0938\u0939\u0940 \u091C\u0917\u0939 \u0906\u090F \u0939\u0948\u0902\u0964 \uD83C\uDF3F",
+    "\u0926\u0935\u093E\u0908 \u0932\u0940, \u0915\u0941\u091B \u0926\u093F\u0928 \u0920\u0940\u0915 \u0930\u0939\u093E \u2014 \u092B\u093F\u0930 \u0935\u0939\u0940 \u0935\u093E\u092A\u0938\u0964\n\n\u0905\u0902\u0926\u0930 \u0915\u0940 \u0935\u091C\u0939 treat \u0928\u0939\u0940\u0902 \u0939\u0941\u0908 \u2014 \u0907\u0938\u0940\u0932\u093F\u090F \u0935\u093E\u092A\u0938 \u0906\u0924\u093E \u0939\u0948\u0964\n\n\u0938\u0939\u0940 \u091C\u0917\u0939 \u0906\u090F \u0939\u0948\u0902\u0964 \uD83C\uDF3F",
+  ],
+};
 
-// ─── DURATION QUESTION — Hinglish only ───────────────────────
+// ─── DURATION QUESTION — Multilingual ────────────────────────
 const DURATION_Q = {
-  text: "Yeh takleef aapko kitne waqt se hai? \uD83C\uDF3F",
-  replies: ["6 mahine se kum", "1-2 saal se", "3-4 saal se", "5-10 saal se", "10+ saal se"],
+  rom: { text: "Yeh takleef aapko kitne waqt se hai? \uD83C\uDF3F", replies: ["6 mahine se kum", "1-2 saal se", "3-4 saal se", "5-10 saal se", "10+ saal se"] },
+  eng: { text: "How long have you been dealing with this? \uD83C\uDF3F", replies: ["Less than 6 months", "1-2 years", "3-4 years", "5-10 years", "10+ years"] },
+  dev: { text: "\u092F\u0939 \u0924\u0915\u0932\u0940\u092B \u0906\u092A\u0915\u094B \u0915\u093F\u0924\u0928\u0947 \u0938\u092E\u092F \u0938\u0947 \u0939\u0948? \uD83C\uDF3F", replies: ["6 \u092E\u0939\u0940\u0928\u0947 \u0938\u0947 \u0915\u092E", "1-2 \u0938\u093E\u0932 \u0938\u0947", "3-4 \u0938\u093E\u0932 \u0938\u0947", "5-10 \u0938\u093E\u0932 \u0938\u0947", "10+ \u0938\u093E\u0932 \u0938\u0947"] },
 };
 
 // ─── DURATION ACK — handles all 5 options ─────────────────────
@@ -301,85 +313,188 @@ function getDurationAck(text) {
   return `${num || 1}-2 saal se hai — abhi bhi theek ho sakta hai completely. \uD83C\uDF3F\nPehle type identify karte hain.`;
 }
 
-// ─── SEVERITY QUESTION — after duration ──────────────────────
+// ─── SEVERITY QUESTION — Multilingual ────────────────────────
 const SEVERITY_Q = {
-  text: "Aur takleef ki intensity kaisi hai? \uD83C\uDF3F",
-  replies: ["Halki — kaam chalaa leta hun", "Moderate — kaafi affect karta hai", "Severe — roz bahut mushkil hai"],
+  rom: { text: "Takleef ki intensity kaisi hai? \uD83C\uDF3F", replies: ["Halki — kaam chal jaata hai", "Moderate — roz affect karta hai", "Severe — roz bahut mushkil hai"] },
+  eng: { text: "How severe is the problem? \uD83C\uDF3F", replies: ["Mild — manageable day to day", "Moderate — affects daily life", "Severe — very difficult every day"] },
+  dev: { text: "\u0924\u0915\u0932\u0940\u092B \u0915\u093F\u0924\u0928\u0940 \u0917\u0902\u092D\u0940\u0930 \u0939\u0948? \uD83C\uDF3F", replies: ["\u0939\u0932\u094D\u0915\u0940 \u2014 \u0915\u093E\u092E \u091A\u0932 \u091C\u093E\u0924\u093E \u0939\u0948", "\u092E\u0927\u094D\u092F\u092E \u2014 \u0930\u094B\u091C affect \u0915\u0930\u0924\u093E \u0939\u0948", "\u0917\u0902\u092D\u0940\u0930 \u2014 \u0930\u094B\u091C \u092C\u0939\u0941\u0924 \u092E\u0941\u0936\u094D\u0915\u093F\u0932 \u0939\u094B\u0924\u093E \u0939\u0948"] },
 };
 
-// ─── SYMPTOMS QUESTION — Hinglish only ───────────────────────
+// ─── SYMPTOMS QUESTION — Multilingual ────────────────────────
 const SYMPTOMS_Q = {
-  text: "Ab batao — kya kya takleef hai? Jo bhi feel hota hai. \uD83C\uDF3F",
-  replies: ["Naak band rehti hai", "Spray use karta hun", "Smell nahi aati", "Ek taraf hamesha band (DNS)"],
+  rom: { text: "Apni main takleef batao — naak mein kya ho raha hai? \uD83C\uDF3F", replies: ["Naak band rehti hai", "Spray use karta/karti hun", "Smell nahi aati", "Ek taraf hamesha band (DNS)"] },
+  eng: { text: "Tell me your main issue — what is happening with your nose? \uD83C\uDF3F", replies: ["Nose stays blocked", "Using nasal spray", "No sense of smell", "One side always blocked (DNS)"] },
+  dev: { text: "\u0905\u092A\u0928\u0940 \u092E\u0941\u0916\u094D\u092F \u0924\u0915\u0932\u0940\u092B \u092C\u0924\u093E\u090F\u0902 \u2014 \u0928\u093E\u0915 \u092E\u0947\u0902 \u0915\u094D\u092F\u093E \u0939\u094B \u0930\u0939\u093E \u0939\u0948? \uD83C\uDF3F", replies: ["\u0928\u093E\u0915 \u092C\u0902\u0926 \u0930\u0939\u0924\u0940 \u0939\u0948", "Spray \u0909\u092A\u092F\u094B\u0917 \u0915\u0930\u0924\u093E/\u0915\u0930\u0924\u0940 \u0939\u0942\u0902", "Smell \u0928\u0939\u0940\u0902 \u0906\u0924\u0940", "\u090F\u0915 \u0924\u0930\u092B \u0939\u092E\u0947\u0936\u093E \u092C\u0902\u0926 (DNS)"] },
 };
 
 // ─── FOLLOW-UP DIAGNOSTIC QUESTIONS ──────────────────────────
-// Called after initial symptom selection to refine sinus type
-function getFollowupQ(initialType, symptomsText) {
+// Doctor-style: one focused question at a time to identify type precisely
+function getFollowupQ(initialType, symptomsText, lang) {
   const tl = symptomsText.toLowerCase();
+  const L = lang || "rom";
 
-  // Spray / DNS — already clear, no follow-up needed
+  // Spray / DNS — already clear from selection, no follow-up needed
   if (initialType === "spray" || initialType === "dns") return null;
 
-  // "Naak band" or congestive/allergic — ask discharge type
-  if (initialType === "congestive" || initialType === "allergic" || /naak band|band rehti|blocked/.test(tl)) {
+  // NAAK BAND / CONGESTIVE / ALLERGIC — Step 1: Ask about discharge
+  if (initialType === "congestive" || initialType === "allergic" || /naak band|band rehti|blocked|nose block/.test(tl)) {
+    if (L === "eng") return {
+      text: "Is there any discharge (fluid) coming from your nose? \uD83C\uDF3F",
+      replies: ["Watery / clear (like water)", "Thick white or creamy", "Yellow or green", "No — just blocked, nothing comes out"],
+    };
+    if (L === "dev") return {
+      text: "\u0928\u093E\u0915 \u0938\u0947 \u0915\u094B\u0908 discharge \u0928\u093F\u0915\u0932\u0924\u093E \u0939\u0948? \uD83C\uDF3F",
+      replies: ["\u092A\u093E\u0928\u0940 \u091C\u0948\u0938\u093E (watery)", "\u0917\u093E\u095D\u093E \u0938\u092B\u0947\u0926", "\u092A\u0940\u0932\u093E \u092F\u093E \u0939\u0930\u093E", "\u0928\u0939\u0940\u0902 \u2014 \u0938\u093F\u0930\u094D\u092B \u092C\u0902\u0926 \u0939\u0948"],
+    };
     return {
-      text: "Naak se kuch nikalta hai? \uD83C\uDF3F",
-      replies: [
-        "Paani jaisi patli (watery)",
-        "Thick safed ya creamy",
-        "Peela ya hara discharge",
-        "Nahi — sirf band rehti hai",
-      ],
+      text: "Naak se kuch nikalta hai — koi fluid ya discharge? \uD83C\uDF3F",
+      replies: ["Paani jaisi (watery / transparent)", "Thick safed ya creamy", "Peela ya hara", "Nahi — sirf band rehti hai"],
     };
   }
 
-  // Smell loss — ask when it happened
-  if (initialType === "polyp" || /smell nahi|smell kum|khushbu nahi/.test(tl)) {
+  // SMELL LOSS / POLYP — Ask when and how it happened
+  if (initialType === "polyp" || /smell nahi|smell kum|khushbu nahi|no smell|lost smell/.test(tl)) {
+    if (L === "eng") return {
+      text: "When did you lose your sense of smell? \uD83C\uDF3F",
+      replies: ["After a cold or infection", "Slowly over time (gradual)", "Both sides blocked equally", "Along with the blocked nose"],
+    };
+    if (L === "dev") return {
+      text: "Smell \u0915\u092C \u0938\u0947 \u0917\u0908? \uD83C\uDF3F",
+      replies: ["Cold/infection \u0915\u0947 \u092C\u093E\u0926", "\u0927\u0940\u0930\u0947-\u0927\u0940\u0930\u0947 \u0939\u0941\u0906", "\u0926\u094B\u0928\u094B\u0902 \u0924\u0930\u092B \u0938\u0947 \u092C\u0930\u093E\u092C\u0930", "\u0928\u093E\u0915 \u092C\u0902\u0926 \u0915\u0947 \u0938\u093E\u0925"],
+    };
     return {
       text: "Smell kab se gayi? \uD83C\uDF3F",
-      replies: [
-        "Ek cold/infection ke baad",
-        "Dheere dheere hua",
-        "Hamesha se hi kum thi",
-        "Naak band ke saath gayi",
-      ],
+      replies: ["Ek cold/infection ke baad", "Dheere dheere hua", "Dono taraf barabar band hai", "Naak band ke saath hi gayi"],
     };
   }
 
-  // Infective already clear from yellow discharge mention — no follow-up
-  if (initialType === "infective") return null;
+  // INFECTIVE (yellow/green already detected) — Confirm with fever/antibiotic history
+  if (initialType === "infective") {
+    if (L === "eng") return {
+      text: "Did you have fever with this, or did antibiotics help (even temporarily)? \uD83C\uDF3F",
+      replies: ["Yes, had fever", "Antibiotics helped but came back", "No fever, no antibiotics", "Not sure"],
+    };
+    if (L === "dev") return {
+      text: "\u0915\u094D\u092F\u093E \u0907\u0938\u0915\u0947 \u0938\u093E\u0925 \u092C\u0941\u0916\u093E\u0930 \u0906\u092F\u093E, \u092F\u093E antibiotics \u0938\u0947 \u0925\u094B\u095C\u093E \u0920\u0940\u0915 \u0939\u0941\u0906? \uD83C\uDF3F",
+      replies: ["\u0939\u093E\u0902, \u092C\u0941\u0916\u093E\u0930 \u0906\u092F\u093E \u0925\u093E", "Antibiotics \u0938\u0947 \u0920\u0940\u0915 \u0939\u0941\u0906 \u092B\u093F\u0930 \u0935\u093E\u092A\u0938", "\u0928\u0939\u0940\u0902 — \u0928\u0938 fever \u0928\u0938 antibiotics", "\u092A\u0924\u093E \u0928\u0939\u0940\u0902"],
+    };
+    return {
+      text: "Fever tha saath mein, ya antibiotics se thoda theek hua tha? \uD83C\uDF3F",
+      replies: ["Haan, fever bhi tha", "Antibiotics se thoda theek, phir wapas aaya", "Nahi — fever nahi, antibiotics nahi", "Yaad nahi"],
+    };
+  }
 
   return null;
+}
+
+// ─── SECOND FOLLOW-UP — after discharge answer, ask about triggers ──
+function getFollowupQ2(refinedType, lang) {
+  const L = lang || "rom";
+
+  // For allergic — ask triggers to confirm
+  if (refinedType === "allergic") {
+    if (L === "eng") return {
+      text: "Does anything in particular trigger it? \uD83C\uDF3F",
+      replies: ["Dust / smoke / pollution", "Cold air or temperature change", "Seasonal (certain times of year)", "Morning is always worse"],
+    };
+    if (L === "dev") return {
+      text: "\u0915\u094B\u0908 \u091A\u0940\u091C\u093C trigger \u0915\u0930\u0924\u0940 \u0939\u0948 \u0907\u0938\u0947? \uD83C\uDF3F",
+      replies: ["\u0927\u0942\u0932/\u0927\u0941\u0906\u0902/\u092A\u094D\u0930\u0926\u0942\u0937\u0923", "\u0920\u0902\u0921\u0940 \u0939\u0935\u093E \u092F\u093E \u0924\u093E\u092A\u092E\u093E\u0928 \u092C\u0926\u0932\u093E\u0935", "\u092E\u094C\u0938\u092E\u0940 (seasonal)", "\u0938\u0941\u092C\u0939 \u0939\u092E\u0947\u0936\u093E \u091C\u093C\u094D\u092F\u093E\u0926\u093E"],
+    };
+    return {
+      text: "Koi cheez trigger karti hai isko? \uD83C\uDF3F",
+      replies: ["Dhool / dhuan / pollution", "Thandi hawa ya mausam badlne pe", "Seasonal (kuch mahino mein)", "Subah uthte hi zyada hoti hai"],
+    };
+  }
+
+  // For congestive — ask about dairy / morning pattern
+  if (refinedType === "congestive") {
+    if (L === "eng") return {
+      text: "Is it worse in the morning? And do you consume dairy regularly? \uD83C\uDF3F",
+      replies: ["Worst in the morning", "Dairy daily (milk, curd, paneer)", "Both — morning + dairy", "Not sure about the pattern"],
+    };
+    if (L === "dev") return {
+      text: "\u0938\u0941\u092C\u0939 \u091C\u093C\u094D\u092F\u093E\u0926\u093E \u0939\u094B\u0924\u0940 \u0939\u0948? Dairy (\u0926\u0942\u0927, \u0926\u0939\u0940, \u092A\u0928\u0940\u0930) \u0930\u094B\u091C \u0932\u0947\u0924\u0947 \u0939\u0948\u0902? \uD83C\uDF3F",
+      replies: ["\u0938\u0941\u092C\u0939 \u0938\u092C\u0938\u0947 \u0917\u0902\u092D\u0940\u0930", "\u0930\u094B\u091C dairy \u0932\u0947\u0924\u093E/\u0932\u0947\u0924\u0940 \u0939\u0942\u0902", "\u0926\u094B\u0928\u094B\u0902 \u2014 \u0938\u0941\u092C\u0939 + dairy", "\u092A\u0924\u093E \u0928\u0939\u0940\u0902"],
+    };
+    return {
+      text: "Subah uthte hi zyada hoti hai? Aur dairy roz lete ho? \uD83C\uDF3F",
+      replies: ["Subah sabse zyada hoti hai", "Dairy roz leta/leti hun (doodh, dahi, paneer)", "Dono — subah + dairy", "Pattern samajh nahi aaya"],
+    };
+  }
+
+  return null; // No second follow-up for other types
 }
 
 // ─── REFINE TYPE FROM FOLLOW-UP ANSWER ───────────────────────
 function refineTypeFromFollowup(initialType, followupText) {
   const tl = followupText.toLowerCase();
 
-  // Discharge-based refinement (naak band follow-up)
-  if (/paani|patli|watery/.test(tl)) return "allergic";         // Watery = allergic
-  if (/thick|safed|creamy|white/.test(tl)) return "congestive"; // Thick white = congestive
-  if (/peela|hara|yellow|green/.test(tl)) return "infective";   // Yellow/green = infective
-  if (/sirf band|nahi nikalta|no discharge/.test(tl)) return "congestive"; // Just blocked = congestive
+  // Discharge-based refinement
+  if (/paani|patli|watery|clear|transparent/.test(tl)) return "allergic";   // Watery = allergic
+  if (/thick|safed|creamy|white|gada/.test(tl)) return "congestive";        // Thick white = congestive
+  if (/peela|hara|yellow|green/.test(tl)) return "infective";               // Yellow/green = infective
+  if (/sirf band|nahi nikalta|no discharge|nothing/.test(tl)) return "congestive"; // Dry block = congestive
 
-  // Smell-loss refinement (polyp follow-up)
-  if (/cold|infection|ke baad/.test(tl)) return "congestive";   // Post-cold smell loss = congestive
-  if (/dheere|gradually|धीरे/.test(tl)) return "polyp";         // Gradual = polyp more likely
-  if (/hamesha|always|always kum/.test(tl)) return "polyp";     // Always had less smell = polyp
-  if (/naak band ke saath/.test(tl)) return initialType;        // Tied to blockage — keep type
+  // Smell-loss refinement
+  if (/cold|infection|ke baad|after/.test(tl)) return "congestive";         // Post-infection = congestive
+  if (/dheere|gradually|slow/.test(tl)) return "polyp";                     // Gradual = polyp
+  if (/dono taraf|both sides|barabar/.test(tl)) return "polyp";             // Both sides equal = polyp
+  if (/naak band ke saath|with blockage/.test(tl)) return initialType;      // Tied to blockage = keep
+
+  // Infective confirmation
+  if (/fever|bukhar/.test(tl)) return "infective";
+  if (/antibiotic|antibiotic se|helped/.test(tl)) return "infective";
 
   return initialType; // No match — keep initial
 }
 
-// ─── REVEAL MESSAGES — Hinglish only ────────────────────────
+// ─── REVEAL MESSAGES — Multilingual, no dramatic tests ───────
+function getRevealMsg(type, lang) {
+  const L = lang || "rom";
+  const reveals = {
+    allergic: {
+      rom: "Samajh gaya — yeh *Allergic Sinus* hai. \uD83C\uDF3F\n\nIs type mein naak ki lining oversensitive ho jaati hai — har trigger pe react karti hai.\n\nSahi protocol se 4-5 din mein sneezing aur triggers kum hone lagte hain.",
+      eng: "Understood — this is *Allergic Sinusitis*. \uD83C\uDF3F\n\nYour nasal lining has become oversensitive and reacts to every trigger.\n\nWith the right protocol, sneezing and triggers reduce noticeably within 4-5 days.",
+      dev: "\u0938\u092E\u091D \u0917\u092F\u093E \u2014 \u092F\u0939 *Allergic Sinus* \u0939\u0948\u0964 \uD83C\uDF3F\n\n\u0928\u093E\u0915 \u0915\u0940 lining oversensitive \u0939\u094B \u0917\u0908 \u0939\u0948 \u2014 \u0939\u0930 trigger \u092A\u0930 react \u0915\u0930\u0924\u0940 \u0939\u0948\u0964\n\nSahi protocol \u0938\u0947 4-5 \u0926\u093F\u0928 \u092E\u0947\u0902 sneezing \u0915\u092E \u0939\u094B\u0928\u0947 \u0932\u0917\u0924\u0940 \u0939\u0948\u0964",
+    },
+    congestive: {
+      rom: "Samajh gaya — yeh *Congestive Sinus* hai. \uD83C\uDF3F\n\nIs type mein nasal channels mein kapha jama rehta hai — jitna waqt jaaye, utna thick hota jaata hai.\n\n*Zaroori:* Dairy bilkul band karni padegi — yeh is type ka sabse bada trigger hai.",
+      eng: "Understood — this is *Congestive Sinusitis*. \uD83C\uDF3F\n\nMucus has been accumulating in your nasal passages over time, becoming thicker.\n\n*Important:* Dairy must be completely stopped — it is the biggest aggravator for this type.",
+      dev: "\u0938\u092E\u091D \u0917\u092F\u093E \u2014 \u092F\u0939 *Congestive Sinus* \u0939\u0948\u0964 \uD83C\uDF3F\n\nNasal channels \u092E\u0947\u0902 kapha \u091C\u092E\u093E \u0930\u0939\u0924\u093E \u0939\u0948 \u2014 \u0935\u0915\u094D\u0924 \u0915\u0947 \u0938\u093E\u0925 \u0914\u0930 thick \u0939\u094B\u0924\u093E \u091C\u093E\u0924\u093E \u0939\u0948\u0964\n\n*\u091C\u093C\u0930\u0942\u0930\u0940:* Dairy \u092C\u0902\u0926 \u0915\u0930\u0928\u0940 \u0939\u094B\u0917\u0940 \u2014 \u092F\u0939 \u0907\u0938 type \u0915\u093E \u0938\u092C\u0938\u0947 \u092C\u095C\u093E trigger \u0939\u0948\u0964",
+    },
+    spray: {
+      rom: "Samajh gaya — yeh *Spray Dependency* hai. \uD83C\uDF3F\n\nNaak ki lining spray ke bina theek se kaam nahi kar paati — physical dependency ban gayi hai.\n\n*Zaroori:* Ek dum band mat karo — sirf dheere graduated protocol se hi chhootega.",
+      eng: "Understood — this is *Spray Dependency* (Rebound Rhinitis). \uD83C\uDF3F\n\nYour nasal lining can no longer function properly without the spray — a physical dependency has developed.\n\n*Important:* Never stop cold turkey — it must be reduced gradually with a structured protocol.",
+      dev: "\u0938\u092E\u091D \u0917\u092F\u093E \u2014 \u092F\u0939 *Spray Dependency* \u0939\u0948\u0964 \uD83C\uDF3F\n\nNasal lining spray \u0915\u0947 \u092C\u093F\u0928\u093E \u0920\u0940\u0915 \u0938\u0947 \u0915\u093E\u092E \u0928\u0939\u0940\u0902 \u0915\u0930 \u092A\u093E\u0924\u0940\u0964\n\n*\u091C\u093C\u0930\u0942\u0930\u0940:* \u090F\u0915\u0926\u092E \u092C\u0902\u0926 \u092E\u0924 \u0915\u0930\u094B \u2014 \u0927\u0940\u0930\u0947-\u0927\u0940\u0930\u0947 graduated protocol \u0938\u0947 \u0939\u0940 \u091B\u0942\u091F\u0947\u0917\u0940\u0964",
+    },
+    infective: {
+      rom: "Samajh gaya — yeh *Infective/Heat Sinus* hai. \uD83C\uDF3F\n\nIs type mein active infection ke saath nasal lining mein heat aur jalan hoti hai.\n\n*Zaroori:* Eucalyptus ya camphor steam bilkul mat karo — is type mein yeh worse karta hai.",
+      eng: "Understood — this is *Infective/Inflammatory Sinusitis*. \uD83C\uDF3F\n\nThere is active infection with heat and irritation in the nasal lining.\n\n*Important:* Never use eucalyptus or camphor steam — it significantly worsens this type.",
+      dev: "\u0938\u092E\u091D \u0917\u092F\u093E \u2014 \u092F\u0939 *Infective Sinus* \u0939\u0948\u0964 \uD83C\uDF3F\n\nActive infection \u0915\u0947 \u0938\u093E\u0925 nasal lining \u092E\u0947\u0902 heat \u0914\u0930 \u091C\u0932\u0928 \u0939\u0948\u0964\n\n*\u091C\u093C\u0930\u0942\u0930\u0940:* Eucalyptus/camphor steam \u092C\u093F\u0932\u0915\u0941\u0932 \u092E\u0924 \u0915\u0930\u094B \u2014 \u0907\u0938\u092E\u0947\u0902 worse \u0939\u094B\u0924\u093E \u0939\u0948\u0964",
+    },
+    polyp: {
+      rom: "Samajh gaya — *Polyp/Severe Blockage* lag raha hai. \uD83C\uDF3F\n\nIs type mein nasal tissue growth hoti hai — dono taraf breathe karna mushkil hota hai.\n\nKai logon ko surgery suggest hui thi — sahi protocol se bina surgery bhi sudhar aata hai.",
+      eng: "Understood — this appears to be *Nasal Polyp/Severe Blockage*. \uD83C\uDF3F\n\nThere is nasal tissue growth causing blockage on both sides.\n\nMany were advised surgery — significant improvement is often possible without it with the right protocol.",
+      dev: "\u0938\u092E\u091D \u0917\u092F\u093E \u2014 *Polyp/Blockage* \u0932\u0917 \u0930\u0939\u093E \u0939\u0948\u0964 \uD83C\uDF3F\n\nNasal tissue growth \u0939\u0948 \u091C\u093F\u0938\u0938\u0947 \u0926\u094B\u0928\u094B\u0902 \u0924\u0930\u092B blockage \u0939\u0948\u0964\n\n\u0915\u0908 \u0932\u094B\u0917\u094B\u0902 \u0915\u094B surgery \u092C\u0924\u093E\u0908 \u0917\u0908 \u0925\u0940 \u2014 \u0938\u0939\u0940 protocol \u0938\u0947 \u092C\u093F\u0928\u093E surgery \u092D\u0940 \u0938\u0941\u0927\u093E\u0930 \u0906\u0924\u093E \u0939\u0948\u0964",
+    },
+    dns: {
+      rom: "Samajh gaya — yeh *DNS (Deviated Nasal Septum)* lag raha hai. \uD83C\uDF3F\n\nNaak ki haddi thodi tedhi hai — uss taraf breathe karna permanently zyada mushkil hota hai.\n\nAyurveda mein DNS ke around ki inflammation aur congestion achi tarah theek hoti hai — breathing improve hoti hai.",
+      eng: "Understood — this appears to be *DNS (Deviated Nasal Septum)*. \uD83C\uDF3F\n\nThe nasal bone has a slight deviation — making breathing harder on that side permanently.\n\nAyurveda addresses the inflammation and congestion around the deviation effectively — breathing improves significantly.",
+      dev: "\u0938\u092E\u091D \u0917\u092F\u093E \u2014 \u092F\u0939 *DNS* (Deviated Nasal Septum) \u0932\u0917 \u0930\u0939\u093E \u0939\u0948\u0964 \uD83C\uDF3F\n\nNasal bone \u0925\u094B\u095C\u0940 \u091F\u0947\u095D\u0940 \u0939\u0948 \u2014 \u0909\u0938 \u0924\u0930\u092B breathe \u0915\u0930\u0928\u093E permanently \u0915\u0920\u093F\u0928 \u0939\u0948\u0964\n\nAyurveda \u092E\u0947\u0902 DNS \u0915\u0947 \u0906\u0938\u092A\u093E\u0938 \u0915\u0940 inflammation \u0914\u0930 congestion \u0920\u0940\u0915 \u0939\u094B\u0924\u0940 \u0939\u0948\u0964",
+    },
+  };
+  const r = reveals[type] || reveals.congestive;
+  return r[L] || r.rom;
+}
+// Keep legacy const for any older references
 const REVEAL = {
-  allergic: "Samajh gaya — yeh *Allergic Sinus* hai. \uD83C\uDF3F\n\nEk test: bahar jao ya doosra room — takleef thodi different lage toh confirm.\n\nIs type mein sahi protocol se 4-5 din mein sneeze/triggers kum hone lagte hain.",
-  congestive: "Samajh gaya — yeh *Congestive Sinus* hai. \uD83C\uDF3F\n\nEk test: sir aage jhukao 5 sec — mathe/galon mein bojh? Confirm hai.\n\n*Zaroori:* Dairy band karni padegi — yeh is type ka sabse bada dushman hai.",
-  spray: "Samajh gaya — yeh *Spray Dependency* hai. \uD83C\uDF3F\n\nEk raat spray band karo — neend mushkil hogi? Yeh naak ki physical dependency hai.\n\n*Kabhi ek dum band mat karo* — dheere protocol se hi chhootega.",
-  infective: "Samajh gaya — yeh *Infective/Heat Sinus* hai. \uD83C\uDF3F\n\nAntibiotic se thoda theek, phir wapas? Classic sign hai.\n\n*Zaroori:* Eucalyptus/camphor steam kabhi mat karo — is type mein worse karta hai.",
-  polyp: "Samajh gaya — *Polyp/Blockage* hai. \uD83C\uDF3F\n\nDono taraf equally band? Laung paas laao — smell nahi aati? Confirm.\n\nKai logon ko surgery suggest hui thi — protocol se bina surgery sudhar aaya hai.",
-  dns: "Samajh gaya — yeh *DNS (Deviated Nasal Septum)* lag raha hai. \uD83C\uDF3F\n\nEk side hamesha band, raat mein zyada problem? Yeh classic DNS sign hai.\n\nAyurveda mein DNS ke around ki inflammation aur congestion bilkul theek hoti hai — breathing improve hoti hai.",
+  allergic: getRevealMsg("allergic", "rom"),
+  congestive: getRevealMsg("congestive", "rom"),
+  spray: getRevealMsg("spray", "rom"),
+  infective: getRevealMsg("infective", "rom"),
+  polyp: getRevealMsg("polyp", "rom"),
+  dns: getRevealMsg("dns", "rom"),
 };
 
 // ─── PITCH MESSAGES — Hinglish only ─────────────────────────
@@ -639,28 +754,32 @@ async function handleMessage(senderId, messageText, senderName) {
 
   // ─── SEQUENTIAL FLOW ─────────────────────────────────────────
   if (userData.state === "new") {
-    const idx = Math.floor(Math.random() * HOOKS.length);
+    const hooksArr = HOOKS[sc] || HOOKS.rom;
+    const idx = Math.floor(Math.random() * hooksArr.length);
+    const dq = DURATION_Q[sc] || DURATION_Q.rom;
     userData.state = "asked_duration";
-    await sendWithTyping(senderId, HOOKS[idx]);
+    await sendWithTyping(senderId, hooksArr[idx]);
     await new Promise((r) => setTimeout(r, 900));
-    await sendQRWithTyping(senderId, DURATION_Q.text, DURATION_Q.replies);
+    await sendQRWithTyping(senderId, dq.text, dq.replies);
     await logToSheet(senderId, senderName, "Hook sent", "HOOK", "");
     return;
   }
 
   // hook_sent — legacy fallback for users mid-flow
   if (userData.state === "hook_sent") {
+    const dq = DURATION_Q[sc] || DURATION_Q.rom;
     userData.state = "asked_duration";
-    await sendQRWithTyping(senderId, DURATION_Q.text, DURATION_Q.replies);
+    await sendQRWithTyping(senderId, dq.text, dq.replies);
     return;
   }
 
   if (userData.state === "asked_duration") {
     userData.duration = text;
     userData.state = "asked_severity";
+    const sq = SEVERITY_Q[sc] || SEVERITY_Q.rom;
     await sendWithTyping(senderId, getDurationAck(text));
     await new Promise((r) => setTimeout(r, 800));
-    await sendQRWithTyping(senderId, SEVERITY_Q.text, SEVERITY_Q.replies);
+    await sendQRWithTyping(senderId, sq.text, sq.replies);
     await logToSheet(senderId, senderName, "Duration: " + text, "DURATION", "");
     return;
   }
@@ -668,7 +787,8 @@ async function handleMessage(senderId, messageText, senderName) {
   if (userData.state === "asked_severity") {
     userData.severity = text;
     userData.state = "asked_symptoms";
-    await sendQRWithTyping(senderId, SYMPTOMS_Q.text, SYMPTOMS_Q.replies);
+    const smq = SYMPTOMS_Q[sc] || SYMPTOMS_Q.rom;
+    await sendQRWithTyping(senderId, smq.text, smq.replies);
     return;
   }
 
@@ -676,12 +796,16 @@ async function handleMessage(senderId, messageText, senderName) {
     userData.symptoms = text;
     const sinusType = detectSinusType(text);
     userData.sinusType = sinusType;
+    userData.followupStage = 1;
 
     // Check if a follow-up diagnostic question is needed
-    const followupQ = getFollowupQ(sinusType, text);
+    const followupQ = getFollowupQ(sinusType, text, sc);
     if (followupQ) {
       userData.state = "asked_followup";
-      await sendWithTyping(senderId, "Theek hai — ek aur cheez puchna tha. \uD83C\uDF3F");
+      const ackMsg = sc === "eng" ? "Got it — one more question. \uD83C\uDF3F"
+        : sc === "dev" ? "\u0920\u0940\u0915 \u0939\u0948 \u2014 \u090F\u0915 \u0914\u0930 \u0938\u0935\u093E\u0932\u0964 \uD83C\uDF3F"
+        : "Theek hai — ek aur sawaal. \uD83C\uDF3F";
+      await sendWithTyping(senderId, ackMsg);
       await new Promise((r) => setTimeout(r, 600));
       await sendQRWithTyping(senderId, followupQ.text, followupQ.replies);
       await logToSheet(senderId, senderName, "Symptoms: " + text, "FOLLOWUP_Q", sinusType);
@@ -692,9 +816,10 @@ async function handleMessage(senderId, messageText, senderName) {
     userData.state = "revealed";
     userData.postPitchReplies = 0;
     userData.history = [];
-    await sendWithTyping(senderId, "Dekh rahe hain... \uD83C\uDF3F");
+    const thinkMsg = sc === "eng" ? "Analysing... \uD83C\uDF3F" : sc === "dev" ? "\u0926\u0947\u0916 \u0930\u0939\u0947 \u0939\u0948\u0902... \uD83C\uDF3F" : "Dekh rahe hain... \uD83C\uDF3F";
+    await sendWithTyping(senderId, thinkMsg);
     await new Promise((r) => setTimeout(r, 700));
-    await sendWithTyping(senderId, REVEAL[sinusType] || REVEAL["congestive"]);
+    await sendWithTyping(senderId, getRevealMsg(sinusType, sc));
     await new Promise((r) => setTimeout(r, 600));
     await sendWithTyping(senderId, getWebsiteLine("trust", sc));
     await logToSheet(senderId, senderName, "Symptoms: " + text, "REVEALED", sinusType);
@@ -702,16 +827,36 @@ async function handleMessage(senderId, messageText, senderName) {
   }
 
   if (userData.state === "asked_followup") {
-    // Refine the sinus type based on follow-up answer
     const refinedType = refineTypeFromFollowup(userData.sinusType, text);
     userData.sinusType = refinedType;
     userData.followupAnswer = text;
+
+    // Check if a second-level follow-up is needed (e.g. triggers for allergic)
+    if ((userData.followupStage || 1) < 2) {
+      const fq2 = getFollowupQ2(refinedType, sc);
+      if (fq2) {
+        userData.followupStage = 2;
+        const ackMsg2 = sc === "eng" ? "Good — one last thing. \uD83C\uDF3F"
+          : sc === "dev" ? "\u0920\u0940\u0915 \u0939\u0948 \u2014 \u090F\u0915 \u0906\u0916\u093F\u0930\u0940 \u0938\u0935\u093E\u0932\u0964 \uD83C\uDF3F"
+          : "Theek hai — ek last sawaal. \uD83C\uDF3F";
+        await sendWithTyping(senderId, ackMsg2);
+        await new Promise((r) => setTimeout(r, 600));
+        await sendQRWithTyping(senderId, fq2.text, fq2.replies);
+        await logToSheet(senderId, senderName, "Followup1: " + text, "FOLLOWUP_Q2", refinedType);
+        return;
+      }
+    }
+
+    // All follow-ups done — go to reveal
     userData.state = "revealed";
     userData.postPitchReplies = 0;
     userData.history = [];
-    await sendWithTyping(senderId, "Samajh gaya — ab clear picture aa gayi. \uD83C\uDF3F");
+    const clearMsg = sc === "eng" ? "Understood — clear picture now. \uD83C\uDF3F"
+      : sc === "dev" ? "\u0938\u092E\u091D \u0917\u092F\u093E \u2014 ab clear \u0939\u0948\u0964 \uD83C\uDF3F"
+      : "Samajh gaya — ab clear picture aa gayi. \uD83C\uDF3F";
+    await sendWithTyping(senderId, clearMsg);
     await new Promise((r) => setTimeout(r, 700));
-    await sendWithTyping(senderId, REVEAL[refinedType] || REVEAL["congestive"]);
+    await sendWithTyping(senderId, getRevealMsg(refinedType, sc));
     await new Promise((r) => setTimeout(r, 600));
     await sendWithTyping(senderId, getWebsiteLine("trust", sc));
     await logToSheet(senderId, senderName, "Followup: " + text, "REVEALED", refinedType);
@@ -722,7 +867,15 @@ async function handleMessage(senderId, messageText, senderName) {
     userData.state = "pitched";
     await sendWithTyping(senderId, getPitch(userData.sinusType));
     await new Promise((r) => setTimeout(r, 700));
-    await sendQRWithTyping(senderId, "Kaunsa option sahi lagta hai? \uD83C\uDF3F", ["Full Program (Rs.1,299)", "Starter Kit (Rs.499)", "Pehle sawaal hai"]);
+    const pitchOptText = sc === "eng" ? "Which option works for you? \uD83C\uDF3F"
+      : sc === "dev" ? "\u0915\u094C\u0928\u0938\u093E option \u0938\u0939\u0940 \u0932\u0917\u0924\u093E \u0939\u0948? \uD83C\uDF3F"
+      : "Kaunsa option sahi lagta hai? \uD83C\uDF3F";
+    const pitchReplies = sc === "eng"
+      ? ["Full Program (Rs.1,299)", "Starter Kit (Rs.499)", "I have a question first"]
+      : sc === "dev"
+      ? ["Full Program (Rs.1,299)", "Starter Kit (Rs.499)", "\u092A\u0939\u0932\u0947 \u0938\u0935\u093E\u0932 \u0939\u0948"]
+      : ["Full Program (Rs.1,299)", "Starter Kit (Rs.499)", "Pehle sawaal hai"];
+    await sendQRWithTyping(senderId, pitchOptText, pitchReplies);
     await logToSheet(senderId, senderName, "Pitched: " + userData.sinusType, "PITCHED", userData.sinusType);
     return;
   }
