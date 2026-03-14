@@ -1100,7 +1100,7 @@ async function loadInsights(){
 loadInsights();setInterval(loadInsights,4*60*60*1000);
 load();setInterval(load,5000);
 function toggleBC(){const p=document.getElementById('bcPanel');p.classList.toggle('open');}
-async function broadcast(){const msg=document.getElementById('bcMsg').value.trim();if(!msg){alert('Message likhein!');return;}if(!confirm('Sabhi WhatsApp/Instagram users ko bhejein?\n"'+msg+'"'))return;const r=await fetch('/admin/api/broadcast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});const d=await r.json();if(d.ok){alert(d.sent+' users ko bheja!');document.getElementById('bcMsg').value='';document.getElementById('bcPanel').classList.remove('open');}else alert('Error: '+(d.error||'unknown'));}
+async function broadcast(){const msg=document.getElementById('bcMsg').value.trim();if(!msg){alert('Message likhein!');return;}if(!confirm('Sabhi WhatsApp/Instagram users ko bhejein?\\n"'+msg+'"'))return;const r=await fetch('/admin/api/broadcast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});const d=await r.json();if(d.ok){alert(d.sent+' users ko bheja!');document.getElementById('bcMsg').value='';document.getElementById('bcPanel').classList.remove('open');}else alert('Error: '+(d.error||'unknown'));}
 </script></body></html>`;
 
 // ─── ADMIN API ROUTES ─────────────────────────────────────────
