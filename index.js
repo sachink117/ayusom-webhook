@@ -31,12 +31,16 @@ const VERIFY_TOKEN       = process.env.VERIFY_TOKEN;
 const ANTHROPIC_API_KEY  = process.env.ANTHROPIC_API_KEY;
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN  = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_WA_NUMBER   = process.env.TWILIO_WHATSAPP_NUMBER;
-const INSTAGRAM_TOKEN    = process.env.INSTAGRAM_ACCESS_TOKEN;
+const TWILIO_WA_NUMBER   = process.env.TWILIO_WHATSAPP_NUMBER || process.env.PHONE_NUMBER_ID;
+const INSTAGRAM_TOKEN    = process.env.INSTAGRAM_TOKEN;
 const SHEET_URL          = process.env.GOOGLE_SHEET_URL || "";
 const PORT               = process.env.PORT || 3000;
 const RAZORPAY_LINK_499  = process.env.RAZORPAY_LINK_499  || "https://rzp.io/rzp/Re2W26iX";
 const RAZORPAY_LINK_1299 = process.env.RAZORPAY_LINK_1299 || "https://rzp.io/rzp/qu8zhQT";
+
+const WHATSAPP_TOKEN           = process.env.WHATSAPP_TOKEN;
+const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+const widgetPending            = {};
 
 const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
@@ -268,12 +272,29 @@ async function sendInstagramMessage(recipientId, text) {
   return res.json();
 }
 
+async function sendWhatsAppMessage(to, body) {
+  const url = "https://graph.facebook.com/v18.0/" + WHATSAPP_PHONE_NUMBER_ID + "/messages";
+  await axios.post(url, {
+    messaging_product: "whatsapp",
+    to,
+    type: "text",
+    text: { body }
+  }, {
+    headers: {
+      Authorization: "Bearer " + WHATSAPP_TOKEN,
+      "Content-Type": "application/json"
+    }
+  });
+}
+
 async function sendMessage(platform, userId, text) {
   if (!text || !text.trim()) return;
   const chunks = splitMessage(text);
   for (const chunk of chunks) {
     if      (platform === "twilio")    await sendTwilioMessage(userId, chunk);
     else if (platform === "instagram") await sendInstagramMessage(userId, chunk);
+    else if (platform === "whatsapp")  await sendWhatsAppMessage(userId, chunk);
+    else if (platform === "website")   { if (widgetPending[userId]) widgetPending[userId].push(chunk); }
     else                               await sendFBMessage(userId, chunk);
     if (chunks.length > 1) await sleep(700);
   }
@@ -1081,6 +1102,42 @@ app.post("/instagram-webhook", async (req, res) => {
 });
 
 // ─── BROADCAST ────────────────────────────────────────────────
+// ── WHATSAPP CLOUD API WEBHOOK ─────────────────────────────────────────
+app.get("/whatsapp-webhook", (req, res) => {
+  const mode      = req.query["hub.mode"];
+  const token     = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+  if (mode === "subscribe" && token === (process.env.WA_VERIFY_TOKEN || "ayusomam_wa_verify")) {
+    console.log("WhatsApp webhook verified");
+    res.status(200).send(challenge);
+  } else {
+    res.sendStatus(403);
+  }
+});
+
+app.post("/whatsapp-webhook", async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const body = req.body;
+    if (body.object !== "whatsapp_business_account") return;
+    for (const entry of body.entry || []) {
+      for (const change of entry.changes || []) {
+        const value = change.value;
+        if (!value || !value.messages) continue;
+        for (const msg of value.messages) {
+          if (msg.type !== "text") continue;
+          const userId = msg.from;
+          const text   = msg.text.body;
+          console.log("[WA] Message from " + userId + ": " + text);
+          await handleMessage(userId, text, "whatsapp");
+        }
+      }
+    }
+  } catch (err) {
+    console.error("WhatsApp webhook error:", err);
+  }
+});
+
 app.post("/broadcast", async (req, res) => {
   const { numbers, message, secret } = req.body;
   if (secret !== VERIFY_TOKEN) return res.status(401).json({ error: "Unauthorized" });
@@ -1674,6 +1731,70 @@ app.get("/health", (req, res) => {
 });
 
 // ─── START ────────────────────────────────────────────────────
+// ── WEBSITE CHAT WIDGET ─────────────────────────────────────────────
+app.get('/widget', (req, res) => {
+  res.setHeader('Content-Type', 'text/html');
+  res.send(
+    '<!DOCTYPE html><html lang="en"><head>' +
+    '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">' +
+    '<title>Ayusomam Herbals Chat</title>' +
+    '<style>' +
+    '*{margin:0;padding:0;box-sizing:border-box}' +
+    'body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f5f5f5}' +
+    '#chat{width:380px;height:600px;background:#fff;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.15);display:flex;flex-direction:column;overflow:hidden}' +
+    '.hd{background:linear-gradient(135deg,#2d5a27,#4a8c42);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:12px}' +
+    '.ic{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:20px}' +
+    '.hd h3{font-size:16px;margin:0}.hd p{font-size:12px;opacity:.85;margin:0}' +
+    '#msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}' +
+    '.msg{max-width:78%;padding:10px 14px;border-radius:18px;font-size:14px;line-height:1.5}' +
+    '.bot{background:#f0f0f0;color:#333;align-self:flex-start;border-bottom-left-radius:4px}' +
+    '.usr{background:#2d5a27;color:#fff;align-self:flex-end;border-bottom-right-radius:4px}' +
+    '.typ{align-self:flex-start;padding:10px 14px;background:#f0f0f0;border-radius:18px;border-bottom-left-radius:4px}' +
+    '.typ span{display:inline-block;width:7px;height:7px;background:#999;border-radius:50%;animation:b 1.2s infinite;margin:0 2px}' +
+    '.typ span:nth-child(2){animation-delay:.2s}.typ span:nth-child(3){animation-delay:.4s}' +
+    '@keyframes b{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}' +
+    '#ft{padding:12px 16px;border-top:1px solid #eee;display:flex;gap:8px}' +
+    '#inp{flex:1;border:1px solid #ddd;border-radius:24px;padding:10px 16px;font-size:14px;outline:none}' +
+    '#inp:focus{border-color:#4a8c42}' +
+    '#btn{background:#2d5a27;color:#fff;border:none;border-radius:50%;width:40px;height:40px;cursor:pointer;font-size:18px}' +
+    '#btn:hover{background:#4a8c42}' +
+    '</style></head><body>' +
+    '<div id="chat">' +
+    '<div class="hd"><div class="ic">🌿</div><div><h3>Ayusomam Herbals</h3><p>Sinus Treatment Expert</p></div></div>' +
+    '<div id="msgs"><div class="msg bot">Namaste! 🌿 How can I help you today?</div></div>' +
+    '<div id="ft"><input id="inp" type="text" placeholder="Type your message..." autocomplete="off"><button id="btn">&#9658;</button></div>' +
+    '</div>' +
+    '<script>' +
+    'var sid="ws_"+Math.random().toString(36).substr(2,9)+"_"+Date.now();' +
+    'var msgs=document.getElementById("msgs"),inp=document.getElementById("inp");' +
+    'function addMsg(t,c){var d=document.createElement("div");d.className="msg "+c;d.textContent=t;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;}' +
+    'function showTyping(){var d=document.createElement("div");d.className="typ";d.id="ti";d.innerHTML="<span></span><span></span><span></span>";msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;}' +
+    'function hideTyping(){var t=document.getElementById("ti");if(t)t.remove();}' +
+    'async function send(){var t=inp.value.trim();if(!t)return;inp.value="";addMsg(t,"usr");showTyping();' +
+    'try{var r=await fetch("/widget-chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:sid,message:t})});' +
+    'var d=await r.json();hideTyping();(d.replies||["Sorry, something went wrong."]).forEach(function(m){addMsg(m,"bot");});}' +
+    'catch(e){hideTyping();addMsg("Connection error. Please refresh.","bot");}}' +
+    'document.getElementById("btn").onclick=send;' +
+    'inp.addEventListener("keydown",function(e){if(e.key==="Enter")send();});' +
+    '<\/script></body></html>'
+  );
+});
+
+app.post('/widget-chat', async (req, res) => {
+  try {
+    const { sessionId, message } = req.body;
+    if (!sessionId || !message) return res.status(400).json({ error: 'Missing fields' });
+    widgetPending[sessionId] = [];
+    await handleMessage(sessionId, message, 'website');
+    await new Promise(resolve => setTimeout(resolve, 3500));
+    const replies = widgetPending[sessionId] || [];
+    delete widgetPending[sessionId];
+    res.json({ replies: replies.length ? replies : ['Thank you! Our team will get back to you shortly.'] });
+  } catch (err) {
+    console.error('Widget-chat error:', err);
+    res.status(500).json({ replies: ['Sorry, something went wrong. Please try again.'] });
+  }
+});
 app.listen(PORT, () => {
   console.log(`SALESOM v5.0 running on port ${PORT}`);
   console.log(`  Sinus types: Reactive Sensitivity, Chronic Congestion, Deep Inflammation, Spray Dependency, Drainage Blockage, Structural Congestion`);
