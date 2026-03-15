@@ -1534,13 +1534,13 @@ function renderLeads() {
          <div class="fu-row" onclick="event.stopPropagation()">
         <div class="toggle-wrap">
           <label class="toggle-sw" style="margin:0">
-            <input type="checkbox" ${l.autoFollowup!==false?'checked':''} onchange="toggleFU('${l.id}',this.checked)">
+            <input type="checkbox" \${l.autoFollowup!==false?'checked':''} onchange="toggleFU('\${l.id}',this.checked)">
             <span class="toggle-slider"></span>
           </label>
           <span class="fu-info" style="margin:0 5px">Auto FU</span>
-          <span class="fu-info" style="color:${computeFuTxt(l).includes('Due')?'#e65100':'#888'}">${computeFuTxt(l)}</span>
+          <span class="fu-info" style="color:\${computeFuTxt(l).includes('Due')?'#e65100':'#888'}">\${computeFuTxt(l)}</span>
         </div>
-        <button class="fu-btn" data-fu-btn="${l.id}" onclick="sendFUNow('${l.id}')">Send now</button>
+        <button class="fu-btn" data-fu-btn="\${l.id}" onclick="sendFUNow('\${l.id}')">Send now</button>
       </div>
  </div>\`;
   }).join('');
