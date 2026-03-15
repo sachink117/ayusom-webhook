@@ -1159,7 +1159,7 @@ app.get("/stats", (req, res) => {
 });
 
 // ─── ADMIN API: DATA ──────────────────────────────────────────
-app.get("/admin/data", (req, res) => {
+app.get("/admin/data", async (req, res) => {
   if (req.query.secret !== VERIFY_TOKEN) return res.status(401).json({ error: "Unauthorized" });
   const all = Object.entries(userData).map(([id, u]) => ({
     id,
