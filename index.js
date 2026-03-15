@@ -31,7 +31,7 @@ const VERIFY_TOKEN       = process.env.VERIFY_TOKEN;
 const ANTHROPIC_API_KEY  = process.env.ANTHROPIC_API_KEY;
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN  = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_WA_NUMBER   = process.env.TWILIO_WHATSAPP_NUMBER || process.env.PHONE_NUMBER_ID;
+const TWILIO_WA_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || '+14155238886'; // Twilio WhatsApp sandbox
 const INSTAGRAM_TOKEN    = process.env.INSTAGRAM_TOKEN;
 const SHEET_URL          = process.env.GOOGLE_SHEET_URL || "";
 const PORT               = process.env.PORT || 3000;
@@ -348,7 +348,9 @@ async function logToSheet(userId, platform, sinusType, state, msg, botReply) {
       body:    JSON.stringify({
         action:    "log_message",
         timestamp: new Date().toISOString(),
-        userId, platform,
+        userId:    userId.replace(/^whatsapp:/i, ''),
+        name:      user.name || '',
+        platform,
         sinusType: sinusType || user.sinusType || "unknown",
         state:     state     || user.state     || "new",
         phase:     user.convPhase || "probe",
