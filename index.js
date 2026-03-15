@@ -1185,7 +1185,7 @@ app.get("/admin/data", async (req, res) => {
       for (const _row of _rows) {
         const _sid = String(_row.SenderID || _row.senderId || _row.id || '').trim();
         if (!_sid) continue;
-        if (!_cm[_sid]) _cm[_sid] = {msgs:[], lastTs:0};
+        if (!_cm[_sid]) {const _p=String(_row.Platform||_row.platform||'').toLowerCase();const _plt=_p.includes('messenger')||_p.includes('facebook')||_p.includes('fb')?'messenger':_p.includes('instagram')?'instagram':'whatsapp';_cm[_sid]={msgs:[],lastTs:0,platform:_plt};}
         const _ts = _row.Timestamp ? new Date(_row.Timestamp).getTime() : 0;
         const _role = String(_row.Role || _row.role || 'user').toLowerCase();
         const _content = String(_row.Message || _row.message || _row.content || '');
@@ -1200,7 +1200,7 @@ app.get("/admin/data", async (req, res) => {
           userData[_sid].history = [..._hist.filter(m=>!_ex.has(m.content)), ...(userData[_sid].history||[])];
           if (!userData[_sid].lastMessageAt) userData[_sid].lastMessageAt = _conv.lastTs||null;
         } else {
-          userData[_sid] = {lang:null,sinusType:null,state:'unknown',platform:'whatsapp',duration:null,selectedPlan:null,lastMessageAt:_conv.lastTs||null,ghostAttempts:0,enrolledAt:null,history:_hist.slice(-60),source:'sheets'};
+          userData[_sid] = {lang:null,sinusType:null,state:'unknown',platform:_conv.platform||'whatsapp',duration:null,selectedPlan:null,lastMessageAt:_conv.lastTs||null,ghostAttempts:0,enrolledAt:null,history:_hist.slice(-60),source:'sheets'};
         }
       }
       console.log('[ADMIN] Merged convs:', Object.keys(_cm).length);
