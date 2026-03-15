@@ -1179,7 +1179,7 @@ app.get("/admin/data", async (req, res) => {
     try {
       const _sr = await fetch(SHEET_URL + '?action=conversations');
       const _sl = await _sr.json();
-      console.log('[ADMIN] Sheets resp type:', typeof _sl, 'isArr:', Array.isArray(_sl), 'keys:', _sl && typeof _sl==='object' ? Object.keys(_sl).join(',') : 'n/a');
+      console.log('[ADMIN] Sheets raw:', JSON.stringify(_sl).substring(0,300));
       const _records = Array.isArray(_sl) ? _sl : (Array.isArray(_sl&&_sl.data) ? _sl.data : Array.isArray(_sl&&_sl.conversations) ? _sl.conversations : Array.isArray(_sl&&_sl.rows) ? _sl.rows : []);
       console.log('[ADMIN] Records to merge:', _records.length);
       for (const sl of _records) {
@@ -1192,7 +1192,7 @@ app.get("/admin/data", async (req, res) => {
           userData[sid]={lang:sl.lang||null,sinusType:sl.sinusType||null,state:sl.state||'unknown',platform:(sl.platform||'unknown').toLowerCase(),duration:sl.duration||null,selectedPlan:sl.selectedPlan||null,lastMessageAt:sl.lastActive?new Date(sl.lastActive).getTime():null,ghostAttempts:0,enrolledAt:null,history:(sl.history||[]).slice(-60),source:'sheets'};
         }
       }
-    } catch(e){console.warn('[ADMIN] Sheets fetch err:',e.message);}
+    } catch(e){console.warn('[ADMIN] Sheets err:',e.message);}
   }
 
   all.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
