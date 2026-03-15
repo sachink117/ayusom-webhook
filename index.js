@@ -9,7 +9,7 @@
 // ✅ Insight-led, not sympathy-led for chronic cases
 // ✅ Medicine cycle assumed for 3+ year cases
 // ✅ Hope-led pitch: "14 din mein sinus theek ho sakta hai"
-// ✅ Commitment first, UPI second (no pushy payment drops)
+// ✅ Commitment first, manual payment details shared by you after yes
 // ✅ Diet always last in program description
 // ✅ No dashes — full stops and line breaks only
 // ✅ All 6 sinus types with wellness naming for reveals
@@ -35,6 +35,8 @@ const TWILIO_WA_NUMBER   = process.env.TWILIO_WHATSAPP_NUMBER;
 const INSTAGRAM_TOKEN    = process.env.INSTAGRAM_ACCESS_TOKEN;
 const SHEET_URL          = process.env.GOOGLE_SHEET_URL || "";
 const PORT               = process.env.PORT || 3000;
+const RAZORPAY_LINK_499  = process.env.RAZORPAY_LINK_499  || "https://rzp.io/rzp/Re2W26iX";
+const RAZORPAY_LINK_1299 = process.env.RAZORPAY_LINK_1299 || "https://rzp.io/rzp/qu8zhQT";
 
 const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
@@ -930,10 +932,22 @@ async function handleMessage(senderId, messageText, platform) {
     if (isCommitmentYes(text)) {
       user.awaitingCommitment = false;
       user.state              = "awaiting_payment";
-      const planPrice = PRICES[user.selectedPlan || "restoration"].price;
-      const paymentMsg = user.lang === "eng"
-        ? `Payment details:\nUPI: [YOUR_UPI_ID]\nAmount: Rs. ${planPrice}\n\nSend the payment screenshot here. Your program starts the same day.`
-        : `Payment details:\nUPI: [YOUR_UPI_ID]\nAmount: Rs. ${planPrice}\n\nPayment ka screenshot yahaan bhej dein. Program usi din shuru hoga.`;
+      const plan      = user.selectedPlan || "restoration";
+      const planPrice = PRICES[plan].price;
+      const rzpLink   = plan === "clearing" ? RAZORPAY_LINK_499 : RAZORPAY_LINK_1299;
+
+      let paymentMsg;
+      if (rzpLink) {
+        // Razorpay link available — send it directly
+        paymentMsg = user.lang === "eng"
+          ? `Here is your secure payment link:\n${rzpLink}\n\nAmount: Rs. ${planPrice}. Once paid, send the confirmation here and your program starts the same day.`
+          : `Yeh raha aapka secure payment link:\n${rzpLink}\n\nAmount: Rs. ${planPrice}. Payment hone ke baad confirmation yahaan bhej dein. Program usi din shuru hoga.`;
+      } else {
+        // No Razorpay — notify and send manually
+        paymentMsg = user.lang === "eng"
+          ? `Great! I will share the payment details with you shortly. Amount: Rs. ${planPrice}.\n\nOnce done, send a screenshot here and your program starts the same day.`
+          : `Bahut badhiya. Payment details abhi share karta hun. Amount: Rs. ${planPrice}.\n\nScreenshot yahaan bhej dein, program usi din shuru hoga.`;
+      }
       await sendWithTyping(platform, senderId, paymentMsg, 800);
       await logToSheet(senderId, platform, user.sinusType, "awaiting_payment", text, paymentMsg);
       return;
