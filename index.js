@@ -289,6 +289,7 @@ async function sendWhatsAppMessage(to, body) {
 
 async function sendMessage(platform, userId, text) {
   if (!text || !text.trim()) return;
+  text = cleanText(text);
   const chunks = splitMessage(text);
   for (const chunk of chunks) {
     if      (platform === "twilio")    await sendTwilioMessage(userId, chunk);
@@ -298,6 +299,17 @@ async function sendMessage(platform, userId, text) {
     else                               await sendFBMessage(userId, chunk);
     if (chunks.length > 1) await sleep(700);
   }
+}
+
+function cleanText(text) {
+  if (!text) return text;
+  return text
+    .replace(/\u2014|\u2013/g, '')          // strip em-dash and en-dash
+    .replace(/^ *[-\u2022] +/gm, '')         // strip bullet hyphens/dots at line start
+    .replace(/ - /g, ' ')                     // strip pause hyphens
+    .replace(/([a-zA-Z\u0900-\u097F]) - ([a-zA-Z\u0900-\u097F])/g, '$1 $2') // word-hyphen-word
+    .replace(/ {2,}/g, ' ')                   // collapse spaces
+    .trim();
 }
 
 function splitMessage(text, maxLen = 1500) {
@@ -480,8 +492,8 @@ function buildSystemPrompt(user) {
   const isEng         = lang === "eng";
 
   const langInstruction = {
-    hin: "LANGUAGE: Respond in Hinglish (Hindi and English mix). Aap always. NEVER Bhai, Yaar, Boss, Didi.",
-    eng: "LANGUAGE: Respond in English. Professional warm tone. No slang.",
+    hin: "LANGUAGE: Respond in Hinglish (Hindi and English mix). Write like a warm knowledgeable friend texting. Aap always. NEVER Bhai, Yaar, Boss, Didi. Short sentences. No formal paragraphs.",
+    eng: "LANGUAGE: Respond in English. Write like a caring, knowledgeable friend. Short sentences. Warm and direct. No formal language. No slang.",
     ben: "LANGUAGE: Respond in Bengali mixed with English. Warm formal tone.",
     mar: "LANGUAGE: Respond in Marathi mixed with English. Aapan/Ji tone.",
     pun: "LANGUAGE: Respond in Punjabi mixed with English. Respectful tone.",
@@ -501,7 +513,8 @@ Problem Duration: ${duration}
 Used Medicines Before: ${usedAllopathy === null ? "not confirmed yet" : usedAllopathy ? "yes" : "no"}
 
 FORMATTING RULES (follow strictly in every message):
-1. NO dashes of any kind. No em dash. No hyphen used as a pause. Use a full stop or line break instead.
+1. ABSOLUTE RULE: ZERO dashes. No — no – no hyphen-as-pause. Not even one. Full stop or line break only. This is non-negotiable.
+1b. Write like a real person texting a friend. Short, warm, natural. Never sound like a formal consultant or a robot.
 2. Keep each message to 4 to 5 lines maximum. No long paragraphs. One idea per message.
 3. When listing things, use numbered points. Never use bullet points or dashes.
 4. No "bhai" or "didi". Use "aap" always. Professional and warm.
@@ -793,8 +806,12 @@ async function handleMessage(senderId, messageText, platform) {
   user.ghostAttempts   = 0;
   user.platform        = platform;
 
-  // Detect language if not set
-  if (!user.lang) user.lang = detectLang(text);
+  // Detect language — always re-check + honour explicit English/Hindi requests
+  const _engReq = /\b(english|in english|speak english|reply english|english mein|only english)\b/i.test(text);
+  const _hinReq = /\b(hindi|hinglish|hindi mein|hindi me|in hindi|hindi bolo|hindi main)\b/i.test(text);
+  if (_engReq) user.lang = 'eng';
+  else if (_hinReq) user.lang = 'hin';
+  else user.lang = detectLang(text) || user.lang || 'hin';
 
   // ── RED FLAG — highest priority ──────────────────────────
   if (hasRedFlag(text)) {
