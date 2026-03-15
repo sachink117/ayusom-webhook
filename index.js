@@ -1174,7 +1174,7 @@ app.get("/admin/data", async (req, res) => {
     enrolledAt:        u.enrolledAt || null,
     history:           (u.history || []).slice(-40), // last 40 messages
   }));
-  // ─── SHEETS HISTORICAL DATA ─────────────────────────────
+  // ─── SHEETS HISTORICAL DATA ─────────────────────────────────
   if (SHEET_URL) {
     try {
       const _sr = await fetch(SHEET_URL + '?action=conversations');
