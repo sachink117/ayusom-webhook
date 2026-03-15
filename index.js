@@ -1086,7 +1086,7 @@ app.post("/webhook", async (req, res) => {
 
 // ─── TWILIO WHATSAPP WEBHOOK ──────────────────────────────────
 app.post(["/twilio-webhook", "/twilio"], async (req, res) => {
-  res.sendStatus(200);
+  res.status(200).end(); // empty body — prevents Twilio from sending "OK" as WhatsApp msg
   try {
     const from  = (req.body.From || "").replace("whatsapp:", "");
     const body  = req.body.Body || "";
