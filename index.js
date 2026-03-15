@@ -31,7 +31,7 @@ const VERIFY_TOKEN       = process.env.VERIFY_TOKEN;
 const ANTHROPIC_API_KEY  = process.env.ANTHROPIC_API_KEY;
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN  = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_WA_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || '+15559069156'; // Ayusomam WhatsApp number
+const TWILIO_WA_NUMBER = '+15559069156'; // Ayusomam Twilio WhatsApp number (hardcoded)
 const INSTAGRAM_TOKEN    = process.env.INSTAGRAM_TOKEN;
 const SHEET_URL          = process.env.GOOGLE_SHEET_URL || "";
 const PORT               = process.env.PORT || 3000;
@@ -244,6 +244,7 @@ function hasRedFlag(text) {
 
 // ─── MESSAGING FUNCTIONS ─────────────────────────────────────
 async function sendTwilioMessage(to, body) {
+  if (!to || !/^[+0-9]/.test(String(to))) { console.error('[Twilio] Skipping invalid to:', to); return; }
   const client = require("twilio")(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
   return client.messages.create({
     body,
