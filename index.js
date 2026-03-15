@@ -1176,24 +1176,23 @@ app.get("/admin/data", async (req, res) => {
   }));
   // ─── SHEETS HISTORICAL DATA ─────────────────────────────────
   if (SHEET_URL) {
-    console.log('[ADMIN] Fetching sheets from:', SHEET_URL ? 'URL_SET' : 'URL_EMPTY');
     try {
       const _sr = await fetch(SHEET_URL + '?action=conversations');
       const _sl = await _sr.json();
-      console.log('[ADMIN] Sheets fetched, type:', typeof _sl, 'isArr:', Array.isArray(_sl), 'len:', Array.isArray(_sl)?_sl.length:'n/a');
-      if (Array.isArray(_sl)) {
-        for (const sl of _sl) {
-          const sid = String(sl.id || '').trim();
-          if (!sid) continue;
-          if (userData[sid]) {
-            const ms = new Set((userData[sid].history||[]).map(m=>m.content));
-            userData[sid].history=[...(sl.history||[]).filter(m=>!ms.has(m.content)),...userData[sid].history];
-          } else {
-            userData[sid]={lang:sl.lang||null,sinusType:sl.sinusType||null,state:sl.state||'unknown',platform:(sl.platform||'unknown').toLowerCase(),duration:sl.duration||null,selectedPlan:sl.selectedPlan||null,lastMessageAt:sl.lastActive?new Date(sl.lastActive).getTime():null,ghostAttempts:0,enrolledAt:null,history:(sl.history||[]).slice(-60),source:'sheets'};
-          }
+      console.log('[ADMIN] Sheets resp type:', typeof _sl, 'isArr:', Array.isArray(_sl), 'keys:', _sl && typeof _sl==='object' ? Object.keys(_sl).join(',') : 'n/a');
+      const _records = Array.isArray(_sl) ? _sl : (Array.isArray(_sl&&_sl.data) ? _sl.data : Array.isArray(_sl&&_sl.conversations) ? _sl.conversations : Array.isArray(_sl&&_sl.rows) ? _sl.rows : []);
+      console.log('[ADMIN] Records to merge:', _records.length);
+      for (const sl of _records) {
+        const sid = String(sl.id || '').trim();
+        if (!sid) continue;
+        if (userData[sid]) {
+          const ms = new Set((userData[sid].history||[]).map(m=>m.content));
+          userData[sid].history=[...(sl.history||[]).filter(m=>!ms.has(m.content)),...userData[sid].history];
+        } else {
+          userData[sid]={lang:sl.lang||null,sinusType:sl.sinusType||null,state:sl.state||'unknown',platform:(sl.platform||'unknown').toLowerCase(),duration:sl.duration||null,selectedPlan:sl.selectedPlan||null,lastMessageAt:sl.lastActive?new Date(sl.lastActive).getTime():null,ghostAttempts:0,enrolledAt:null,history:(sl.history||[]).slice(-60),source:'sheets'};
         }
       }
-    } catch(e){console.warn('[ADMIN] Sheets fetch err:',e.message,e.stack?.substring(0,200));}
+    } catch(e){console.warn('[ADMIN] Sheets fetch err:',e.message);}
   }
 
   all.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
