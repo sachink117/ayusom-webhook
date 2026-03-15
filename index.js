@@ -31,7 +31,7 @@ const VERIFY_TOKEN       = process.env.VERIFY_TOKEN;
 const ANTHROPIC_API_KEY  = process.env.ANTHROPIC_API_KEY;
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN  = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_WA_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || '+14155238886'; // Twilio WhatsApp sandbox
+const TWILIO_WA_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || '+15559069156'; // Ayusomam WhatsApp number
 const INSTAGRAM_TOKEN    = process.env.INSTAGRAM_TOKEN;
 const SHEET_URL          = process.env.GOOGLE_SHEET_URL || "";
 const PORT               = process.env.PORT || 3000;
@@ -1084,7 +1084,7 @@ app.post("/webhook", async (req, res) => {
 });
 
 // ─── TWILIO WHATSAPP WEBHOOK ──────────────────────────────────
-app.post("/twilio-webhook", async (req, res) => {
+app.post(["/twilio-webhook", "/twilio"], async (req, res) => {
   res.sendStatus(200);
   try {
     const from  = (req.body.From || "").replace("whatsapp:", "");
