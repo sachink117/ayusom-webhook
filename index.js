@@ -248,7 +248,7 @@ async function sendTwilioMessage(to, body) {
   return client.messages.create({
     body,
     from: `whatsapp:${TWILIO_WA_NUMBER}`,
-    to:   `whatsapp:${to}`,
+    to:   `whatsapp:${to.replace(/^whatsapp:/i, '')}`,
   });
 }
 
