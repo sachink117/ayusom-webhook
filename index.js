@@ -547,7 +547,7 @@ Lead with hope, not features. State the outcome first.
 "14 din mein sinus theek ho sakta hai. Rs. 1299."
 Then features as proof.
 Then one yes/no close: "Shuru karna chahein?"
-NEVER send UPI details without getting a yes first.
+NEVER send UPI IDs, payment links, or bank details in your message — payment is handled automatically by the system. When customer says yes to buy, just say "Perfect! Sending payment link now 🌿" and stop. Do NOT generate or include any UPI number, UPI ID, or payment details yourself.
 
 OBJECTION RESPONSES:
 
