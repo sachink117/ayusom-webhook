@@ -1637,7 +1637,7 @@ function sendFUNow(userId){
   fetch('/admin/send-followup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:SEC,userId})})
     .then(r=>r.json())
     .then(d=>{
-      if(d.ok){alert('Sent! (Follow-up #'+d.followupCount+')\n\n'+d.message.substring(0,100)+'...');loadData();}
+      if(d.ok){alert('Sent! (Follow-up #'+d.followupCount+')\\n\\n'+d.message.substring(0,100)+'...');loadData();}
       else{alert('Error: '+(d.error||'unknown'));if(btn){btn.disabled=false;btn.textContent='Send now';}}
     }).catch(()=>{if(btn){btn.disabled=false;btn.textContent='Send now';}});
 }
