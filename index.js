@@ -1174,6 +1174,26 @@ app.get("/admin/data", (req, res) => {
     enrolledAt:        u.enrolledAt || null,
     history:           (u.history || []).slice(-40), // last 40 messages
   }));
+  // ─── SHEETS HISTORICAL DATA ─────────────────────────────
+  if (SHEET_URL) {
+    try {
+      const _sr = await fetch(SHEET_URL + '?action=conversations');
+      const _sl = await _sr.json();
+      if (Array.isArray(_sl)) {
+        for (const sl of _sl) {
+          const sid = String(sl.id || '').trim();
+          if (!sid) continue;
+          if (memMap[sid]) {
+            const ms = new Set((memMap[sid].history||[]).map(m=>m.content));
+            memMap[sid].history=[...(sl.history||[]).filter(m=>!ms.has(m.content)),...memMap[sid].history];
+          } else {
+            memMap[sid]={id:sid,platform:(sl.platform||'unknown').toLowerCase(),state:sl.state||'unknown',sinusType:sl.sinusType||null,lang:sl.lang||null,duration:sl.duration||null,selectedPlan:sl.selectedPlan||null,lastMessageAt:sl.lastActive?new Date(sl.lastActive).getTime():null,ghostAttempts:0,enrolledAt:null,history:(sl.history||[]).slice(-60),source:'sheets'};
+          }
+        }
+      }
+    } catch(e){console.warn('Sheets fetch err:',e.message);}
+  }
+
   all.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
 
   const stats = {
