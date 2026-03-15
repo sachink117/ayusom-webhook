@@ -1176,9 +1176,11 @@ app.get("/admin/data", async (req, res) => {
   }));
   // ─── SHEETS HISTORICAL DATA ─────────────────────────────────
   if (SHEET_URL) {
+    console.log('[ADMIN] Fetching sheets from:', SHEET_URL ? 'URL_SET' : 'URL_EMPTY');
     try {
       const _sr = await fetch(SHEET_URL + '?action=conversations');
       const _sl = await _sr.json();
+      console.log('[ADMIN] Sheets fetched, type:', typeof _sl, 'isArr:', Array.isArray(_sl), 'len:', Array.isArray(_sl)?_sl.length:'n/a');
       if (Array.isArray(_sl)) {
         for (const sl of _sl) {
           const sid = String(sl.id || '').trim();
@@ -1191,7 +1193,7 @@ app.get("/admin/data", async (req, res) => {
           }
         }
       }
-    } catch(e){console.warn('Sheets fetch err:',e.message);}
+    } catch(e){console.warn('[ADMIN] Sheets fetch err:',e.message,e.stack?.substring(0,200));}
   }
 
   all.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
