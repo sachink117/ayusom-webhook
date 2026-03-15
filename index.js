@@ -1177,11 +1177,10 @@ app.get("/admin/data", async (req, res) => {
   // ─── SHEETS HISTORICAL DATA ─────────────────────────────────
   if (SHEET_URL) {
     try {
-      const _sr = await fetch(SHEET_URL + '?action=conversations');
+      const _sr = await fetch(SHEET_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'conversations'})});
       const _sl = await _sr.json();
-      console.log('[ADMIN] Sheets raw:', JSON.stringify(_sl).substring(0,300));
-      const _records = Array.isArray(_sl) ? _sl : (Array.isArray(_sl&&_sl.data) ? _sl.data : Array.isArray(_sl&&_sl.conversations) ? _sl.conversations : Array.isArray(_sl&&_sl.rows) ? _sl.rows : []);
-      console.log('[ADMIN] Records to merge:', _records.length);
+      const _records = Array.isArray(_sl) ? _sl : (Array.isArray(_sl&&_sl.data) ? _sl.data : Array.isArray(_sl&&_sl.conversations) ? _sl.conversations : []);
+      console.log('[ADMIN] Sheets records:', _records.length, _sl&&_sl.error?'err:'+_sl.error:'ok');
       for (const sl of _records) {
         const sid = String(sl.id || '').trim();
         if (!sid) continue;
