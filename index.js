@@ -1158,6 +1158,334 @@ app.get("/stats", (req, res) => {
   res.json(stats);
 });
 
+// ─── ADMIN API: DATA ──────────────────────────────────────────
+app.get("/admin/data", (req, res) => {
+  if (req.query.secret !== VERIFY_TOKEN) return res.status(401).json({ error: "Unauthorized" });
+  const all = Object.entries(userData).map(([id, u]) => ({
+    id,
+    platform:          u.platform || "unknown",
+    state:             u.state    || "new",
+    sinusType:         u.sinusType || null,
+    lang:              u.lang     || null,
+    duration:          u.duration || null,
+    selectedPlan:      u.selectedPlan || null,
+    lastMessageAt:     u.lastMessageAt || null,
+    ghostAttempts:     u.ghostAttempts || 0,
+    enrolledAt:        u.enrolledAt || null,
+    history:           (u.history || []).slice(-40), // last 40 messages
+  }));
+  all.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+
+  const stats = {
+    total:       all.length,
+    converted:   all.filter((u) => u.state === "post_payment" || u.state === "done").length,
+    pitched:     all.filter((u) => ["pitched","awaiting_payment","awaiting_commitment"].includes(u.state)).length,
+    active:      all.filter((u) => !["new","done","post_payment"].includes(u.state)).length,
+    ghosted:     all.filter((u) => u.ghostAttempts > 0).length,
+  };
+  stats.conversionRate = stats.total ? ((stats.converted / stats.total) * 100).toFixed(1) : "0";
+  res.json({ stats, leads: all });
+});
+
+// ─── ADMIN API: REPLY ─────────────────────────────────────────
+app.post("/admin/reply", async (req, res) => {
+  if (req.body.secret !== VERIFY_TOKEN) return res.status(401).json({ error: "Unauthorized" });
+  const { userId, platform, message } = req.body;
+  if (!userId || !platform || !message) return res.status(400).json({ error: "Missing fields" });
+  try {
+    await sendMessage(platform, userId, message);
+    // Inject into history so it appears in the thread
+    if (userData[userId]) {
+      userData[userId].history = userData[userId].history || [];
+      userData[userId].history.push({ role: "assistant", content: message });
+    }
+    await logToSheet(userId, platform, userData[userId]?.sinusType || null, "admin_reply", "", message);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── ADMIN DASHBOARD SPA ──────────────────────────────────────
+app.get("/admin", (req, res) => {
+  if (req.query.secret !== VERIFY_TOKEN) {
+    return res.send(`<!DOCTYPE html><html><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f5f5f5">
+      <form method="GET" action="/admin" style="background:#fff;padding:32px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.1);text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">🌿</div>
+        <h2 style="margin:0 0 20px;color:#1a1a1a">Ayusomam Admin</h2>
+        <input name="secret" type="password" placeholder="Enter secret token" style="padding:10px 16px;border:1px solid #ddd;border-radius:8px;font-size:15px;width:220px"/>
+        <br/><br/>
+        <button type="submit" style="background:#2e7d32;color:#fff;border:none;padding:10px 28px;border-radius:8px;font-size:15px;cursor:pointer">Login</button>
+      </form></body></html>`);
+  }
+
+  const secret = req.query.secret;
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Ayusomam Admin</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a1a;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+    .topbar{background:#2e7d32;color:#fff;padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:10}
+    .topbar h1{font-size:17px;font-weight:600}
+    .topbar-right{display:flex;align-items:center;gap:16px;font-size:13px;opacity:.9}
+    .filter-bar{display:flex;gap:8px;padding:10px 16px;background:#fff;border-bottom:1px solid #e8e8e8;flex-shrink:0}
+    .filter-btn{padding:5px 14px;border-radius:20px;border:1px solid #ddd;background:#fff;font-size:13px;cursor:pointer;transition:all .15s}
+    .filter-btn.active{background:#2e7d32;color:#fff;border-color:#2e7d32}
+    .layout{display:flex;flex:1;overflow:hidden}
+    .sidebar{width:320px;flex-shrink:0;background:#fff;border-right:1px solid #e8e8e8;display:flex;flex-direction:column;overflow:hidden}
+    .sidebar-header{padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#666;font-weight:500}
+    .lead-list{flex:1;overflow-y:auto}
+    .lead-item{padding:12px 16px;border-bottom:1px solid #f5f5f5;cursor:pointer;transition:background .1s}
+    .lead-item:hover{background:#f9f9f9}
+    .lead-item.active{background:#e8f5e9}
+    .lead-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+    .lead-name{font-size:14px;font-weight:500;color:#1a1a1a}
+    .lead-time{font-size:11px;color:#aaa}
+    .lead-meta{display:flex;gap:6px;align-items:center}
+    .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500}
+    .badge-fb{background:#e3f2fd;color:#1565c0}
+    .badge-wa{background:#e8f5e9;color:#2e7d32}
+    .badge-ig{background:#fce4ec;color:#c62828}
+    .badge-state{background:#f5f5f5;color:#555}
+    .badge-converted{background:#e8f5e9;color:#2e7d32}
+    .badge-pitched{background:#fff3e0;color:#e65100}
+    .badge-ghosted{background:#fafafa;color:#999}
+    .chat-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+    .chat-header{padding:14px 20px;background:#fff;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;gap:12px}
+    .chat-header-info h2{font-size:15px;font-weight:600}
+    .chat-header-info p{font-size:12px;color:#888;margin-top:2px}
+    .stats-bar{display:flex;gap:12px;padding:10px 20px;background:#fff;border-bottom:1px solid #f0f0f0;flex-shrink:0}
+    .stat-pill{background:#f4f6f8;border-radius:8px;padding:6px 14px;text-align:center}
+    .stat-pill .val{font-size:18px;font-weight:700;color:#2e7d32}
+    .stat-pill .lbl{font-size:11px;color:#888;margin-top:1px}
+    .messages{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+    .msg{max-width:72%;padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+    .msg-user{background:#e8f5e9;color:#1a1a1a;align-self:flex-start;border-bottom-left-radius:4px}
+    .msg-bot{background:#fff;color:#1a1a1a;align-self:flex-end;border-bottom-right-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+    .msg-time{font-size:10px;color:#bbb;margin-top:3px;text-align:right}
+    .empty-state{flex:1;display:flex;align-items:center;justify-content:center;color:#bbb;flex-direction:column;gap:8px}
+    .empty-state span{font-size:40px}
+    .reply-box{padding:12px 16px;background:#fff;border-top:1px solid #e8e8e8;display:flex;gap:10px;align-items:flex-end}
+    .reply-input{flex:1;border:1px solid #ddd;border-radius:12px;padding:10px 14px;font-size:14px;resize:none;outline:none;font-family:inherit;max-height:120px;min-height:42px;transition:border .15s}
+    .reply-input:focus{border-color:#2e7d32}
+    .send-btn{background:#2e7d32;color:#fff;border:none;border-radius:12px;padding:10px 20px;font-size:14px;cursor:pointer;white-space:nowrap;font-weight:500;transition:opacity .15s}
+    .send-btn:disabled{opacity:.5;cursor:default}
+    .platform-icon{font-size:18px}
+    .no-convo{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#bbb}
+    .no-convo .icon{font-size:48px}
+    .no-convo p{font-size:15px}
+    ::-webkit-scrollbar{width:4px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:#ddd;border-radius:4px}
+  </style>
+</head>
+<body>
+<div class="topbar">
+  <h1>🌿 Ayusomam Dashboard</h1>
+  <div class="topbar-right">
+    <span id="clock"></span>
+    <button onclick="loadData()" style="background:rgba(255,255,255,.2);border:none;color:#fff;padding:5px 12px;border-radius:8px;cursor:pointer;font-size:13px">↻ Refresh</button>
+  </div>
+</div>
+
+<div class="stats-bar" id="statsBar">
+  <div class="stat-pill"><div class="val" id="s-total">—</div><div class="lbl">Total</div></div>
+  <div class="stat-pill"><div class="val" id="s-active">—</div><div class="lbl">Active</div></div>
+  <div class="stat-pill"><div class="val" id="s-pitched" style="color:#e65100">—</div><div class="lbl">In Checkout</div></div>
+  <div class="stat-pill"><div class="val" id="s-converted">—</div><div class="lbl">Converted</div></div>
+  <div class="stat-pill"><div class="val" id="s-rate">—</div><div class="lbl">Conv. Rate</div></div>
+  <div class="stat-pill"><div class="val" id="s-ghosted" style="color:#999">—</div><div class="lbl">Ghosted</div></div>
+</div>
+
+<div class="filter-bar">
+  <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+  <button class="filter-btn" onclick="setFilter('messenger',this)">📘 Messenger</button>
+  <button class="filter-btn" onclick="setFilter('whatsapp',this)">💬 WhatsApp</button>
+  <button class="filter-btn" onclick="setFilter('instagram',this)">📸 Instagram</button>
+  <button class="filter-btn" onclick="setFilter('post_payment',this)">✅ Converted</button>
+  <button class="filter-btn" onclick="setFilter('pitched',this)">🔥 In Checkout</button>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-header" id="leadCount">Loading...</div>
+    <div class="lead-list" id="leadList"></div>
+  </div>
+  <div class="chat-panel" id="chatPanel">
+    <div class="no-convo">
+      <div class="icon">💬</div>
+      <p>Select a conversation to view</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const SECRET = '${secret}';
+let allLeads = [];
+let activeFilter = 'all';
+let activeUserId = null;
+let autoRefreshTimer = null;
+
+const platformIcon  = { messenger:'📘', whatsapp:'💬', instagram:'📸', unknown:'💬' };
+const platformBadge = { messenger:'badge-fb', whatsapp:'badge-wa', instagram:'badge-ig', unknown:'badge-fb' };
+const stateColor    = { post_payment:'badge-converted', awaiting_payment:'badge-pitched', pitched:'badge-pitched', awaiting_commitment:'badge-pitched' };
+
+function timeAgo(ts) {
+  if (!ts) return '—';
+  const m = Math.round((Date.now() - ts) / 60000);
+  if (m < 1)  return 'just now';
+  if (m < 60) return m + 'm ago';
+  if (m < 1440) return Math.round(m/60) + 'h ago';
+  return Math.round(m/1440) + 'd ago';
+}
+
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderLeads();
+}
+
+async function loadData() {
+  try {
+    const r = await fetch('/admin/data?secret=' + SECRET);
+    const d = await r.json();
+    allLeads = d.leads || [];
+    const s = d.stats || {};
+    document.getElementById('s-total').textContent     = s.total || 0;
+    document.getElementById('s-active').textContent    = s.active || 0;
+    document.getElementById('s-pitched').textContent   = s.pitched || 0;
+    document.getElementById('s-converted').textContent = s.converted || 0;
+    document.getElementById('s-rate').textContent      = (s.conversionRate || '0') + '%';
+    document.getElementById('s-ghosted').textContent   = s.ghosted || 0;
+    renderLeads();
+    if (activeUserId) renderChat(activeUserId);
+  } catch(e) { console.error(e); }
+}
+
+function renderLeads() {
+  let leads = allLeads;
+  if (activeFilter === 'messenger')   leads = leads.filter(l => l.platform === 'messenger');
+  if (activeFilter === 'whatsapp')    leads = leads.filter(l => l.platform === 'whatsapp');
+  if (activeFilter === 'instagram')   leads = leads.filter(l => l.platform === 'instagram');
+  if (activeFilter === 'post_payment') leads = leads.filter(l => l.state === 'post_payment' || l.state === 'done');
+  if (activeFilter === 'pitched')     leads = leads.filter(l => ['pitched','awaiting_payment','awaiting_commitment'].includes(l.state));
+
+  document.getElementById('leadCount').textContent = leads.length + ' conversation' + (leads.length !== 1 ? 's' : '');
+  const list = document.getElementById('leadList');
+  list.innerHTML = leads.map(l => {
+    const icon    = platformIcon[l.platform] || '💬';
+    const bCls    = platformBadge[l.platform] || 'badge-fb';
+    const sCls    = stateColor[l.state] || 'badge-state';
+    const lastMsg = (l.history || []).filter(m => m.role === 'user').slice(-1)[0];
+    const preview = lastMsg ? lastMsg.content.substring(0,50) + (lastMsg.content.length > 50 ? '…' : '') : 'No messages yet';
+    return \`<div class="lead-item\${l.id === activeUserId ? ' active' : ''}" onclick="selectLead('\${l.id}')">
+      <div class="lead-top">
+        <span class="lead-name">\${icon} \${l.id.substring(0,12)}…</span>
+        <span class="lead-time">\${timeAgo(l.lastMessageAt)}</span>
+      </div>
+      <div class="lead-meta" style="margin-bottom:4px">
+        <span class="badge \${bCls}">\${l.platform}</span>
+        <span class="badge \${sCls}">\${l.state}</span>
+        \${l.sinusType ? '<span class="badge" style="background:#f3e5f5;color:#6a1b9a">' + l.sinusType.replace(/_/g,' ') + '</span>' : ''}
+      </div>
+      <div style="font-size:12px;color:#999;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">\${preview}</div>
+    </div>\`;
+  }).join('');
+}
+
+function selectLead(id) {
+  activeUserId = id;
+  renderLeads();
+  renderChat(id);
+}
+
+function renderChat(id) {
+  const lead = allLeads.find(l => l.id === id);
+  if (!lead) return;
+  const icon  = platformIcon[lead.platform] || '💬';
+  const panel = document.getElementById('chatPanel');
+  const history = lead.history || [];
+
+  panel.innerHTML = \`
+    <div class="chat-header">
+      <span class="platform-icon">\${icon}</span>
+      <div class="chat-header-info">
+        <h2>\${lead.platform.charAt(0).toUpperCase()+lead.platform.slice(1)} · \${lead.id}</h2>
+        <p>\${lead.sinusType ? lead.sinusType.replace(/_/g,' ') + ' · ' : ''}\${lead.state} · \${lead.lang || 'hin'}\${lead.duration ? ' · ' + lead.duration : ''}</p>
+      </div>
+    </div>
+    <div class="messages" id="msgArea">
+      \${history.length === 0
+        ? '<div class="empty-state"><span>💬</span><p>No messages yet</p></div>'
+        : history.map(m => \`
+          <div>
+            <div class="msg \${m.role === 'user' ? 'msg-user' : 'msg-bot'}">\${m.content}</div>
+          </div>\`).join('')}
+    </div>
+    <div class="reply-box">
+      <textarea class="reply-input" id="replyInput" placeholder="Type a message to send via \${lead.platform}…" rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendReply()}"
+        oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendReply()">Send ↗</button>
+    </div>\`;
+
+  // Scroll to bottom
+  const msgArea = document.getElementById('msgArea');
+  if (msgArea) msgArea.scrollTop = msgArea.scrollHeight;
+}
+
+async function sendReply() {
+  const input = document.getElementById('replyInput');
+  const btn   = document.getElementById('sendBtn');
+  const msg   = input.value.trim();
+  if (!msg || !activeUserId) return;
+  const lead = allLeads.find(l => l.id === activeUserId);
+  if (!lead) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try {
+    const r = await fetch('/admin/reply', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ secret: SECRET, userId: activeUserId, platform: lead.platform, message: msg }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      input.value = '';
+      input.style.height = 'auto';
+      // Add to local history immediately
+      lead.history = lead.history || [];
+      lead.history.push({ role: 'assistant', content: msg });
+      renderChat(activeUserId);
+    } else {
+      alert('Send failed: ' + (d.error || 'Unknown error'));
+    }
+  } catch(e) { alert('Error: ' + e.message); }
+  btn.disabled = false;
+  btn.textContent = 'Send ↗';
+}
+
+// Clock
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'});
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+// Auto-refresh data every 30s
+loadData();
+setInterval(loadData, 30000);
+</script>
+</body>
+</html>`);
+});
+
 // ─── HEALTH CHECK ─────────────────────────────────────────────
 app.get("/health", (req, res) => {
   res.json({
