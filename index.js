@@ -1,1131 +1,1826 @@
-const express = require('express');
-const fetch = require('node-fetch');
-const crypto = require('crypto');
-const app = express();
+// ============================================================
+// AYUSOMAM MESSENGER BOT — Version 5.0 (PLUGIN EDITION)
+// Built by Claude | Ayusomam Herbals
+//
+// v5.0 Updates (from Plugin learnings):
+// ✅ Numbered duration + symptom menus (tap to reply)
+// ✅ Multi-symptom selection with combo insights (wow factor)
+// ✅ Sinus Type revealed LAST after all insights
+// ✅ Insight-led, not sympathy-led for chronic cases
+// ✅ Medicine cycle assumed for 3+ year cases
+// ✅ Hope-led pitch: "14 din mein sinus theek ho sakta hai"
+// ✅ Commitment first, manual payment details shared by you after yes
+// ✅ Diet always last in program description
+// ✅ No dashes — full stops and line breaks only
+// ✅ All 6 sinus types with wellness naming for reveals
+// ✅ Language mirroring across all Indian languages
+// ✅ Ghosting recovery + Day milestones (5, 7, 10, 13)
+// ✅ Red flag detection → ENT referral
+// ✅ Google Sheets logging
+// ============================================================
 
-app.use('/razorpay-webhook', express.raw({ type: 'application/json' }));
+const express    = require("express");
+const Anthropic  = require("@anthropic-ai/sdk");
+const app        = express();
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.urlencoded({ extended: false }));
 
-const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
-const GOOGLE_SHEET_URL = process.env.GOOGLE_SHEET_URL;
-const CLAUDE_API_KEY = process.env.ANTHROPIC_API_KEY;
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
-const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN;
-const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
+// ─── CONFIG ──────────────────────────────────────────────────
+const PAGE_ACCESS_TOKEN  = process.env.PAGE_ACCESS_TOKEN;
+const VERIFY_TOKEN       = process.env.VERIFY_TOKEN;
+const ANTHROPIC_API_KEY  = process.env.ANTHROPIC_API_KEY;
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_AUTH_TOKEN  = process.env.TWILIO_AUTH_TOKEN;
+const TWILIO_WA_NUMBER = '+15559069156'; // Ayusomam Twilio WhatsApp number (hardcoded)
+const INSTAGRAM_TOKEN    = process.env.INSTAGRAM_TOKEN;
+const SHEET_URL          = process.env.GOOGLE_SHEET_URL || "";
+const PORT               = process.env.PORT || 3000;
+const RAZORPAY_LINK_499  = process.env.RAZORPAY_LINK_499  || "https://rzp.io/rzp/Re2W26iX";
+const RAZORPAY_LINK_1299 = process.env.RAZORPAY_LINK_1299 || "https://rzp.io/rzp/qu8zhQT";
 
-const PAGE_ID = '1035532399636645';
-const PAYMENT_1299 = 'https://rzp.io/rzp/qu8zhQT';
-const PAYMENT_499 = 'https://rzp.io/rzp/Re2W26iX';
-const WHATSAPP_NUM = '+91 85951 60713';
+const WHATSAPP_TOKEN           = process.env.WHATSAPP_TOKEN;
+const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+const widgetPending            = {};
 
-// ============================================================
-// IN-MEMORY STATE
-// ============================================================
-const userState = {};
-const userProfile = {};
-const convHistory = {};
-const followUpTracker = {}; // { senderId: { pitchedAt, followUp1Sent, followUp2Sent, platform, sendFnType } }
+const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
-// ============================================================
-// IST TIME HELPER
-// ============================================================
-function getISTHour() {
-  const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
-  return ist.getUTCHours();
+// ─── IN-MEMORY STORE ─────────────────────────────────────────
+// userData[userId] = {
+//   lang, sinusType, convPhase, state, history,
+//   duration, durationIndex, symptoms, symptomNums,
+//   usedAllopathy, selectedPlan, enrolledAt,
+//   lastMessageAt, ghostAttempts, followupStage,
+//   milestonesSent[], name, platform,
+//   durationMenuSent, symptomMenuSent, insightShown,
+//   sinusTypeRevealed, awaitingCommitment
+// }
+const userData = {};
+const processedMessages = new Set();
+
+// ─── PRICING ─────────────────────────────────────────────────
+const PRICES = {
+  reset:       { name: "7-Day Sinus Reset",       price: "499",   days: 7  },
+  restoration: { name: "14-Day Sinus Restoration", price: "1,299", days: 14 },
+};
+
+// ─── SINUS TYPE MAPPING ───────────────────────────────────────
+// Internal key → customer-facing wellness name
+const SINUS_TYPE_NAMES = {
+  allergic:   "Reactive Sensitivity Type",
+  congestive: "Chronic Congestion Type",
+  infective:  "Deep Inflammation Type",
+  spray:      "Spray Dependency Pattern",
+  polyp:      "Drainage Blockage Type",
+  dns:        "Structural Congestion Type",
+};
+
+// ─── DURATION OPTIONS ─────────────────────────────────────────
+const DURATION_OPTIONS = [
+  "1 se 3 mahine",
+  "3 se 6 mahine",
+  "1 se 2 saal",
+  "3 se 5 saal",
+  "5 saal se zyada",
+];
+
+// ─── SYMPTOM OPTIONS ──────────────────────────────────────────
+const SYMPTOM_OPTIONS = [
+  "Naak band rehti hai, khul hi nahi pati",
+  "Baar baar sneezing, dhool ya thandi se trigger hoti hai",
+  "Smell ya taste kum ho gayi hai",
+  "Sar bhaari rehta hai, aankhon ke upar pressure feel hota hai",
+  "Gale mein kuch girta rehta hai, baar baar clear karna padta hai",
+  "Baar baar infection aata hai, throat mein bhi asar hota hai",
+];
+
+// ─── CONVERSATION PHASES ─────────────────────────────────────
+const PHASES = ["probe", "mirror", "educate", "reframe", "close"];
+
+// ─── LANGUAGE DETECTION ──────────────────────────────────────
+function detectLang(text) {
+  if (!text) return "eng";
+  const devanagari = (text.match(/[\u0900-\u097F]/g) || []).length;
+  const bengali    = (text.match(/[\u0980-\u09FF]/g) || []).length;
+  const telugu     = (text.match(/[\u0C00-\u0C7F]/g) || []).length;
+  const tamil      = (text.match(/[\u0B80-\u0BFF]/g) || []).length;
+  const kannada    = (text.match(/[\u0C80-\u0CFF]/g) || []).length;
+  const punjabi    = (text.match(/[\u0A00-\u0A7F]/g) || []).length;
+  const max = Math.max(devanagari, bengali, telugu, tamil, kannada, punjabi);
+  if (max < 2) return "eng";
+  if (devanagari >= max) return "hin";
+  if (bengali    >= max) return "ben";
+  if (telugu     >= max) return "tel";
+  if (tamil      >= max) return "tam";
+  if (kannada    >= max) return "kan";
+  if (punjabi    >= max) return "pun";
+  return "eng";
 }
-function getTimeSlot() {
-  const h = getISTHour();
-  return (h >= 5 && h < 14) ? 'morning' : 'night';
-}
 
-// ============================================================
-// FREE STEPS
-// ============================================================
-const FREE_STEPS = {
-  morning: {
-    allergic: `✅ Vataja-Kaphaja Pratishyaya 🌿
-Type: Allergic Rhinosinusitis | Dosha: Vata + Kapha
-
-Aaj ke 2 steps subah try karein — ek doosre ke complementary hain:
-
-1️⃣ *Tulsi-Ginger Steam* — Subah uthte hi, khaana khaane se pehle
-Ek bhagona paani mein 4-5 fresh tulsi patte + adha inch kuch adrak daalen. Ubaal lein, phir towel sar pe odh ke 8-10 min steam lein. Muh band, sirf naak se saans lein.
-
-⏱️ 15-20 min baad —
-
-2️⃣ *Saline Nasal Rinse*
-1 cup gunguna paani + ½ tsp saindhav namak (sendha namak). Haath ki hatheli mein leke ek naak se kheenchein, doosri se bahar aane dein. Dono taraf.
-Steam ne mucus dhila kiya — rinse usse bahar karta hai.
-
-⚠️ Yeh steps aaj ke liye temporary surface relief hain. Allergy ka root — sensitized naak ki lining — sirf structured protocol se address hoti hai. Shaam ko zaroor batana — kuch fark mehsoos hua? 🙏`,
-
-    congestive: `✅ Kaphaja Pratishyaya 🔵
-Type: Congestive Sinusitis | Dosha: Kapha dominant
-
-Aaj ke 2 steps subah try karein:
-
-1️⃣ *Adrak-Saunth Steam* — khaali pet, uthte hi
-Paani mein 1 inch kuchi adrak + ½ tsp saunth (dry ginger powder) daalen. Ubaal ke 10 min steam lein, towel sar pe. Balgam loose hoga andar se.
-
-⏱️ 20-25 min baad —
-
-2️⃣ *Warm Jal Neti / Saline Rinse*
-1 cup gunguna paani + ½ tsp saindhav namak. Naak mein dono taraf rinse karein — gently, force nahi. Loose hua balgam bahar nikalega.
-
-⚠️ Yeh sirf aaj ke liye temporary relief hai. Andar ki congestion ka source structured approach se hi address hota hai. Shaam ko batana zaroor — kitna fark aaya? 🙏`,
-
-    heat: `✅ Pittaja Pratishyaya 🔥
-Type: Inflammatory Sinusitis | Dosha: Pitta aggravation
-
-Aaj ke 2 steps subah try karein:
-
-1️⃣ *Dhaniya-Saunf Infusion* — khaali pet, subah uthke
-1 tsp dhaniya (coriander seeds) + 1 tsp saunf ko raat bhar paani mein bhigo ke rakhein. Subah chhan ke thanda hi peeyein. Pitta ko andar se shant karta hai.
-
-⏱️ 30-40 min baad khaana khaane ke baad —
-
-2️⃣ *Ghee Nasya* (medicated nasal application)
-Dono naak mein 1-1 boond pure desi ghee (garm nahi — room temp). 5 min bilkul still baith ke rakhein. Burning sensation aur inflammation mein seedha kaam karta hai.
-
-⚠️ Yeh andar ki pitta vitiation ka root address nahi karti — sirf aaj ke liye relief hai. Shaam ko zaroor batana 🙏`,
-
-    dependency: `✅ Dushta Pratishyaya ⚠️
-Type: Chronic Rebound Sinusitis | Dosha: Vata + Srotas blockage
-
-Aaj ke 2 steps subah try karein:
-
-1️⃣ *Pre-Spray Steam Replacement*
-Spray use karne se pehle 10 min steam karein — plain paani, koi additive nahi. Agar naak khul jaaye toh spray ki zaroorat na padhe. Agar padhe toh sirf ek naak mein — doosri naak open rahe.
-
-⏱️ Dono ke beech minimum 30 min ka gap —
-
-2️⃣ *Anu Taila / Desi Ghee Nasya*
-Steam ke 30 min baad, dono naak mein 1-1 boond desi ghee ya anu taila (Ayurvedic nasal drops — easily available). Naak ki lining ko nourish karta hai — spray ki harshness se healing shuru hoti hai.
-
-⚠️ Spray ne jo mucosal damage kiya hai — yeh ghee se thodi healing karta hai, lekin dependency todne ke liye structured protocol chahiye. Shaam ko zaroor batana 🙏`
-  },
-  night: {
-    allergic: `✅ Vataja-Kaphaja Pratishyaya 🌿
-Type: Allergic Rhinosinusitis | Dosha: Vata + Kapha
-
-Aaj raat ke 2 steps try karein:
-
-1️⃣ *Haldi-Ghee Nasal Protocol* — Khana khaane ke 1 hour baad
-Ek cup garm doodh mein ½ tsp haldi + ½ tsp ghee milaen. Dhire dhire peeyein. Saath mein — dono naak mein 1-1 boond desi ghee nasya karein. Andar ki inflammation pe kaam karta hai.
-
-⏱️ 45-60 min baad, sone se 20-30 min pehle —
-
-2️⃣ *Sone se Pehle Steam*
-4-5 tulsi patte paani mein, 8 min steam. Towel sar pe. Raat ko dustbits aur allergens naak mein settle hote hain — yeh flush karta hai. Steam ke baad seedha so jaayein, bahar hawa mein mat niklein.
-
-⚠️ Yeh raat ke liye surface relief hai — allergy ki root cause waise ki waisi hai. Subah uthke zaroor batana — neend kaisi aayi, naak khuli thi ya band? 🙏`,
-
-    congestive: `✅ Kaphaja Pratishyaya 🔵
-Type: Congestive Sinusitis | Dosha: Kapha dominant
-
-Aaj raat ke 2 steps try karein:
-
-1️⃣ *Adrak-Haldi Kadha* — Raat ke khane ke 30-40 min baad
-½ inch adrak + ½ tsp haldi + 1 cup paani — 5 min ubaalein. Thoda thanda karke peeyein. Balgam ko andar se loose karta hai overnight.
-
-⏱️ 40-50 min baad, sone se 15-20 min pehle —
-
-2️⃣ *Steam + Ghee Nasya*
-10 min steam (towel sar pe). Phir 5 min baith ke — dono naak mein 1-1 boond desi ghee. Steam ne balgam dhila kiya, ghee nasal lining ko coat karta hai taki raat ko throat mein na girta rahe.
-
-⚠️ Yeh sirf aaj raat ke liye temporary relief hai. Subah uthke naak ki condition zaroor batana 🙏`,
-
-    heat: `✅ Pittaja Pratishyaya 🔥
-Type: Inflammatory Sinusitis | Dosha: Pitta aggravation
-
-Aaj raat ke 2 steps try karein:
-
-1️⃣ *Cooling Drink Before Dinner*
-Khana khaane se 20-30 min pehle — 1 glass room-temp nariyal paani ya saunf-dhaniya infusion (raat bhar bhigo ke). Fried, spicy, fermented khana aaj avoid karein — pitta raat ko badhta hai.
-
-⏱️ Khana khaane ke 1 hour baad —
-
-2️⃣ *Chandan-Ghee Nasya*
-Dono naak mein 1-1 boond desi ghee. Sone se pehle 5 min bilkul still baith ke rakhein. Ghee cooling + anti-inflammatory hota hai — pitta-based burning pe seedha kaam karta hai.
-
-⚠️ Yeh raat ke liye surface-level relief hai. Pitta ka root internally address karna padega. Subah kaise feel hua zaroor batana 🙏`,
-
-    dependency: `✅ Dushta Pratishyaya ⚠️
-Type: Chronic Rebound Sinusitis | Dosha: Vata + Srotas blockage
-
-Aaj raat ke 2 steps try karein:
-
-1️⃣ *Spray se Pehle Steam Trial*
-Sone se pehle 10 min steam — plain paani. Naak kholne ki koshish spray ki jagah steam se karein. Agar zaroorat pad hi jaaye toh sirf ek naak, minimum amount.
-
-⏱️ Steam ke 30-40 min baad —
-
-2️⃣ *Ghee Nasya + Correct Sleeping Position*
-Dono naak mein 1-1 boond desi ghee. Sone ki position: jis taraf naak zyada khuli ho — us taraf nahi, doosri taraf karwat lein. Gravity se dono naak ko equally breathe karne ka mauka milta hai.
-
-⚠️ Spray dependency mein mucosal damage heal hone mein time lagta hai — yeh raat ke liye thodi madad hai. Subah zaroor batana — spray lena pada ya nahi? 🙏`
+// ─── PARSE NUMBER LIST FROM REPLY ────────────────────────────
+// Handles: "1", "1,3", "1 3 4", "1,2,3", "1 and 3", "1-3" etc.
+function parseNumberList(text) {
+  const nums = [];
+  const matches = text.match(/[1-6]/g) || [];
+  for (const m of matches) {
+    const n = parseInt(m);
+    if (n >= 1 && n <= 6 && !nums.includes(n)) nums.push(n);
   }
-};
-
-// ============================================================
-// ASSESSMENT INSIGHTS
-// ============================================================
-const DURATION_INSIGHT = {
-  short: '📌 Short-term mein body abhi reactive phase mein hai — sahi approach se results zyada fast aate hain.',
-  medium: '📌 6 mahine–1 saal mein pattern set hone lagta hai — structured intervention sahi time pe hai.',
-  long: '📌 1–3 saal mein problem chronic hone ki taraf jaati hai — root cause pe kaam karna zaroori ho jaata hai.',
-  verylong: '📌 3+ saal ki chronic condition mein repeated stress hua hai — deep protocol hi kaam karta hai.'
-};
-
-const TRIED_INSIGHT = {
-  'kuch nahi': '📌 Abhi tak kuch try nahi kiya — body naturally respond karti hai structured approach se jab already medicated na ho.',
-  allopathy: '📌 Allopathy symptoms suppress karti hai — inflammation temporarily thami, root cause waise ka waisa rehta hai. Isliye band karne pe symptoms wapas aate hain.',
-  'nasal spray': '📌 Nasal spray naak ki lining constrict karti hai — temporary open hoti hai. Regular use se mucosal damage aur dependency badhti hai.',
-  'sab try kiya': '📌 Root cause pe seedha kaam nahi hua isliye wapas aaya. Ayurvedic approach underlying imbalance pe kaam karti hai, sirf symptoms pe nahi.'
-};
-
-const SEVERITY_INSIGHT = {
-  mild: '📌 Abhi flare mode mild hai — sahi time hai tackle karne ka before it becomes moderate.',
-  moderate: '📌 Moderate impact matlab body already compensating kar rahi hai daily — structured intervention needed.',
-  severe: '📌 Severe impact mein sleep, focus, energy sab affected — yeh sirf sinus nahi, quality of life issue hai.'
-};
-
-const SYMPTOM_INSIGHT = {
-  congestive: '📌 Yeh Kaphaja Pratishyaya ka pattern hai — Kapha dosha vitiated hone se nasal passages mein ama accumulate hoti hai, srotas block hote hain. Subah zyada hona is ka classic sign hai.',
-  allergic: '📌 Yeh Vataja-Kaphaja Pratishyaya hai — Vata aur Kapha dono vitiated hain. Sneezing Vata ka naak se bahar nikalna hai, watery discharge bhi Vata-Kapha imbalance ka sign.',
-  heat: '📌 Yeh Pittaja Pratishyaya hai — Pitta dosha vitiated hone se nasal lining mein heat aur inflammation badh jaati hai. Yellow-green discharge aur burning Pitta aggravation ke clear signs hain.',
-  dependency: '📌 Yeh Dushta Pratishyaya ka pattern hai — prolonged external substance se nasal mucosa ki natural functioning disturb ho gayi hai. Srotas chronically block hain, Vata movement irregular hai.'
-};
-
-// ============================================================
-// FOLLOW-UP MESSAGE
-// ============================================================
-const SURFACE_MSG = `☝️ Yeh steps temporary relief ke liye hain — root cause pe kaam nahi karte.
-
-Agar sinus baar baar aata hai ya months se chal raha hai — toh andar ka dosha imbalance address karna padega. Warna yeh cycle chalti rahegi 🔄
-
-Aap batayein:
-1️⃣ Haan, structured protocol dekhna hai
-2️⃣ Pehle steps try karti/karta hun, baad mein bataungi/bataunga`;
-
-// ============================================================
-// FOLLOW-UP MESSAGES (24hr & 48hr)
-// ============================================================
-const FOLLOWUP_24HR = {
-  allergic: `Hey 👋 Kal aapne assessment kiya tha na?
-
-Steps try kiye? Kuch fark aaya? 🤔
-
-Ek insight dein — allergic sinus mein naak ki lining har trigger ke saath aur sensitive hoti jaati hai. Matlab jitna late karein, utna zyada react karegi 📈
-
-Typically jo log protocol follow karte hain — Day 5-6 tak sneezing noticeably kam hoti hai ✅
-
-Agar ready hain — bas 1 ya 2 reply karein, kal se shuru 🙏
-1 — ₹499 (7-day)
-2 — ₹1,299 (14-day)`,
-
-  congestive: `Hey 👋 Kal assessment hua tha na aapka?
-
-Steam/rinse se kuch relief aaya? 🤔
-
-Ek zaroori baat — congestion mein srotas (nasal channels) jitne din block rehte hain, utne zyada thick hote jaate hain. Recovery mein har din ka delay matter karta hai 📈
-
-Typically protocol follow karne pe Day 3-4 se naak khulni start hoti hai ✅
-
-Ready hain toh bas reply karein — kal se Day 1 🙏
-1 — ₹499 (7-day)
-2 — ₹1,299 (14-day)`,
-
-  heat: `Hey 👋 Kal assessment hua tha aapka
-
-Steps se kuch fark laga? 🤔
-
-Ek important baat — Pitta-based inflammation aise nahi rukti, time ke saath surrounding areas mein failti hai. Jitni jaldi address karein, utna kam damage 📈
-
-Protocol follow karne wale logon ko typically Week 1 mein clear reduction dikhta hai ✅
-
-Shuru karna hai toh bas reply karein 🙏
-1 — ₹499 (7-day)
-2 — ₹1,299 (14-day)`,
-
-  dependency: `Hey 👋 Kal assessment hua tha na aapka?
-
-Steam try kiya? Spray thodi kam lagi? 🤔
-
-Ek seedhi baat — har baar spray lagane se naak ki lining aur patli hoti jaati hai. Yeh dependency ka cycle hai — jitni jaldi todein, utna acha 📈
-
-Protocol follow karne wale log typically 10-12 din mein spray significantly kam kar paate hain ✅
-
-Ready hain toh bas reply karein 🙏
-1 — ₹499 (7-day)
-2 — ₹1,299 (14-day)`
-};
-
-const FOLLOWUP_48HR = {
-  allergic: `🙏 Last message aapke liye —
-
-Sochiye — har mahine ENT pe ₹500-800 jaate hain, medicines alag. Phir bhi mausam badle toh wapas shuru.
-
-₹499 mein 7 din ka complete protocol milta hai — daily guidance ke saath. Aur ₹1,299 mein 14 din ka deep protocol jo root dosha imbalance pe kaam karta hai.
-
-Iske baad hum aapko message nahi karenge ✋
-Jab mann ho tab reply karein:
-1 — ₹499 (7-day)
-2 — ₹1,299 (14-day)
-3 — Sachin Ji se baat`,
-
-  congestive: `🙏 Last message aapke liye —
-
-Monthly medicines pe ₹1,500-3,000 lagte hain — phir bhi naak band ki band. Kyunki wo sirf symptoms pe kaam karti hain, root cause pe nahi.
-
-₹499 mein 7 din ka structured protocol. ₹1,299 mein 14 din ka deep protocol — dosha level pe kaam karta hai.
-
-Iske baad hum aapko message nahi karenge ✋
-Jab chahein reply karein:
-1 — ₹499 (7-day)
-2 — ₹1,299 (14-day)
-3 — Sachin Ji se baat`,
-
-  heat: `🙏 Last message aapke liye —
-
-Inflammation jab tak andar se address nahi hoti — tablets se temporary suppress hoke wapas aati hai. Yahi cycle chal raha hai.
-
-₹499 mein 7 din ka protocol. ₹1,299 mein 14 din ka deep protocol — Pitta dosha ko root se balance karta hai.
-
-Iske baad hum message nahi karenge ✋
-Jab ready hon reply karein:
-1 — ₹499 (7-day)
-2 — ₹1,299 (14-day)
-3 — Sachin Ji se baat`,
-
-  dependency: `🙏 Last message aapke liye —
-
-Spray se naak khulti hai — lekin band karo toh double block. Yeh rebound cycle hai. Medicines isse nahi todti — naak ki lining ko heal karna padta hai.
-
-₹499 mein 7 din ka protocol. ₹1,299 mein 14 din ka deep protocol — mucosal healing + spray withdrawal dono cover karta hai.
-
-Iske baad hum message nahi karenge ✋
-Jab chahein reply karein:
-1 — ₹499 (7-day)
-2 — ₹1,299 (14-day)
-3 — Sachin Ji se baat`
-};
-
-// ============================================================
-// DUAL PLAN PITCH
-// ============================================================
-function buildPlanMsg(sinusType) {
-  const TYPE_LABEL_MAP = {
-    allergic: 'Vataja-Kaphaja Pratishyaya | Allergic Rhinosinusitis | Dosha: Vata + Kapha',
-    congestive: 'Kaphaja Pratishyaya | Congestive Sinusitis | Dosha: Kapha dominant',
-    heat: 'Pittaja Pratishyaya | Inflammatory Sinusitis | Dosha: Pitta aggravation',
-    dependency: 'Dushta Pratishyaya | Chronic Rebound Sinusitis | Dosha: Vata + Srotas'
-  };
-  const typeLabel = TYPE_LABEL_MAP[sinusType] || 'Pratishyaya';
-
-  const INSIGHT = {
-    allergic: '💡 Allergic sinus mein naak ki lining oversensitive ho jaati hai — har trigger pe react karti hai. Jab tak yeh sensitivity address nahi hoti, sneeze-runny nose ka cycle nahi rukega.',
-    congestive: '💡 Congestive sinus mein srotas (nasal channels) mein kapha jamta jaata hai — jitna time jaaye, utna thick ho. Jab tak andar se saaf nahi hoga, naak khulegi nahi properly.',
-    heat: '💡 Inflammatory sinus mein pitta dosha naak ki lining mein heat create karta hai — burning, yellow mucus, headache sab isi ka sign hai. Jab tak pitta balance nahi hoga, yeh repeat hota rahega.',
-    dependency: '💡 Spray naak ki lining ko artificially constrict karti hai — temporary khulti hai, phir double block. Jab tak lining heal nahi hogi, spray chhutegi nahi.'
-  };
-
-  const insight = INSIGHT[sinusType] || INSIGHT.congestive;
-
-  return `Aapka assessment complete hua ✅
-
-*${typeLabel}*
-
-${insight}
-
-Aapke liye 2 protocols hain 👇
-
-━━━━━━━━━━━━━━━━━━━━━
-
-⚡ *PROTOCOL 1 — ₹499*
-*7-Day Sinus Stabilization*
-
-✔ Naya problem hai (6 months–1 saal)
-✔ Pehli baar structured try karna hai
-✔ Sirf 15-20 min daily
-
-📅 7 din — roz clear steps
-📲 Sachin Ji WhatsApp pe personally guide karenge
-🌿 Ghar ke cheezein + herbal support
-
-💰 Ek ENT visit = ₹500-800 sirf consultation
-Yahan ₹499 mein 7 din ka poora protocol + daily guidance
-
-━━━━━━━━━━━━━━━━━━━━━
-
-🔥 *PROTOCOL 2 — ₹1,299*
-*14-Day Deep Sinus Protocol*
-⭐ Sabse zyada log yahi lete hain
-
-✔ Purani problem — 1+ saal
-✔ Spray/medicine pe depend hain
-✔ Pehle try kiya — temporary hi raha
-✔ Root cause se permanently theek karna hai
-
-📅 14 din — subah + raat personalized routine
-📊 Daily tracking — aapke progress ke saath adjust hota hai
-🌿 Herbal support included + personalized
-🩺 Dosha ke hisaab se diet guidance
-📲 Sachin Ji se direct WhatsApp access
-
-💰 Monthly medicines = ₹1,500-3,000 — phir bhi wapas aata hai
-Yahan ₹1,299 mein root cause pe seedha kaam
-
-━━━━━━━━━━━━━━━━━━━━━
-         ₹499      |  ₹1,299
-━━━━━━━━━━━━━━━━━━━━━
-Din      7          |  14
-Routine  1x/day     |  2x/day
-Tracking Basic      |  Full
-Herbal   Optional   |  Included
-Diet     ✗          |  ✓
-━━━━━━━━━━━━━━━━━━━━━
-
-🕐 Aaj reply karein — kal subah Day 1 aapke WhatsApp pe
-
-Bas number reply karein:
-1 — ₹499 (7-day)
-2 — ₹1,299 (14-day)
-3 — Fark samjhna hai
-4 — Sachin Ji se baat`;
+  return nums.sort();
 }
 
-// ============================================================
-// HELPERS
-// ============================================================
-function extractFirstNumber(text) {
-  const match = text.match(/\d+/);
-  return match ? parseInt(match[0]) : null;
-}
-
-function detectDuration(text) {
+// ─── SINUS TYPE FROM KEYWORD SCAN ────────────────────────────
+function detectSinusTypeFromText(text) {
   const t = text.toLowerCase();
-  if (t.match(/bachpan|janam|decade|bahut purani/)) return 'long';
-  if (t.match(/\b(10|15|20|25|30)\s*(year|sal|saal)\b/)) return 'long';
-  if (t.match(/\b(3|4|5|6|7|8|9)\s*(year|sal|saal)\b/)) return 'long';
-  if (t.match(/teen|paanch|char|saalon|years/)) return 'long';
-  if (t.match(/1 year|2 year|1 saal|2 saal|do saal|ek saal/)) return 'medium';
-  if (t.match(/6 month|6 mahine|kuch mahine|naya|abhi|recent/)) return 'short';
+  if (t.includes("spray") || t.includes("otrivin") || t.includes("nasivion") ||
+      t.includes("nasal drop") || t.includes("bina spray"))                     return "spray";
+  if (t.includes("polyp") || t.includes("polip") || t.includes("growt"))        return "polyp";
+  if (t.includes("dns") || t.includes("deviated") || t.includes("septum") ||
+      t.includes("tirchi") || t.includes("crooked"))                             return "dns";
+  if (t.includes("jalan") || t.includes("burning") || t.includes("yellow") ||
+      t.includes("peela") || t.includes("pus"))                                  return "infective";
+  if (t.includes("band") || t.includes("smell") || t.includes("taste") ||
+      t.includes("gandh") || t.includes("swad") || t.includes("heaviness"))      return "congestive";
+  if (t.includes("sneez") || t.includes("chhink") || t.includes("allerg") ||
+      t.includes("dhool") || t.includes("dust") || t.includes("watery eye"))     return "allergic";
   return null;
 }
 
-function detectSymptom(text) {
-  const t = text.toLowerCase();
-  if (t.match(/sneez|watery|runny|allerg|dust|season|aankhein/)) return 'allergic';
-  if (t.match(/band|block|bhaari|heavy|pressure|chehra|congestion/)) return 'congestive';
-  if (t.match(/burn|jalan|yellow|green|headache|sar dard|thick/)) return 'heat';
-  if (t.match(/otrivin|spray|depend|addiction|nasivion|vicks/)) return 'dependency';
-  return null;
+// ─── SINUS TYPE FROM SYMPTOM NUMBERS ─────────────────────────
+function getSinusTypeFromSymptoms(nums) {
+  const has = (n) => nums.includes(n);
+  if (nums.includes(2) && !nums.includes(3) && !nums.includes(4)) return "allergic";
+  if (nums.includes(3) && nums.includes(4))                         return "infective";
+  if (nums.includes(3))                                             return "infective";
+  if (nums.includes(5) && nums.includes(6))                         return "polyp";
+  if (nums.includes(1) && nums.includes(4))                         return "congestive";
+  if (nums.includes(1))                                             return "congestive";
+  if (nums.includes(4))                                             return "congestive";
+  return "congestive";
 }
 
-// ============================================================
-// GOOGLE SHEETS
-// ============================================================
-async function updateLead(userId, temp, stage, symptom, name, message, platform, extra = {}) {
-  if (!GOOGLE_SHEET_URL) return;
-  try {
-    const payload = {
-      timestamp: new Date().toISOString(),
-      platform: platform || 'Facebook',
-      senderId: userId,
-      name: name || userId,
-      message: message || '',
-      temperature: temp || '🔵 Cold',
-      lastStage: stage || 'new',
-      symptom: symptom || '',
-      ...extra
-    };
-    const res = await fetch(GOOGLE_SHEET_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const text = await res.text();
-    console.log(`Sheet [${temp}] [${stage}] [${platform}] ${userId}: ${text}`);
-  } catch (e) {
-    console.error('Sheet error:', e.message);
-  }
-}
+// ─── SYMPTOM INSIGHTS (the wow factor) ───────────────────────
+// Returns multi-message insight text based on selected symptom numbers
+function buildSymptomInsights(nums, lang) {
+  const isEng = lang === "eng";
 
-// ============================================================
-// SEND FACEBOOK MESSAGE
-// ============================================================
-async function sendMessage(recipientId, text) {
-  try {
-    const res = await fetch(
-      `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipient: { id: recipientId },
-          message: { text }
-        })
-      }
-    );
-    const data = await res.json();
-    if (data.error) console.error('FB Send error:', data.error);
-  } catch (e) {
-    console.error('sendMessage error:', e.message);
-  }
-}
-
-// ============================================================
-// SEND WHATSAPP MESSAGE
-// ============================================================
-async function sendWAMessage(to, text) {
-  try {
-    const res = await fetch(
-      `https://graph.facebook.com/v18.0/${WHATSAPP_PHONE_ID}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to,
-          type: 'text',
-          text: { body: text }
-        })
-      }
-    );
-    const data = await res.json();
-    if (data.error) console.error('WA Send error:', data.error);
-  } catch (e) {
-    console.error('sendWAMessage error:', e.message);
-  }
-}
-
-// ============================================================
-// AI FALLBACK
-// ============================================================
-async function getAIResponse(senderId, userText) {
-  if (!CLAUDE_API_KEY) return null;
-  const sinusType = userProfile[senderId]?.symptom || 'unknown';
-  const stage = userState[senderId] || 'new';
-  const TYPE_NAMES = {
-    allergic: 'Vataja-Kaphaja Pratishyaya (Allergic Rhinosinusitis)',
-    congestive: 'Kaphaja Pratishyaya (Congestive Sinusitis)',
-    heat: 'Pittaja Pratishyaya (Inflammatory Sinusitis)',
-    dependency: 'Dushta Pratishyaya (Chronic Rebound Sinusitis)'
+  const singleInsights = {
+    1: isEng
+      ? "Blocked nose means mucus has been building up chronically in your nasal passages. When this is not cleared regularly, the passages narrow and the body starts treating it as the new normal."
+      : "Naak band rehna matlab nasal passages mein chronic mucus build-up ho raha hai. Jab ye regularly clear nahi hota, passages narrow hone lagte hain aur body ise normal maanna shuru kar deti hai.",
+    2: isEng
+      ? "Repeated sneezing triggered by dust or cold means your nasal lining has become hypersensitive. The body is over-reacting to external triggers. This is not just allergy. It is an imbalanced immune response in the nasal system."
+      : "Dhool ya thandi se baar baar sneezing matlab nasal lining hypersensitive ho gayi hai. Body baahri triggers ke against over-react kar rahi hai. Ye sirf allergy nahi. Ye nasal system ki imbalanced immune response hai.",
+    3: isEng
+      ? "Smell and taste loss happens when inflammation reaches the olfactory nerves at the top of the nasal passage. This is a sign that inflammation has gone deeper than the surface. It is reversible, but needs the right approach."
+      : "Smell aur taste kum hona tab hota hai jab inflammation olfactory nerves tak pahunch jaati hai. Ye sign hai ki inflammation surface se andar ja chuki hai. Ye reversible hai, lekin sahi approach chahiye.",
+    4: isEng
+      ? "Head heaviness and eye pressure means mucus is collecting inside the sinuses and not draining out. The pressure you feel above the eyes is directly from that trapped mucus and inflammation around it."
+      : "Sar bhaari aur aankhon ke upar pressure matlab mucus sinuses ke andar collect ho raha hai aur drain nahi ho pa raha. Jo pressure feel hota hai aankhon ke upar, woh directly usi trapped mucus ki wajah se hai.",
+    5: isEng
+      ? "Mucus dripping into the throat means the nasal drainage system is not clearing forward. It goes backward instead. This usually gets worse at night and disrupts sleep. It also keeps the throat irritated."
+      : "Gale mein girna matlab nasal drainage system aage clear nahi ho raha. Peeche ki taraf ja raha hai. Ye raat ko zyada hota hai aur neend disturb karta hai. Throat bhi irritate rehti hai isi wajah se.",
+    6: isEng
+      ? "Recurring infections happen because blocked passages become a breeding ground for bacteria. Every time you treat the infection with antibiotics, the blockage stays. So the infection keeps coming back. The real problem is the blockage, not the infection."
+      : "Baar baar infection isliye aata hai kyunki blocked passages mein bacteria thehri rehti hai. Har baar antibiotic se infection treat karo, blockage wahi rehti hai. Isliye infection wapas aata hai. Asli problem blockage hai, infection nahi.",
   };
-  const system = `Tu Ayusomam Herbals ka Ayurvedic sinus specialist hai. Hinglish mein jawab de — simple, warm, clinical. 2-3 lines max.
-User ki sinus type: ${TYPE_NAMES[sinusType] || 'assessment pending'}
-Current stage: ${stage}
-Rules:
-- Sirf sinus aur Ayurveda ke baare mein baat kar
-- Protocol 1 (Rs.499, 7-day) aur Protocol 2 (Rs.1299, 14-day) offer kar sakte ho
-- Off-topic ho toh politely redirect kar
-- Kabhi bhi doosre brands ya allopathy recommend mat kar
-- Payment links mat dena — sirf batana ki "1 ya 2 reply karo"`;
 
-  if (!convHistory[senderId]) convHistory[senderId] = [];
-  convHistory[senderId].push({ role: 'user', content: userText });
-  if (convHistory[senderId].length > 10) convHistory[senderId] = convHistory[senderId].slice(-10);
+  const combinationInsights = {
+    "1,4": isEng
+      ? "Blocked nose and pressure together means mucus is stuck inside the sinuses with no way out. Classic chronic congestion pattern."
+      : "Naak band aur pressure saath mein matlab mucus sinuses ke andar collect ho rahi hai aur drain nahi ho pa rahi. Classic chronic congestion pattern hai.",
+    "1,6": isEng
+      ? "Blocked nose and recurring infection together means every infection is caused by the same blockage. Treating only the infection will keep this cycle going forever."
+      : "Naak band aur baar baar infection saath mein matlab har infection usi blockage ki wajah se ho rahi hai. Sirf infection treat karte rehne se ye cycle kabhi band nahi hogi.",
+    "3,4": isEng
+      ? "Smell loss and pressure together means inflammation has spread from the sinuses up to the smell nerves. Multiple areas are now affected."
+      : "Smell loss aur pressure saath mein matlab inflammation sinuses se upar smell nerves tak pahunch gayi hai. Multiple areas affect ho chuke hain.",
+    "5,6": isEng
+      ? "Post-nasal drip and recurring infection together form a cycle. Mucus drips into the throat, bacteria settles there, infection follows. Breaking this drainage cycle is the key."
+      : "Gale mein girna aur baar baar infection ek cycle mein hain. Mucus throat mein girti hai, bacteria wahan settle hoti hai, infection hota hai. Is drainage cycle ko band karna zaroori hai.",
+    "1,2,4": isEng
+      ? "This combination means your nasal passages are both reactive to triggers AND congested. Double burden on the system."
+      : "Ye combination matlab nasal passages triggers ke against reactive bhi hain aur congestion bhi hai. System pe double burden hai.",
+    "1,3,4": isEng
+      ? "All three together means inflammation has spread significantly. The blockage, the smell loss, and the pressure are all connected. Full system reset is needed."
+      : "Teeno saath mein matlab inflammation kaafi spread ho gayi hai. Blockage, smell loss, aur pressure teeno connected hain. Full system reset zaroori hai.",
+  };
 
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': CLAUDE_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 200,
-        system,
-        messages: convHistory[senderId]
-      })
-    });
-    const data = await res.json();
-    const reply = data.content?.[0]?.text || null;
-    if (reply) convHistory[senderId].push({ role: 'assistant', content: reply });
-    return reply;
-  } catch (e) {
-    console.error('AI error:', e.message);
-    return null;
+  // Collect individual insights for selected symptoms
+  const parts = [];
+  for (const n of nums) {
+    if (singleInsights[n]) parts.push(singleInsights[n]);
   }
+
+  // Find best combo insight
+  const key = nums.slice().sort().join(",");
+  let comboInsight = null;
+  // Check all combo keys, longest match first
+  const comboKeys = Object.keys(combinationInsights).sort((a, b) => b.split(",").length - a.split(",").length);
+  for (const ck of comboKeys) {
+    const ckNums = ck.split(",").map(Number);
+    if (ckNums.every((n) => nums.includes(n))) {
+      comboInsight = combinationInsights[ck];
+      break;
+    }
+  }
+
+  if (comboInsight && nums.length > 1) parts.push(comboInsight);
+
+  return parts;
 }
 
-// ============================================================
-// RULE-BASED FLOW
-// ============================================================
-async function handleRuleBased(senderId, text, sendFn) {
-  const state = userState[senderId] || 'new';
-  if (state === 'human_takeover') return true;
-  const _plat = ({ website: 'Website', whatsapp: 'WhatsApp' })[userProfile[senderId]?.platform] || 'Facebook';
-
-  // ── NEW ──
-  if (state === 'new') {
-    if (!userProfile[senderId]) userProfile[senderId] = {};
-    userState[senderId] = 'q1_duration';
-    await updateLead(senderId, '🟡 Warm', 'assessment_started', '', '', '', _plat);
-    await sendFn(senderId,
-      `Namaste 🙏 Ayusomam Herbals mein aapka swagat hai.\n\nSinus ki problem hai? Aap bilkul sahi jagah aaye hain ✅\n\nPehle aapki condition samajhte hain — 4 chhote sawaal hain, sirf 2 min lagenge.\n\nYeh problem kitne samay se hai?\n1️⃣ 1–6 mahine\n2️⃣ 6 mahine–1 saal\n3️⃣ 1–3 saal\n4️⃣ 3 saal se zyada\n\nBas number reply karein 👇`
-    );
-    return true;
-  }
-
-  // ── Q1: DURATION ──
-  if (state === 'q1_duration') {
-    const num = extractFirstNumber(text);
-    const detected = detectDuration(text);
-    const ans = detected || (num === 1 ? 'short' : num === 2 ? 'medium' : num >= 3 ? 'long' : null);
-    if (!ans) {
-      await sendFn(senderId, 'Thoda aur clearly batayein — kitne mahine ya saal se hai? 🙏');
-      return true;
-    }
-    userProfile[senderId].duration = ans;
-    userState[senderId] = 'q2_symptom';
-    const dInsight = DURATION_INSIGHT[ans] || '';
-    if (dInsight) await sendFn(senderId, dInsight);
-    await sendFn(senderId,
-      `Noted ✅\n\nAb batayein — sabse zyada kya hota hai?\n1️⃣ Naak band, chehra bhaari, pressure 😤\n2️⃣ Sneezing, runny nose, dust/mausam se trigger 🤧\n3️⃣ Burning, thick mucus, sar dard 🔥\n4️⃣ Nasal spray ke bina saans nahi aati 😰\n\nNumber reply karein 👇`
-    );
-    return true;
-  }
-
-  // ── Q2: SYMPTOM ──
-  if (state === 'q2_symptom') {
-    const num = extractFirstNumber(text);
-    const detected = detectSymptom(text);
-    const map = { 1: 'congestive', 2: 'allergic', 3: 'heat', 4: 'dependency' };
-    const ans = detected || map[num] || null;
-    if (!ans) {
-      await sendFn(senderId, 'Apna main symptom batayein — ek number reply karein 🙏');
-      return true;
-    }
-    userProfile[senderId].symptom = ans;
-    userState[senderId] = 'q3_tried';
-    const sInsight = SYMPTOM_INSIGHT[ans] || '';
-    if (sInsight) await sendFn(senderId, sInsight);
-    await sendFn(senderId,
-      `Samajh aaya ✅\n\nIske liye pehle kuch try kiya?\n1️⃣ Nahi, kuch nahi kiya abhi tak\n2️⃣ Allopathy / antibiotic li\n3️⃣ Nasal spray use ki\n4️⃣ Sab try kiya — kuch permanent nahi hua 😔\n\nNumber reply karein 👇`
-    );
-    return true;
-  }
-
-  // ── Q3: TRIED ──
-  if (state === 'q3_tried') {
-    const num = extractFirstNumber(text);
-    if (!num || num < 1 || num > 4) {
-      await sendFn(senderId, '1 se 4 ke beech number reply karein 🙏');
-      return true;
-    }
-    const map = { 1: 'kuch nahi', 2: 'allopathy', 3: 'nasal spray', 4: 'sab try kiya' };
-    const triedVal = map[num];
-    userProfile[senderId].tried = triedVal;
-    userState[senderId] = 'q4_severity';
-    const tInsight = TRIED_INSIGHT[triedVal] || '';
-    if (tInsight) await sendFn(senderId, tInsight);
-    await sendFn(senderId,
-      `Last sawaal 👇\n\nDaily life mein kitna affect karta hai?\n1️⃣ Thoda — manage ho jaata hai\n2️⃣ Kaafi — regularly dikkat hoti hai 😣\n3️⃣ Bahut zyada — neend, kaam, sab affected 😫\n\nNumber reply karein 👇`
-    );
-    return true;
-  }
-
-  // ── Q4: SEVERITY → FREE STEPS ──
-  if (state === 'q4_severity') {
-    const num = extractFirstNumber(text);
-    if (!num || num < 1 || num > 3) {
-      await sendFn(senderId, '1, 2 ya 3 reply karein 🙏');
-      return true;
-    }
-    const sevVal = { 1: 'mild', 2: 'moderate', 3: 'severe' }[num];
-    userProfile[senderId].severity = sevVal;
-    const sevInsight = SEVERITY_INSIGHT[sevVal] || '';
-    if (sevInsight) await sendFn(senderId, sevInsight);
-    const type = userProfile[senderId].symptom || 'congestive';
-    const timing = getTimeSlot();
-    userProfile[senderId].freeStepTiming = timing;
-    await updateLead(senderId, '🔴 Hot', 'assessment_complete', type, '', '', _plat);
-    userState[senderId] = 'after_steps';
-    const stepMsg = (FREE_STEPS[timing] && FREE_STEPS[timing][type]) || FREE_STEPS[timing]['congestive'];
-    await sendFn(senderId, stepMsg);
-    await sendFn(senderId, SURFACE_MSG);
-    return true;
-  }
-
-  // ── AFTER STEPS ──
-  if (state === 'after_steps') {
-    const t = text.toLowerCase().trim();
-    const wantsTry = t === '2' || t.match(/pehle|try|baad|steps/);
-    if (wantsTry) {
-      userState[senderId] = 'try_first';
-      await updateLead(senderId, '🟡 Warm', 'try_first', userProfile[senderId].symptom, '', '', _plat);
-      followUpTracker[senderId] = { pitchedAt: Date.now(), followUp1Sent: false, followUp2Sent: false, platform: userProfile[senderId].platform || 'facebook' };
-      await sendFn(senderId, `Bilkul 🙏 Steps try karein — subah aur raat dono.\n\nKuch bhi sawaal ho ya result share karna ho — yahan reply karein.\n\nJab ready ho tab protocol ke liye batayein.`);
-      return true;
-    }
-    userState[senderId] = 'pitched';
-    const sinusType = userProfile[senderId].symptom || 'congestive';
-    await updateLead(senderId, '🔴 Hot', 'plans_shown', sinusType, '', '', _plat);
-    followUpTracker[senderId] = { pitchedAt: Date.now(), followUp1Sent: false, followUp2Sent: false, platform: userProfile[senderId].platform || 'facebook' };
-    await sendFn(senderId, buildPlanMsg(sinusType));
-    return true;
-  }
-
-  // ── PLAN SELECTION ──
-  if (state === 'pitched') {
-    const t = text.toLowerCase().trim();
-
-    // Protocol 1
-    if (t === '1' || t.match(/\b499\b|protocol 1|plan 1/)) {
-      userState[senderId] = 'plan_selected';
-      delete followUpTracker[senderId];
-      await updateLead(senderId, '🔴 Hot', 'protocol_1_selected', userProfile[senderId]?.symptom, '', '', _plat);
-      await sendFn(senderId,
-        `Sahi decision 🙏\n\nPayment link:\n${PAYMENT_499}\n\nPayment ke baad screenshot yahan bhejein.\n\nAyusomam Herbals 🌿`
-      );
-      return true;
-    }
-
-    // Protocol 2
-    if (t === '2' || t.match(/\b1299\b|protocol 2|plan 2/)) {
-      userState[senderId] = 'plan_selected';
-      delete followUpTracker[senderId];
-      await updateLead(senderId, '🔴 Hot', 'protocol_2_selected', userProfile[senderId]?.symptom, '', '', _plat);
-      await sendFn(senderId,
-        `Bahut achha 🙏\n\nPayment link:\n${PAYMENT_1299}\n\nPayment ke baad screenshot yahan bhejein.\n\nAyusomam Herbals 🌿`
-      );
-      return true;
-    }
-
-    // Difference
-    if (t === '3' || t.match(/kaun sa|fark|difference|confused|dono mein|samajh/)) {
-      await sendFn(senderId,
-        `Key difference:\n\nProtocol 1 — 7 din, ek time daily, acute/new cases. Body ko stabilize karna goal.\n\nProtocol 2 — 14 din, subah + raat dono, chronic/old ya spray dependent cases. Root dosha imbalance address karna goal.\n\nDono fundamentally alag hain — ek ka extension nahi.\n\nSeedha batayein — 1 ya 2?`
-      );
-      return true;
-    }
-
-    // Specialist
-    if (t === '4' || t.match(/specialist|sachin|baat|call/)) {
-      userState[senderId] = 'human_takeover';
-      await updateLead(senderId, '🔴 Hot', 'requested_specialist', userProfile[senderId]?.symptom, '', '', _plat);
-      await sendFn(senderId,
-        `Bilkul 🙏 Sachin Ji personally baat karenge.\n📱 ${WHATSAPP_NUM}\n\nAyusomam Herbals 🌿`
-      );
-      return true;
-    }
-
-    await sendFn(senderId,
-      `Reply karein:\n1 — Protocol 1 (Rs.499)\n2 — Protocol 2 (Rs.1,299)\n3 — Dono mein kya fark hai?\n4 — Specialist se baat 🙏`
-    );
-    return true;
-  }
-
-  // ── POST PAYMENT ──
-  if (state === 'plan_selected' || state === 'done' || state === 'try_first') {
-    await sendFn(senderId, `Kisi bhi madad ke liye seedha WhatsApp karein:\n📱 ${WHATSAPP_NUM}\nAyusomam Herbals 🌿`);
-    return true;
-  }
-
-  return false;
-}
-
-// ============================================================
-// MAIN PROCESSOR
-// ============================================================
-async function processMessage(senderId, text, sendFn, platform) {
-  if (userState[senderId] === 'human_takeover') {
-    console.log(`SILENT — human takeover: ${senderId}`);
-    return;
-  }
-
-  console.log(`[${platform}] ${senderId}: ${text}`);
-  if (!userProfile[senderId]) userProfile[senderId] = {};
-  userProfile[senderId].platform = platform === 'WhatsApp' ? 'whatsapp' : platform === 'Website' ? 'website' : 'facebook';
+// ─── RED FLAG DETECTION ───────────────────────────────────────
+function hasRedFlag(text) {
   const t = text.toLowerCase();
-  const state = userState[senderId] || 'new';
+  return (
+    t.includes("blood") || t.includes("khoon") || t.includes("rakta") ||
+    t.includes("vision") || t.includes("aankhein") || t.includes("nazar") ||
+    t.includes("severe pain") || t.includes("bahut dard") ||
+    t.includes("double vision") || t.includes("swelling eye") ||
+    (t.includes("fever") && (t.includes("high") || t.includes("102"))) ||
+    (t.includes("bukhar") && t.includes("tej"))
+  );
+}
 
-  // Payment query intercept
-  const isPaymentQuery = t.match(/payment|kaise karu|kitna hai|price|cost|1299|499|buy|lena hai|link do|gpay|phonepe|paytm|order/);
-  if (isPaymentQuery && (state === 'pitched' || state === 'after_steps' || state === 'plan_selected')) {
-    await sendFn(senderId,
-      `Payment links:\n\nProtocol 1 (Rs.499) — 7 din:\n${PAYMENT_499}\n\nProtocol 2 (Rs.1,299) — 14 din:\n${PAYMENT_1299}\n\nPayment ke baad screenshot bhejein 🙏`
-    );
-    return;
+// ─── MESSAGING FUNCTIONS ─────────────────────────────────────
+async function sendTwilioMessage(to, body) {
+  if (!to || !/^[+0-9]/.test(String(to))) { console.error('[Twilio] Skipping invalid to:', to); return; }
+  const client = require("twilio")(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+  return client.messages.create({
+    body,
+    from: `whatsapp:${TWILIO_WA_NUMBER}`,
+    to:   `whatsapp:${to.replace(/^whatsapp:/i, '')}`,
+  });
+}
+
+async function sendFBMessage(recipientId, text) {
+  const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`;
+  const res = await fetch(url, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
+  });
+  return res.json();
+}
+
+async function sendInstagramMessage(recipientId, text) {
+  const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${INSTAGRAM_TOKEN}`;
+  const res = await fetch(url, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
+  });
+  return res.json();
+}
+
+async function sendWhatsAppMessage(to, body) {
+  const url = "https://graph.facebook.com/v18.0/" + WHATSAPP_PHONE_NUMBER_ID + "/messages";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + WHATSAPP_TOKEN,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "text",
+      text: { body }
+    })
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("[WA] Send failed:", err);
   }
+}
 
-  // WhatsApp contact
-  if (t.match(/whatsapp|watsapp|contact|call|seedha baat/)) {
-    await sendFn(senderId, `Seedha baat karein:\n📱 ${WHATSAPP_NUM}\n\nAyusomam Herbals 🌿`);
-    return;
+async function sendMessage(platform, userId, text) {
+  if (!text || !text.trim()) return;
+  text = cleanText(text);
+  const chunks = splitMessage(text);
+  for (const chunk of chunks) {
+    if      (platform === "twilio")    await sendTwilioMessage(userId, chunk);
+    else if (platform === "instagram") await sendInstagramMessage(userId, chunk);
+    else if (platform === "whatsapp")  await sendWhatsAppMessage(userId, chunk);
+    else if (platform === "website")   { if (widgetPending[userId]) widgetPending[userId].push(chunk); }
+    else                               await sendFBMessage(userId, chunk);
+    if (chunks.length > 1) await sleep(700);
   }
+}
 
-  const handled = await handleRuleBased(senderId, text, sendFn);
-  if (!handled) {
-    const aiReply = await getAIResponse(senderId, text);
-    if (aiReply) {
-      await sendFn(senderId, aiReply);
+function cleanText(text) {
+  if (!text) return text;
+  return text
+    .replace(/\u2014|\u2013/g, '')          // strip em-dash and en-dash
+    .replace(/^ *[-\u2022] +/gm, '')         // strip bullet hyphens/dots at line start
+    .replace(/ - /g, ' ')                     // strip pause hyphens
+    .replace(/([a-zA-Z\u0900-\u097F]) - ([a-zA-Z\u0900-\u097F])/g, '$1 $2') // word-hyphen-word
+    .replace(/ {2,}/g, ' ')                   // collapse spaces
+    .trim();
+}
+
+function splitMessage(text, maxLen = 1500) {
+  if (text.length <= maxLen) return [text];
+  const parts = [];
+  let cur = "";
+  for (const line of text.split("\n")) {
+    if ((cur + "\n" + line).length > maxLen) {
+      if (cur) parts.push(cur.trim());
+      cur = line;
     } else {
-      await sendFn(senderId, `Sachin Ji se seedha baat karein:\n📱 ${WHATSAPP_NUM}\n\nAyusomam Herbals 🌿`);
+      cur = cur ? cur + "\n" + line : line;
     }
+  }
+  if (cur) parts.push(cur.trim());
+  return parts;
+}
+
+async function sendWithTyping(platform, userId, text, delayMs = 1200) {
+  await sleep(delayMs);
+  await sendMessage(platform, userId, text);
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+// ─── GOOGLE SHEETS LOGGING ────────────────────────────────────
+async function logToSheet(userId, platform, sinusType, state, msg, botReply) {
+  if (!SHEET_URL) return;
+  const user = userData[userId] || {};
+  try {
+    await fetch(SHEET_URL, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        action:    "log_message",
+        timestamp: new Date().toISOString(),
+        userId:    userId.replace(/^whatsapp:/i, ''),
+        name:      user.name || '',
+        platform,
+        sinusType: sinusType || user.sinusType || "unknown",
+        state:     state     || user.state     || "new",
+        phase:     user.convPhase || "probe",
+        userMsg:   (msg      || "").substring(0, 300),
+        botReply:  cleanText(botReply || "").substring(0, 300),
+      }),
+    });
+
+    await fetch(SHEET_URL, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        action:          "update_lead",
+        timestamp:       new Date().toISOString(),
+        userId, platform,
+        name:            user.name          || "",
+        language:        user.lang          || "hin",
+        sinusType:       user.sinusType     || sinusType || "unknown",
+        duration:        user.duration      || "",
+        symptoms:        (user.symptomNums  || []).join(","),
+        usedAllopathy:   user.usedAllopathy === true ? "Yes" : user.usedAllopathy === false ? "No" : "Not asked",
+        convPhase:       user.convPhase     || "probe",
+        state:           user.state         || state || "new",
+        selectedPlan:    user.selectedPlan  || "",
+        enrolledAt:      user.enrolledAt    ? new Date(user.enrolledAt).toISOString() : "",
+        ghostAttempts:   user.ghostAttempts || 0,
+        milestonesSent:  (user.milestonesSent || []).join(","),
+        lastMessageAt:   user.lastMessageAt ? new Date(user.lastMessageAt).toISOString() : "",
+        totalMessages:   Math.floor((user.history || []).length / 2),
+        lastUserMsg:     (msg      || "").substring(0, 200),
+        lastBotReply:    (botReply || "").substring(0, 200),
+      }),
+    });
+  } catch (e) {
+    console.error("Sheet log error:", e.message);
   }
 }
 
-// ============================================================
-// FACEBOOK WEBHOOK
-// ============================================================
-app.get('/webhook', (req, res) => {
-  const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'ayusomam_verify';
-  if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === VERIFY_TOKEN) {
-    res.status(200).send(req.query['hub.challenge']);
+// ─── NAME EXTRACTION ─────────────────────────────────────────
+function extractNameFromText(text) {
+  if (!text) return null;
+  const patterns = [
+    /(?:mera naam|my name is|main hun|i am|i'm|naam hai)\s+([A-Za-z\u0900-\u097F]+)/i,
+    /^([A-Za-z]{3,20})\s+(?:hun|hoon|here|bol raha|bol rahi)/i,
+  ];
+  for (const p of patterns) {
+    const m = text.match(p);
+    if (m && m[1] && m[1].length > 2) return m[1];
+  }
+  return null;
+}
+
+// ─── DURATION EXTRACTION ─────────────────────────────────────
+function extractDuration(text) {
+  if (!text) return null;
+  const m = text.match(/(\d+)\s*(?:saal|year|sal|mahine|month|hafte|week|din|day)/i);
+  if (m) return m[0];
+  if (/bahut samay|kaafi samay|long time|years/i.test(text)) return "Long term";
+  return null;
+}
+
+// ─── DURATION MENU BUILDER ────────────────────────────────────
+function buildDurationMenu(lang) {
+  if (lang === "eng") {
+    return "How long have you had this sinus problem?\n\n1. Just started (1 to 3 months)\n2. A few months (3 to 6 months)\n3. 1 to 2 years\n4. 3 to 5 years\n5. More than 5 years";
+  }
+  return "Ye problem kitne time se hai?\n\n1. Abhi abhi shuru hua (1 se 3 mahine)\n2. Thodi purani hai (3 se 6 mahine)\n3. 1 se 2 saal se\n4. 3 se 5 saal se\n5. 5 saal se zyada";
+}
+
+// ─── SYMPTOM MENU BUILDER ─────────────────────────────────────
+function buildSymptomMenu(lang) {
+  if (lang === "eng") {
+    return "Which symptoms do you have? Reply with all the numbers that apply.\n\n1. Nose stays blocked, can never fully open\n2. Repeated sneezing triggered by dust or cold\n3. Smell or taste has reduced\n4. Head feels heavy, pressure above the eyes\n5. Something keeps dripping into the throat, need to clear it often\n6. Recurring infections, also affecting the throat";
+  }
+  return "Aapko kaunse symptoms hain? Sab numbers reply karein jo apply hote hain.\n\n1. Naak band rehti hai, khul hi nahi pati\n2. Baar baar sneezing, dhool ya thandi se trigger hoti hai\n3. Smell ya taste kum ho gayi hai\n4. Sar bhaari rehta hai, aankhon ke upar pressure feel hota hai\n5. Gale mein kuch girta rehta hai, baar baar clear karna padta hai\n6. Baar baar infection aata hai, throat mein bhi asar hota hai";
+}
+
+// ─── MEDICINE CYCLE MESSAGE ───────────────────────────────────
+function buildMedicineCycleMsg(durationIndex, lang) {
+  // Only for 3+ year cases (indices 2, 3, 4)
+  if (durationIndex < 2) return null;
+  if (lang === "eng") {
+    return "With this much history, you have likely tried medicines before. Some relief, then the same problem came back. Is that right?";
+  }
+  return "Itne time mein medicines zaroor try ki hogi. Thoda relief, phir wahi problem wapas. Sahi hai?";
+}
+
+// ─── SINUS TYPE REVEAL MESSAGE ────────────────────────────────
+function buildTypeReveal(sinusType, lang) {
+  const name = SINUS_TYPE_NAMES[sinusType] || "Chronic Sinus Type";
+  if (lang === "eng") {
+    return `Based on everything you have shared, your sinus type is: ${name}.`;
+  }
+  return `Jo aapne bataya usse ek cheez clear hai.\n\nAapka sinus type hai: ${name}.`;
+}
+
+// ─── HOPE-LED PITCH ───────────────────────────────────────────
+function buildPitch(user) {
+  const isEng    = user.lang === "eng";
+  const chronic  = (user.durationIndex || 0) >= 2;
+  const plan     = chronic ? "restoration" : "reset";
+  const planName = PRICES[plan].name;
+  const price    = PRICES[plan].price;
+
+  user.selectedPlan = plan;
+
+  if (isEng) {
+    if (chronic) {
+      return `Your sinus can get better in 14 days.\n\nThis is not just hope. This is what our customers have experienced.\n\nThe program is a structured system: herbs that target chronic inflammation, specific breathing exercises, identifying your personal triggers, and diet adjustments. Everything in the right sequence.\n\n${planName} is Rs. ${price}. That is Rs. 92 a day.\n\nWould you like to start?`;
+    }
+    return `In 7 days, you will feel a clear difference.\n\nHerbs, exercises, structured routine. Easy to follow.\n\n${planName} is Rs. ${price}.\n\nWould you like to try?`;
+  }
+
+  if (chronic) {
+    return `14 din mein aapka sinus theek ho sakta hai.\n\nYe sirf ummeed nahi. Ye hamare customers ka experience hai.\n\nProgram ek structured system hai. Herbs jo chronic inflammation ko target karte hain, specific breathing exercises, aapke personal triggers identify karna, aur diet adjustments. Sab sahi sequence mein.\n\n${planName} hai Rs. ${price}. Matlab Rs. 92 roz.\n\nShuru karna chahein?`;
+  }
+  return `7 din mein aap khud farak feel karein.\n\nHerbs, exercises, structured routine. Easy to follow.\n\n${planName} hai Rs. ${price}.\n\nTry karein?`;
+}
+
+// ─── COMMITMENT YES DETECTION ─────────────────────────────────
+function isCommitmentYes(text) {
+  const t = text.toLowerCase().trim();
+  return ["haan", "ha", "yes", "theek hai", "kar lete", "okay", "ok",
+    "shuru", "batao", "try", "start", "karein", "krte", "bilkul"].some((s) => t.includes(s));
+}
+
+// ─── PAYMENT DETECTION ───────────────────────────────────────
+function isPaymentConfirmation(text) {
+  const t = text.toLowerCase();
+  return ["paid", "payment", "done", "kiya", "bheja", "transferred",
+    "upi", "gpay", "phonepe", "paytm", "screenshot"].some((k) => t.includes(k));
+}
+
+// ─── SALESOM SYSTEM PROMPT ────────────────────────────────────
+function buildSystemPrompt(user) {
+  const lang          = user.lang || "hin";
+  const sinusType     = user.sinusType ? SINUS_TYPE_NAMES[user.sinusType] || user.sinusType : "still identifying";
+  const phase         = user.convPhase || "probe";
+  const duration      = user.duration  || "not captured yet";
+  const usedAllopathy = user.usedAllopathy ?? null;
+  const isEng         = lang === "eng";
+
+  const langInstruction = {
+    hin: "LANGUAGE: Respond in Hinglish (Hindi and English mix). Write like a warm knowledgeable friend texting. Aap always. NEVER Bhai, Yaar, Boss, Didi. Short sentences. No formal paragraphs.",
+    eng: "LANGUAGE: Respond in English. Write like a caring, knowledgeable friend. Short sentences. Warm and direct. No formal language. No slang.",
+    ben: "LANGUAGE: Respond in Bengali mixed with English. Warm formal tone.",
+    mar: "LANGUAGE: Respond in Marathi mixed with English. Aapan/Ji tone.",
+    pun: "LANGUAGE: Respond in Punjabi mixed with English. Respectful tone.",
+    tel: "LANGUAGE: Respond in Telugu mixed with English. Warm formal tone.",
+    tam: "LANGUAGE: Respond in Tamil mixed with English. Warm formal tone.",
+    kan: "LANGUAGE: Respond in Kannada mixed with English. Warm formal tone.",
+  }[lang] || "LANGUAGE: Respond in Hinglish.";
+
+  return `You are SALESOM, the AI consultant for Ayusomam Herbals. You respond as Sachin, the founder.
+
+${langInstruction}
+
+CURRENT PATIENT CONTEXT:
+Sinus Type: ${sinusType}
+Conversation Phase: ${phase}
+Problem Duration: ${duration}
+Used Medicines Before: ${usedAllopathy === null ? "not confirmed yet" : usedAllopathy ? "yes" : "no"}
+
+FORMATTING RULES (follow strictly in every message):
+1. ABSOLUTE RULE: ZERO dashes. No — no – no hyphen-as-pause. Not even one. Full stop or line break only. This is non-negotiable.
+1b. Write like a real person texting a friend. Short, warm, natural. Never sound like a formal consultant or a robot.
+2. Keep each message to 4 to 5 lines maximum. No long paragraphs. One idea per message.
+3. When listing things, use numbered points. Never use bullet points or dashes.
+4. No "bhai" or "didi". Use "aap" always. Professional and warm.
+5. No sympathy openers for chronic cases (3+ years). Open with a clinical insight instead.
+6. Prefer yes/no questions. Reduce typing effort for the customer.
+7. When listing program components, always use this order: herbs first, exercises second, trigger identification third, diet last. Diet sounds like restriction. Mention it last.
+8. Mirror the customer's language. If they write in English, reply in English. If Hindi, reply in Hindi. Never switch unless they do.
+
+SINUS TYPES AND APPROACH:
+
+1. REACTIVE SENSITIVITY TYPE (Allergic)
+   Symptoms: Morning sneezing, watery eyes, dust or cold triggers, seasonal cycles
+   Insight for customer: Nasal lining has become hypersensitive. Body over-reacts to external triggers. This is an immune imbalance, not just allergy.
+   Key probe: "Triggers kaun se hain? Season change mein worse hota hai?"
+
+2. CHRONIC CONGESTION TYPE (Congestive/Kaphaja)
+   Symptoms: Blocked nose, smell or taste loss, facial heaviness, often started after a cold
+   Insight for customer: Mucus has been building up chronically. Passages have narrowed. Body has normalized the inflamed state.
+   Key probe: "Dairy kitna lete hain? Doodh, dahi, paneer."
+
+3. DEEP INFLAMMATION TYPE (Heat Pattern/Pittaja)
+   Symptoms: Burning sensation, yellow discharge, worse in heat, antibiotic cycle
+   CRITICAL: Eucalyptus or camphor steam WORSENS this type. State this early.
+   Insight for customer: Pitta aggravation. Standard steam makes this worse.
+   Key probe: "Spicy food ya garmi mein worse hota hai?"
+
+4. SPRAY DEPENDENCY PATTERN
+   Symptoms: Cannot sleep without spray, frequency increasing, failed cold turkey attempts
+   Insight for customer: Cold turkey never works for spray dependency. Physiological rebound is the reason. Graduated protocol only.
+   Key probe: "Raat ko bina spray ke so pa rahe hain?"
+
+5. DRAINAGE BLOCKAGE TYPE (Polyp)
+   SAFETY RULE: Never claim to shrink polyps. Structural issues need ENT evaluation.
+   Honest framing: "Structural issues ENT se confirm karwao. Hamaara protocol surrounding inflammation address karta hai, jo polyp ke saath hoti hai. Structural correction surgical hai."
+   Always recommend ENT evaluation first.
+
+6. STRUCTURAL CONGESTION TYPE (DNS)
+   SAFETY RULE: DNS is anatomical. Protocol cannot straighten a septum.
+   Honest framing: "DNS ka permanent solution surgical correction hai. Hamaara protocol surrounding inflammation aur congestion address karta hai. Bahut DNS patients 60 to 70 percent relief paate hain."
+   Never claim to fix DNS anatomically.
+
+CONVERSATION PHASES:
+PROBE: Ask 1 to 2 smart questions to identify type.
+MIRROR: Reflect symptoms accurately. Use insights, not sympathy. "Matlab aapki nasal lining..."
+EDUCATE: Explain why current approach is not working. Be specific to their sinus type.
+REFRAME: Show the gap between what they tried and what a type-specific protocol does.
+CLOSE: This is handled by the structured flow automatically. If customer asks about the program or price, describe it hope-first then features.
+
+CURRENT PHASE IS ${phase.toUpperCase()}. Stay in this phase unless user signals readiness to advance.
+
+THE TWO PROGRAMS:
+
+1. 7-Day Sinus Reset Rs. 499
+   For: First-time, mild cases, seasonal issues, post-14-day maintenance
+   Pitch as: "7-Day Sinus Reset. 7 din mein farak feel karein. Rs. 499."
+
+2. 14-Day Sinus Restoration Rs. 1299
+   For: All chronic cases, spray dependency, all 6 sinus types with 1+ year history
+   Pitch as: "14 din mein sinus theek ho sakta hai. Rs. 1299. Rs. 92 roz."
+   Program includes in this order: targeted herbs, breathing exercises, personal trigger identification, diet adjustments.
+
+PITCH RULE:
+Lead with hope, not features. State the outcome first.
+"14 din mein sinus theek ho sakta hai. Rs. 1299."
+Then features as proof.
+Then one yes/no close: "Shuru karna chahein?"
+NEVER send UPI IDs, payment links, or bank details in your message — payment is handled automatically by the system. When customer says yes to buy, just say "Perfect! Sending payment link now 🌿" and stop. Do NOT generate or include any UPI number, UPI ID, or payment details yourself.
+
+OBJECTION RESPONSES:
+
+"Mahanga hai" or "Expensive":
+"Samajh aa raha hai. 7-Day Sinus Reset se shuru kar sakte hain. Rs. 499 mein 7 din ka structured protocol. Results feel karein. Phir decide karein."
+
+"Pehle Ayurveda try kiya kuch nahi hua":
+"Jo try kiya, kya woh specifically aapke sinus type ke liye tha? Generic Ayurveda aur type-specific protocol mein bahut farak hota hai. Yahi gap hai."
+
+"Koi guarantee hai":
+"Guarantee word use nahi karunga. Har body alag hoti hai. Jo honestly bol sakta hun: jo customers ne protocol exactly follow kiya unhe Day 5 to 7 mein meaningful change mila."
+
+"Itna sab karna padega, time nahi":
+"Subah 20 minute, raat 10 minute. Roz exactly batata hun kya karna hai. Sochna nahi padta, sirf karna padta hai."
+
+"Doctor ne bola Ayurveda se nahi hoga":
+"Doctor allopathic framework se dekh rahe hain. Classical Ayurveda ka classification alag hai. 14 din try karna medical treatment rok nahi raha."
+
+"Pehle free try karwao":
+Give one free type-specific tip. Then: "Yeh ek step hai. Full protocol mein 7 to 8 steps hain aur har step ek reason se wahan hai."
+
+"10 saal ki problem 14 din mein kaise":
+"Doctor dawai deta hai. Dawai inflammation ko dabati hai, khatam nahi karti. 10 saal mein problem complex nahi hui. Baar baar temporarily dabai gayi. Hum woh karte hain jo doctor nahi karta. Herbs, exercises, triggers, aur diet. Cause hata do, symptoms wapas nahi aate."
+
+RED FLAGS. If user mentions blood in discharge, vision changes, 102 degrees+ fever with sinus, severe one-sided facial pain, eye swelling:
+Immediately say: "Yeh symptoms serious hain. Aaj hi ENT ya doctor se milein. Yeh emergency signs hain jo pehle evaluate hone chahiye. Protocol baad mein start kar sakte hain."
+Then stop the sales conversation.
+
+IMPORTANT: You are a wellness consultant, not a replacement for medical care. Always recommend ENT for polyp, DNS, and red flag cases.`;
+}
+
+// ─── SALESOM AI CALL ──────────────────────────────────────────
+async function callSalesom(userId, userMessage, platform) {
+  const user = userData[userId];
+  const history = (user.history || []).slice(-12);
+
+  const messages = [
+    ...history,
+    { role: "user", content: userMessage },
+  ];
+
+  const response = await anthropic.messages.create({
+    model:      "claude-sonnet-4-20250514",
+    max_tokens: 800,
+    system:     buildSystemPrompt(user),
+    messages,
+  });
+
+  const reply = response.content?.[0]?.text || "";
+
+  if (!user.history) user.history = [];
+  user.history.push({ role: "user",      content: userMessage });
+  user.history.push({ role: "assistant", content: reply });
+  if (user.history.length > 24) user.history = user.history.slice(-24);
+
+  return reply;
+}
+
+// ─── PHASE ADVANCEMENT ───────────────────────────────────────
+function advancePhase(user, userMessage) {
+  const phase = user.convPhase || "probe";
+  const msg   = userMessage.toLowerCase();
+  const buySignals = ["haan", "yes", "try", "interested", "batao", "link", "kaise", "kab", "start"];
+  const hasBuySignal = buySignals.some((s) => msg.includes(s));
+  const phaseMap = { probe: "mirror", mirror: "educate", educate: "reframe", reframe: "close", close: "close" };
+  if (hasBuySignal && phase !== "close") user.convPhase = phaseMap[phase];
+}
+
+// ─── GHOSTING RECOVERY ───────────────────────────────────────
+function getGhostMessage(user, attempt) {
+  const type = user.sinusType;
+  const name = user.name ? `${user.name} ji` : "ji";
+  const isEng = user.lang === "eng";
+
+  if (attempt === 1) {
+    const hooks = {
+      allergic:   isEng ? `${name} We spoke about your seasonal sneezing. One thing worth knowing: the timing of breathing exercises matters a lot in reactive sinus cases. Most people miss this. Whenever you have a moment.` : `${name} 🙏 Kal baat hui thi seasonal sneezing ke baare mein. Ek cheez batana tha. Reactive sinus mein breathing exercise ka timing bahut important hota hai. Zyaadatar log ye miss karte hain. Jab time ho.`,
+      congestive: isEng ? `${name} We spoke about your blocked nose and smell. One thing: a specific cleansing step before steam makes a significant difference in congestion cases. Whenever you have a moment.` : `${name} 🙏 Kal naak band aur smell ke baare mein baat hui thi. Ek cheez. Congestive cases mein steam se pehle ek specific step hota hai. Woh akela bahut farak karta hai. Jab time ho.`,
+      infective:  isEng ? `${name} We spoke about the burning sensation. Important: eucalyptus or camphor steam makes this type worse, not better. If you are using it, stop today. Sharing more when you are ready.` : `${name} 🙏 Kal naak mein jalan ke baare mein baat hui thi. Important. Eucalyptus ya camphor steam is type mein condition worse karta hai. Agar use kar rahe hain, aaj se band karein. Aur batana tha. Jab ready hon.`,
+      spray:      isEng ? `${name} We spoke about spray dependency. Cold turkey never works because of physiological rebound. That is why attempts keep failing. Sharing more when you are ready.` : `${name} 🙏 Spray dependency ke baare mein baat hui thi. Cold turkey kabhi kaam nahi karta. Physiological rebound hoti hai. Isliye attempts fail hote hain. Aur batana tha. Jab ready hon.`,
+      polyp:      isEng ? `${name} We spoke about your condition. Even with structural issues, reducing surrounding inflammation improves breathing quality significantly. Sharing more when you have time.` : `${name} 🙏 Aapki condition ke baare mein baat hui thi. Structural issue ke saath bhi surrounding inflammation reduce karna breathing quality significantly improve karta hai. Jab time ho.`,
+      dns:        isEng ? `${name} We spoke about DNS. The surrounding inflammation and congestion that comes with DNS can be addressed. Breathing quality improves significantly even without surgery. More to share when you have time.` : `${name} 🙏 DNS ke baare mein baat hui thi. DNS ke saath jo surrounding inflammation aur congestion hoti hai, usse address kiya ja sakta hai. Surgery ke bina bhi breathing kaafi improve hoti hai. Jab time ho.`,
+    };
+    return hooks[type] || (isEng
+      ? `${name} We spoke about your sinus. Had a specific insight for your case. Whenever you have a moment. 🙏`
+      : `${name} 🙏 Kal sinus ke baare mein baat hui thi. Aapke case ke liye ek specific insight thi. Jab time ho.`);
+  }
+
+  if (attempt === 2) {
+    return isEng
+      ? `${name} Direct question: is the problem still there?\n\nIf yes, let us discuss the right option.\nIf it resolved on its own, please let me know.\n\nNo pressure either way. 🙏`
+      : `${name} Seedha sawaal: kya woh problem abhi bhi chal rahi hai?\n\nAgar haan, sahi option discuss karte hain.\nAgar theek ho gaya, batayein.\n\nKoi pressure nahi. 🙏`;
+  }
+
+  return null;
+}
+
+// ─── DAY-WISE MILESTONE MESSAGES ─────────────────────────────
+function getMilestoneMessage(user, day) {
+  const type = user.sinusType;
+  const name = user.name ? `${user.name} ji` : "ji";
+  const isEng = user.lang === "eng";
+
+  const milestones = {
+    allergic: {
+      5:  isEng ? `${name} Day 5 check-in. Sneezing triggers should feel a little less intense by now. Is dusty air or the morning episode milder than before?\n\nWhatever you feel, share it. I will adjust if needed.` : `${name} 🙏 Day 5 check-in. Sneezing triggers ka response thoda kam feel ho raha hoga. Dusty jagah ya subah ka episode pehle se mild hua?\n\nJo bhi feel ho, batayein. Zaroorat ho toh protocol adjust karunga.`,
+      7:  isEng ? `${name} Day 7. Important observation today: has the intensity of triggers reduced? You should notice seasonal sensitivity improving by now.\n\nHow is the progress?` : `${name} 🙏 Day 7. Aaj ka ek important observation: triggers ki intensity kam hui hai? Season sensitivity mein fark aa raha hoga abhi tak.\n\nKaisi chal rahi hai progress?`,
+      10: isEng ? `${name} Day 10 done. The allergic cycle starts breaking at this point.\n\nHow many times did you need antihistamine in the last 3 days?\n\nThe next 4 days are critical. Stay consistent.` : `${name} 🙏 Day 10 ho gaya. Allergic cycle break hona shuru hoti hai is point pe.\n\nLast 3 din mein antihistamine kitni baar leni padi?\n\nAgle 4 din critical hain. Consistency banaye rakhein.`,
+      13: isEng ? `${name} Day 13. Almost there.\n\nThe improvement you have seen so far will hold through seasonal peaks with the 7-Day Sinus Reset. One reset per month stops triggers from rebuilding.\n\nInterested in continuing after Day 14?` : `${name} 🙏 Day 13. Almost complete.\n\nAb tak jo improvement aayi hai woh seasonal peak pe bhi hold karegi 7-Day Sinus Reset se. Mahine mein ek baar reset karo, triggers dobara build nahi hote.\n\nInterested hain Day 14 ke baad continue karne mein?`,
+    },
+    congestive: {
+      5:  isEng ? `${name} Day 5. Most important check-in.\n\nHas any smell or taste returned, even slightly? Even 10 percent return means the protocol is working.\n\nShare whatever you notice. I am genuinely waiting for this feedback.` : `${name} 🙏 Day 5. Sabse important check-in.\n\nSmell ya taste mein koi bhi thoda sa sensation wapas aaya? Even 10 percent return matlab protocol kaam kar raha hai.\n\nBatayein. Main genuinely is feedback ka wait kar raha hun.`,
+      7:  isEng ? `${name} Day 7 milestone. Smell and taste return usually happens in this window.\n\nHow is it feeling? And is dairy completely stopped? That single factor affects results the most.` : `${name} 🙏 Day 7 milestone. Smell taste return usually is window mein hoti hai.\n\nKaisa feel ho raha hai? Aur dairy completely band hai na? Woh single factor sabse zyada results affect karta hai.`,
+      10: isEng ? `${name} Day 10. Congestion should be significantly reduced by now. How blocked is the nose this morning?\n\nIf improvement is happening, good. If not, be honest about dairy.` : `${name} 🙏 Day 10. Congestion significantly reduced honi chahiye. Subah naak kitni band hoti hai aaj?\n\nAgar improvement hai, achha. Agar kuch feel nahi, dairy ke baare mein honestly batayein.`,
+      13: isEng ? `${name} Tomorrow is Day 14 of your Sinus Restoration. What a journey.\n\nTo maintain the smell and taste recovery, the 7-Day Sinus Reset once a month keeps Kapha from rebuilding.\n\nShall I send the link?` : `${name} 🙏 Kal 14-Day Sinus Restoration ka last day hai. Bahut achhi journey rahi.\n\nSmell taste jo restore hua, usse maintain karna ho toh 7-Day Sinus Reset mahine mein ek baar karo. Kapha dobara build nahi hota.\n\nLink bheju?`,
+    },
+    infective: {
+      5:  isEng ? `${name} Day 5 check-in. Burning should be noticeably less by now.\n\nIs the discharge still yellow or is the color shifting toward clear?\nYellow to cloudy to clear means Pitta is normalizing.\n\nShare what you observe.` : `${name} 🙏 Day 5 check-in. Burning mein noticeable reduction aa rahi hogi.\n\nDischarge ka color, abhi bhi yellow hai ya thoda change aa raha hai?\nYellow se cloudy se clear matlab Pitta normalize ho rahi hai.\n\nBatayein.`,
+      7:  isEng ? `${name} Day 7. Discharge should be predominantly clear by now.\n\nReminder: hot chai, spicy food, and prolonged time in heat rebuild Pitta. Any issues on that front?` : `${name} 🙏 Day 7. Discharge predominantly clear hona chahiye abhi tak.\n\nEk reminder: garm chai, spicy khana, garmi mein zyada time. Yeh sab Pitta rebuild karte hain. Kuch issues hain is front pe?`,
+      10: isEng ? `${name} Day 10. Headache frequency should also be less by now. How is the overall progress?\n\nIf burning is still significant, let me adjust the protocol. Be honest.` : `${name} 🙏 Day 10. Headache frequency bhi kam hui hogi. Kaisi hai overall progress?\n\nAgar burning abhi bhi significant hai, ek adjustment karte hain protocol mein. Honestly batayein.`,
+      13: isEng ? `${name} Tomorrow is the last day of your Sinus Restoration.\n\nPitta seasonal flare can return in summer without maintenance. One 7-Day Reset before the season starts and it does not come back.\n\nInterested?` : `${name} 🙏 Kal 14 din complete hone wale hain.\n\nPitta seasonal flare garmi mein wapas aa sakti hai bina maintenance ke. Season se pehle ek baar 7-Day Reset karo, flare aata hi nahi.\n\nInterested hain?`,
+    },
+    spray: {
+      5:  isEng ? `${name} Day 5. First big milestone.\n\nDid you have even a 1 to 2 hour period where the nose stayed open without spray?\nEven a small spray-free window means your natural mechanism is returning.\n\nCelebrate this. It is genuinely significant.` : `${name} 🙏 Day 5. Pehla bada milestone.\n\nKya koi 1 se 2 ghante ka period aaya jab spray bina naak theek rahi?\nChhoti si bhi spray-free window matlab body ka natural mechanism wapas aa raha hai.\n\nCelebrate karein ye. Genuinely bada hai.`,
+      7:  isEng ? `${name} Day 7. How many times is spray being used at night now?\n\nBhramari Pranayama for 10 minutes before sleeping is the most important step at this stage. Are you doing it?` : `${name} 🙏 Day 7. Raat mein spray use kitni baar ho rahi hai abhi?\n\nSone se pehle 10 min Bhramari Pranayama is phase mein sabse important step hai. Kar rahe hain?`,
+      10: isEng ? `${name} Day 10. Key milestone. Daytime spray-free periods of 4 to 6 hours should be possible now.\n\nHow many spray-free hours today? Give me an honest number.` : `${name} 🙏 Day 10. Key milestone. Din mein 4 se 6 ghante spray-free rehna possible hona chahiye abhi.\n\nAaj kitne ghante spray-free rahe? Honest number batayein.`,
+      13: isEng ? `${name} Almost there. Freedom from spray dependency, which felt impossible before.\n\nIf night spray is still present, the 7-Day Sinus Reset extends the rehabilitation. If you are already spray-free, one monthly Reset keeps that progress locked in.\n\nWhat would you prefer?` : `${name} 🙏 Almost there. Spray dependency se freedom, jo 2 saal pehle impossible laga tha.\n\nRaat ka spray abhi bhi hai toh 7-Day Sinus Reset se extended rehabilitation karte hain. Spray-free ho chuke hain toh monthly ek baar Reset, jo progress aayi hai woh hold karti hai.\n\nKya prefer karenge?`,
+    },
+    polyp: {
+      5:  isEng ? `${name} Day 5. Inflammation reduction starts at this point.\n\nIs breathing feeling even slightly easier? Even partial relief means the Kapha congestion around the blockage is reducing.\n\nShare what you notice.` : `${name} 🙏 Day 5. Inflammation reduction shuru hoti hai is point pe.\n\nBreathing thodi bhi easy feel ho rahi hai? Even partial relief matlab polyp ke around jo congestion thi woh kam ho rahi hai.\n\nBatayein.`,
+      7:  isEng ? `${name} Day 7 check-in. Have you scheduled an ENT appointment?\n\nRunning the protocol alongside ENT evaluation gives the best outcome for your case. Both together.` : `${name} 🙏 Day 7 check-in. ENT appointment schedule kiya?\n\nProtocol ke saath parallel ENT evaluation aapke case mein best outcome deta hai. Dono saath.`,
+      10: isEng ? `${name} Day 10. How is the breathing quality now?\n\nEven with structural issues, addressing surrounding inflammation improves breathing significantly. Share how it has been so far.` : `${name} 🙏 Day 10. Kaisi hai breathing quality abhi?\n\nStructural issue ke saath bhi surrounding inflammation address hona breathing ko significantly improve karta hai. Abhi tak ka progress batayein.`,
+      13: isEng ? `${name} 14 days are almost done.\n\nFor polyp cases, inflammation rebuilds without maintenance. One 7-Day Reset per month keeps it from coming back.\n\nShall I send details?` : `${name} 🙏 14 din almost complete hone wale hain.\n\nPolyp cases mein inflammation wapas build hoti hai bina maintenance ke. Mahine mein ek 7-Day Reset, inflammation ka wapas aana rok sakte hain.\n\nDetails bheju?`,
+    },
+    dns: {
+      5:  isEng ? `${name} Day 5. Is there any change in the quality of congestion?\n\nEven with DNS, addressing surrounding congestion improves breathing noticeably. Anything to report?` : `${name} 🙏 Day 5. Congestion quality mein koi change feel ho raha hai?\n\nDNS ke saath bhi surrounding Kapha congestion reduce hona breathing significantly improve karta hai. Kuch feel hua?`,
+      7:  isEng ? `${name} Day 7. Has nighttime blockage reduced at all?\n\nSleeping on the less-affected side is also important for DNS cases. Are you doing that?` : `${name} 🙏 Day 7. Raat mein naak band hona kam hua hai?\n\nSone ki position, affected side upar rakhna, DNS mein important hai. Kar rahe hain?`,
+      10: isEng ? `${name} Day 10 milestone. On a scale of 1 to 10, how is breathing quality now versus Day 1?\n\nEven with DNS, 60 to 70 percent improvement is achievable with a consistent protocol.` : `${name} 🙏 Day 10 milestone. Overall breathing quality 1 se 10 mein kitni feel hoti hai ab versus Day 1?\n\nDNS cases mein bhi 60 se 70 percent improvement possible hai consistent protocol se.`,
+      13: isEng ? `${name} Tomorrow is the last day.\n\nWith DNS, seasonal congestion can return. One 7-Day Reset at each season change keeps breathing quality maintained year-round.\n\nInterested?` : `${name} 🙏 Kal last day hai.\n\nDNS ke saath seasonal congestion wapas aa sakti hai. Season change pe ek baar 7-Day Reset karo, saal bhar breathing quality maintain rehti hai.\n\nInterested hain?`,
+    },
+  };
+
+  const typeMilestones = milestones[type] || milestones.congestive;
+  return typeMilestones[day] || null;
+}
+
+// ─── SCHEDULED JOBS ───────────────────────────────────────────
+setInterval(async () => {
+  const now = Date.now();
+  for (const [userId, user] of Object.entries(userData)) {
+    if (!user.platform) continue;
+
+    // Ghosting recovery
+    if (
+      user.state &&
+      !["done", "post_payment", "human"].includes(user.state) &&
+      user.lastMessageAt
+    ) {
+      const hoursSince = (now - user.lastMessageAt) / (1000 * 60 * 60);
+      if (hoursSince >= 24 && hoursSince < 25 && (user.ghostAttempts || 0) === 0) {
+        const msg = getGhostMessage(user, 1);
+        if (msg) {
+          await sendMessage(user.platform, userId, msg);
+          user.ghostAttempts  = 1;
+          user.lastMessageAt  = now;
+          // ghost_1 — no sheet log (would create blank row)
+        }
+      } else if (hoursSince >= 72 && hoursSince < 73 && (user.ghostAttempts || 0) === 1) {
+        const msg = getGhostMessage(user, 2);
+        if (msg) {
+          await sendMessage(user.platform, userId, msg);
+          user.ghostAttempts  = 2;
+          user.lastMessageAt  = now;
+          // ghost_2 — no sheet log (would create blank row)
+        }
+      }
+    }
+
+    // Day-wise milestone check-ins
+    if (user.enrolledAt && user.sinusType && user.state === "post_payment") {
+      const daysSinceEnroll = Math.floor((now - user.enrolledAt) / (1000 * 60 * 60 * 24));
+      const milestoneDay = [5, 7, 10, 13].find(
+        (d) => daysSinceEnroll === d && !(user.milestonesSent || []).includes(d)
+      );
+      if (milestoneDay) {
+        const msg = getMilestoneMessage(user, milestoneDay);
+        if (msg) {
+          await sendMessage(user.platform, userId, msg);
+          if (!user.milestonesSent) user.milestonesSent = [];
+          user.milestonesSent.push(milestoneDay);
+          await logToSheet(userId, user.platform, user.sinusType, `day_${milestoneDay}_checkin`, "", msg);
+        }
+      }
+    }
+  }
+}, 30 * 60 * 1000);
+
+setInterval(() => processedMessages.clear(), 10 * 60 * 1000);
+
+// ─── MAIN MESSAGE HANDLER ─────────────────────────────────────
+async function handleMessage(senderId, messageText, platform) {
+  if (!messageText || !messageText.trim()) return;
+  const text = messageText.trim();
+
+  // Init user
+  if (!userData[senderId]) {
+    userData[senderId] = {
+      lang: null, sinusType: null, convPhase: "probe",
+      state: "new", history: [], duration: null,
+      durationIndex: null, symptomNums: [], symptoms: null,
+      usedAllopathy: null, selectedPlan: null, enrolledAt: null,
+      lastMessageAt: Date.now(), ghostAttempts: 0,
+      milestonesSent: [], name: null, platform,
+      durationMenuSent: false, symptomMenuSent: false,
+      insightShown: false, sinusTypeRevealed: false,
+      awaitingCommitment: false,
+    };
+  }
+
+  const user           = userData[senderId];
+  user.lastMessageAt   = Date.now();
+  user.ghostAttempts   = 0;
+  user.platform        = platform;
+
+  // Detect language — always re-check + honour explicit English/Hindi requests
+  const _engReq = /\b(english|in english|speak english|reply english|english mein|only english)\b/i.test(text);
+  const _hinReq = /\b(hindi|hinglish|hindi mein|hindi me|in hindi|hindi bolo|hindi main)\b/i.test(text);
+  if (_engReq) user.lang = 'eng';
+  else if (_hinReq) user.lang = 'hin';
+  else user.lang = detectLang(text) || user.lang || 'hin';
+
+  // ── LANGUAGE SWITCH INTERCEPTION (only mid-conversation, not during assessment) ──
+  const inAssessment = ["asked_duration", "asked_symptoms"].includes(user.state);
+  if ((_engReq || _hinReq) && text.trim().split(/\s+/).length <= 6 && !inAssessment) {
+    const ack = user.lang === 'eng'
+      ? "Sure! I'll reply in English now. Please continue."
+      : 'Bilkul! Ab Hindi mein baat karte hain. Bataiye kya takleef hai?';
+    await sendWithTyping(platform, senderId, ack);
+    userData[senderId] = user;
+    return;
+  }
+
+  // ── RED FLAG — highest priority ──────────────────────────
+  if (hasRedFlag(text)) {
+    const redFlagMsg = user.lang === "eng"
+      ? "These symptoms need immediate medical attention. Please see an ENT specialist or doctor today. Blood in discharge, vision changes, or high fever with sinus pain are serious signs that must be evaluated first. Please do not delay."
+      : "Yeh symptoms serious hain 🙏\n\nAaj hi ENT ya doctor se milein. Naak mein khoon, aankhon mein dikkat, ya tej bukhar ke saath sinus dard emergency signs hain jo pehle evaluate hone chahiye.\n\nProtocol baad mein start kar sakte hain.";
+    await sendWithTyping(platform, senderId, redFlagMsg, 600);
+    user.state = "human";
+    await logToSheet(senderId, platform, user.sinusType, "red_flag", text, redFlagMsg);
+    return;
+  }
+
+  // ── POST-PAYMENT ─────────────────────────────────────────
+  if (user.state === "post_payment") {
+    const reply = await callSalesom(senderId, text, platform);
+    await sendWithTyping(platform, senderId, reply);
+    await logToSheet(senderId, platform, user.sinusType, "post_payment", text, reply);
+    return;
+  }
+
+  // ── PAYMENT CONFIRMATION ──────────────────────────────────
+  if (isPaymentConfirmation(text) && user.state === "awaiting_payment") {
+    user.state      = "post_payment";
+    user.enrolledAt = Date.now();
+    user.milestonesSent = [];
+    const planName  = user.selectedPlan === "reset" ? "7-Day Sinus Reset" : "14-Day Sinus Restoration";
+    const confirmMsg = user.lang === "eng"
+      ? `Thank you so much 🙏 Payment confirmed.\n\nYour ${planName} starts today. I will send your morning guidance shortly. We work together here on WhatsApp every day. 🌿\n\nAny questions, message here.`
+      : `Bahut shukriya 🙏 Payment confirm ho gayi.\n\nAapka ${planName} aaj se shuru ho raha hai. Subah ki guidance aaj bhejta hun. Roz WhatsApp pe saath rahenge. 🌿\n\nKoi bhi sawaal, yahaan message karein.`;
+    await sendWithTyping(platform, senderId, confirmMsg);
+    await logToSheet(senderId, platform, user.sinusType, "payment_confirmed", text, "payment confirmed");
+    return;
+  }
+
+  // ── WELCOME — skip language menu, auto-detect from reply ──
+  if (user.state === "new") {
+    user.state = "asked_duration";
+    user.durationMenuSent = true;
+    const welcomeMsg =
+      "Namaste 🙏 Ayusomam Herbals mein swagat hai.\nSinus ki takleef mein specialized Ayurvedic guidance dete hain.\n\nAap jis bhasha mein comfortable hain, usi mein reply karein.\n\nYe problem kitne time se hai?\n\n1. Abhi abhi shuru hua (1 se 3 mahine)\n2. Thodi purani hai (3 se 6 mahine)\n3. 1 se 2 saal se\n4. 3 se 5 saal se\n5. 5 saal se zyada\n\nBas number reply karein 👇";
+    await sendWithTyping(platform, senderId, welcomeMsg, 800);
+    await logToSheet(senderId, platform, null, "welcome_sent", text, "welcome + duration menu");
+    return;
+  }
+
+  // ── DURATION REPLY ────────────────────────────────────────
+  if (user.state === "asked_duration" || (user.durationMenuSent && !user.durationIndex)) {
+    const dNums = parseNumberList(text);
+    if (dNums.length > 0 && dNums[0] >= 1 && dNums[0] <= 5) {
+      const idx = dNums[0] - 1;
+      user.durationIndex = idx;
+      user.duration      = DURATION_OPTIONS[idx];
+      user.state         = "asked_symptoms";
+
+      // For 3+ year cases, state the medicine cycle assumption
+      const cycleMsg = buildMedicineCycleMsg(idx, user.lang);
+      if (cycleMsg) {
+        await sendWithTyping(platform, senderId, cycleMsg, 800);
+        await sleep(1000);
+      }
+
+      // Send symptom menu
+      await sendWithTyping(platform, senderId, buildSymptomMenu(user.lang), 800);
+      user.symptomMenuSent = true;
+      await logToSheet(senderId, platform, null, "asked_symptoms", text, "duration captured");
+      return;
+    }
+
+    // If they typed duration in text form instead of number
+    const extracted = extractDuration(text);
+    if (extracted) {
+      user.duration  = extracted;
+      user.state     = "asked_symptoms";
+      await sendWithTyping(platform, senderId, buildSymptomMenu(user.lang), 800);
+      user.symptomMenuSent = true;
+      return;
+    }
+
+    // Re-prompt duration menu if unclear
+    await sendWithTyping(platform, senderId, buildDurationMenu(user.lang), 600);
+    return;
+  }
+
+  // ── SYMPTOM REPLY ─────────────────────────────────────────
+  if (user.state === "asked_symptoms" || (user.symptomMenuSent && !user.insightShown)) {
+    const sNums = parseNumberList(text);
+
+    // Check for text-based type mentions even if no numbers
+    if (sNums.length === 0) {
+      const detected = detectSinusTypeFromText(text);
+      if (detected) {
+        user.sinusType = detected;
+      }
+      // Still needs symptoms, ask again or proceed to AI
+      if (!user.sinusType) {
+        await sendWithTyping(platform, senderId, buildSymptomMenu(user.lang), 600);
+        return;
+      }
+    } else {
+      user.symptomNums = sNums;
+      user.symptoms    = sNums.map((n) => SYMPTOM_OPTIONS[n - 1]).join(", ");
+
+      // Also check for spray/polyp/dns keywords in symptom text
+      const detected = detectSinusTypeFromText(text);
+      user.sinusType  = detected || getSinusTypeFromSymptoms(sNums);
+    }
+
+    // Detect medicine usage
+    user.usedAllopathy = (user.durationIndex || 0) >= 2 ? true : null;
+
+    user.insightShown      = true;
+    user.sinusTypeRevealed = true;
+    user.convPhase         = "reframe";
+    user.state             = "pitched";
+
+    // Build and send insights one at a time for wow factor
+    const insights = buildSymptomInsights(user.symptomNums || [], user.lang);
+    for (const insight of insights) {
+      await sendWithTyping(platform, senderId, insight, 1000);
+    }
+
+    await sleep(1200);
+
+    // Reveal sinus type
+    const typeReveal = buildTypeReveal(user.sinusType, user.lang);
+    await sendWithTyping(platform, senderId, typeReveal, 800);
+    await sleep(1000);
+
+    // Hope-led pitch
+    const pitch = buildPitch(user);
+    await sendWithTyping(platform, senderId, pitch, 1000);
+
+    user.awaitingCommitment = true;
+    await logToSheet(senderId, platform, user.sinusType, "pitched", text, typeReveal + " | " + pitch);
+    return;
+  }
+
+  // ── COMMITMENT STEP ───────────────────────────────────────
+  if (user.awaitingCommitment && user.state === "pitched") {
+    if (isCommitmentYes(text)) {
+      user.awaitingCommitment = false;
+      user.state              = "awaiting_payment";
+      const plan      = user.selectedPlan || "restoration";
+      const planPrice = PRICES[plan].price;
+      const rzpLink   = plan === "clearing" ? RAZORPAY_LINK_499 : RAZORPAY_LINK_1299;
+
+      let paymentMsg;
+      if (rzpLink) {
+        // Razorpay link available — send it directly
+        paymentMsg = user.lang === "eng"
+          ? `Here is your secure payment link:\n${rzpLink}\n\nAmount: Rs. ${planPrice}. Once paid, send the confirmation here and your program starts the same day.`
+          : `Yeh raha aapka secure payment link:\n${rzpLink}\n\nAmount: Rs. ${planPrice}. Payment hone ke baad confirmation yahaan bhej dein. Program usi din shuru hoga.`;
+      } else {
+        // No Razorpay — notify and send manually
+        paymentMsg = user.lang === "eng"
+          ? `Great! I will share the payment details with you shortly. Amount: Rs. ${planPrice}.\n\nOnce done, send a screenshot here and your program starts the same day.`
+          : `Bahut badhiya. Payment details abhi share karta hun. Amount: Rs. ${planPrice}.\n\nScreenshot yahaan bhej dein, program usi din shuru hoga.`;
+      }
+      await sendWithTyping(platform, senderId, paymentMsg, 800);
+      await logToSheet(senderId, platform, user.sinusType, "awaiting_payment", text, paymentMsg);
+      return;
+    }
+
+    // Not a yes. Let AI handle the objection.
+    advancePhase(user, text);
+    const reply = await callSalesom(senderId, text, platform);
+    await sendWithTyping(platform, senderId, reply);
+    await logToSheet(senderId, platform, user.sinusType, "objection_handling", text, reply);
+    return;
+  }
+
+  // ── EXTRACT NAME IF NOT CAPTURED ──────────────────────────
+  if (!user.name) {
+    const n = extractNameFromText(text);
+    if (n) user.name = n;
+  }
+
+  // ── DEFAULT: SALESOM AI HANDLES EVERYTHING ELSE ───────────
+  // This covers: off-script questions, mid-program questions,
+  // re-engagement, any state not caught above
+  advancePhase(user, text);
+
+  // Early sinus type detection from free text
+  if (!user.sinusType) {
+    const detected = detectSinusTypeFromText(text);
+    if (detected) {
+      user.sinusType = detected;
+      user.convPhase = "mirror";
+    }
+  }
+
+  let reply;
+  try {
+    reply = await callSalesom(senderId, text, platform);
+  } catch (err) {
+    console.error("SALESOM AI error:", err.message);
+    reply = user.lang === "eng"
+      ? "So sorry, a brief technical issue. Please send your message again. 🙏"
+      : "Maafi chahta hun. Thodi technical dikkat aa gayi. Please ek baar wapas message karein. 🙏";
+  }
+
+  await sendWithTyping(platform, senderId, reply);
+
+  // Detect if AI moved to pitch state
+  if (reply.includes("499") || reply.includes("1,299") || reply.includes("Shuru karna")) {
+    user.state = "pitched";
+    if (user.convPhase !== "close") user.convPhase = "close";
+  }
+
+  await logToSheet(senderId, platform, user.sinusType, user.state, text, reply);
+}
+
+// ─── FACEBOOK WEBHOOK ─────────────────────────────────────────
+app.get("/webhook", (req, res) => {
+  if (
+    req.query["hub.mode"]          === "subscribe" &&
+    req.query["hub.verify_token"]  === VERIFY_TOKEN
+  ) {
+    res.status(200).send(req.query["hub.challenge"]);
   } else {
     res.sendStatus(403);
   }
 });
 
-app.post('/webhook', async (req, res) => {
-  const body = req.body;
-  if (body.object === 'page') {
-    for (const entry of body.entry) {
-      for (const msg of entry.messaging) {
-        if (msg.sender.id === PAGE_ID) {
-          const recipientId = msg.recipient?.id;
-          if (recipientId && recipientId !== PAGE_ID) {
-            const msgText = msg.message?.text || '';
-            if (msgText.startsWith('BOT_ON_')) {
-              const targetId = msgText.replace('BOT_ON_', '').trim();
-              userState[targetId] = 'new';
-              convHistory[targetId] = [];
-              console.log(`BOT REACTIVATED: ${targetId}`);
-            } else {
-              userState[recipientId] = 'human_takeover';
-              console.log(`HUMAN TAKEOVER: ${recipientId}`);
-            }
-          }
-          continue;
-        }
-        const senderId = msg.sender?.id;
-        const text = msg.message?.text?.trim();
-        if (!senderId || !text) continue;
-        await processMessage(senderId, text, sendMessage, 'Facebook');
+app.post("/webhook", async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const body = req.body;
+    if (body.object !== "page") return;
+    for (const entry of body.entry || []) {
+      for (const event of entry.messaging || []) {
+        if (!event.message || event.message.is_echo) continue;
+        const msgId = event.message.mid;
+        if (processedMessages.has(msgId)) continue;
+        processedMessages.add(msgId);
+        await handleMessage(event.sender.id, event.message.text || "", "facebook");
       }
     }
+  } catch (e) {
+    console.error("FB webhook error:", e.message);
   }
-  res.status(200).send('EVENT_RECEIVED');
 });
 
-// ============================================================
-// WHATSAPP WEBHOOK
-// ============================================================
-app.get('/whatsapp', (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
-  if (mode === 'subscribe' && token === WA_VERIFY_TOKEN) {
+// ─── TWILIO WHATSAPP WEBHOOK ──────────────────────────────────
+app.post(["/twilio-webhook", "/twilio"], async (req, res) => {
+  res.status(200).end(); // empty body — prevents Twilio from sending "OK" as WhatsApp msg
+  try {
+    const from  = (req.body.From || "").replace("whatsapp:", "");
+    const body  = req.body.Body || "";
+    const msgId = req.body.MessageSid;
+    if (!from || !body) return;
+    if (processedMessages.has(msgId)) return;
+    processedMessages.add(msgId);
+    await handleMessage(from, body, "twilio");
+  } catch (e) {
+    console.error("Twilio webhook error:", e.message);
+  }
+});
+
+// ─── INSTAGRAM WEBHOOK ────────────────────────────────────────
+app.get("/instagram-webhook", (req, res) => {
+  if (
+    req.query["hub.mode"]          === "subscribe" &&
+    req.query["hub.verify_token"]  === VERIFY_TOKEN
+  ) {
+    res.status(200).send(req.query["hub.challenge"]);
+  } else {
+    res.sendStatus(403);
+  }
+});
+
+app.post("/instagram-webhook", async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const body = req.body;
+    if (body.object !== "instagram") return;
+    for (const entry of body.entry || []) {
+      for (const event of (entry.messaging || [])) {
+        if (!event.message || event.message.is_echo) continue;
+        const msgId = event.message.mid;
+        if (processedMessages.has(msgId)) continue;
+        processedMessages.add(msgId);
+        await handleMessage(event.sender.id, event.message.text || "", "instagram");
+      }
+    }
+  } catch (e) {
+    console.error("Instagram webhook error:", e.message);
+  }
+});
+
+// ─── BROADCAST ────────────────────────────────────────────────
+// ── WHATSAPP CLOUD API WEBHOOK ─────────────────────────────────────────
+app.get("/whatsapp-webhook", (req, res) => {
+  const mode      = req.query["hub.mode"];
+  const token     = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+  if (mode === "subscribe" && token === (process.env.WA_VERIFY_TOKEN || "ayusomam_wa_verify")) {
+    console.log("WhatsApp webhook verified");
     res.status(200).send(challenge);
   } else {
     res.sendStatus(403);
   }
 });
 
-app.post('/whatsapp', async (req, res) => {
+app.post("/whatsapp-webhook", async (req, res) => {
   res.sendStatus(200);
   try {
     const body = req.body;
-    if (body.object !== 'whatsapp_business_account') return;
+    if (body.object !== "whatsapp_business_account") return;
     for (const entry of body.entry || []) {
       for (const change of entry.changes || []) {
         const value = change.value;
-        if (!value.messages) continue;
+        if (!value || !value.messages) continue;
         for (const msg of value.messages) {
-          if (msg.type !== 'text') continue;
-          const from = msg.from;
-          const text = msg.text?.body?.trim();
-          if (!from || !text) continue;
-          await processMessage(from, text, sendWAMessage, 'WhatsApp');
+          if (msg.type !== "text") continue;
+          const userId = msg.from;
+          const text   = msg.text.body;
+          console.log("[WA] Message from " + userId + ": " + text);
+          await handleMessage(userId, text, "whatsapp");
         }
       }
     }
-  } catch (e) {
-    console.error('WA webhook error:', e.message);
+  } catch (err) {
+    console.error("WhatsApp webhook error:", err);
   }
 });
 
-// ============================================================
-// RAZORPAY WEBHOOK
-// ============================================================
-app.post('/razorpay-webhook', async (req, res) => {
-  res.sendStatus(200);
-  try {
-    const signature = req.headers['x-razorpay-signature'];
-    const rawBody = req.body;
-    if (RAZORPAY_WEBHOOK_SECRET && signature) {
-      const expectedSig = crypto
-        .createHmac('sha256', RAZORPAY_WEBHOOK_SECRET)
-        .update(rawBody)
-        .digest('hex');
-      if (expectedSig !== signature) {
-        console.error('❌ Razorpay signature mismatch');
-        return;
+app.post("/broadcast", async (req, res) => {
+  const { numbers, message, secret } = req.body;
+  if (secret !== VERIFY_TOKEN) return res.status(401).json({ error: "Unauthorized" });
+  if (!Array.isArray(numbers) || !message) return res.status(400).json({ error: "Invalid payload" });
+  let sent = 0;
+  const errors = [];
+  for (const num of numbers) {
+    try {
+      await sendTwilioMessage(num, message);
+      sent++;
+      await sleep(500);
+    } catch (e) {
+      errors.push({ num, error: e.message });
+    }
+  }
+  res.json({ sent, errors });
+});
+
+// ─── SEASONAL BROADCAST TEMPLATES ────────────────────────────
+app.get("/seasonal-template/:season", (req, res) => {
+  const templates = {
+    "pre-winter": {
+      season: "Pre-Winter (Nov)",
+      target: "Congestive + Spray users",
+      message: "Ji 🙏 December mein Kapha peak hoti hai. Congestive sinus is time mein sabse zyada flare hoti hai. Abhi se shuru karna zyada effective hai. 14-Day Sinus Restoration Rs. 1299 ready hai. Reply karein. Sachin, Ayusomam Herbals 🌿",
+    },
+    "pre-summer": {
+      season: "Pre-Summer (Apr)",
+      target: "Deep Inflammation users",
+      message: "Ji 🙏 Garmi aa rahi hai. Deep Inflammation pattern ke liye yeh critical time hai. Proactive protocol is season mein sabse effective hota hai. 14-Day Sinus Restoration ready hai. Reply karein. 🌿",
+    },
+    "vasant": {
+      season: "Vasant (Feb-Mar)",
+      target: "Reactive Sensitivity users",
+      message: "Ji 🙏 Vasant season mein Reactive Sensitivity sinus sabse zyada flare hoti hai. Pollen season se pehle protocol start karna sabse effective hai. 14-Day Sinus Restoration Rs. 1299 ready hai. Details chahiye? Reply karein. 🌿",
+    },
+    "monsoon": {
+      season: "Monsoon (Jul-Sep)",
+      target: "All types",
+      message: "Ji 🙏 Monsoon mein sinus peak pe hoti hai. 7-Day Sinus Reset Rs. 499 ya 14-Day Sinus Restoration Rs. 1299. Dono available hain. Reply karein. 🌿",
+    },
+    "past-customer": {
+      season: "Past Customer Re-engagement",
+      target: "Completed 14-day program",
+      message: "Ji 🙏 14-Day Sinus Restoration complete ki thi. Follow up karne ka mann tha. Naak kaisi hai ab? Agar seasonal flare wapas aa rahi ho, 7-Day Sinus Reset Rs. 499 se maintain kar sakte hain. Reply karein. 🌿",
+    },
+  };
+  const t = templates[req.params.season];
+  if (!t) return res.status(404).json({ error: "Template not found", available: Object.keys(templates) });
+  res.json(t);
+});
+
+// ─── STATS / ADMIN ────────────────────────────────────────────
+app.get("/stats", (req, res) => {
+  if (req.query.secret !== VERIFY_TOKEN) return res.status(401).json({ error: "Unauthorized" });
+  const all = Object.values(userData);
+  const stats = {
+    totalUsers: all.length,
+    byType: {}, byState: {}, byPhase: {},
+    enrolled:   all.filter((u) => u.enrolledAt).length,
+    ghosted:    all.filter((u) => u.ghostAttempts > 0).length,
+    converted:  all.filter((u) => u.state === "post_payment" || u.state === "done").length,
+  };
+  for (const u of all) {
+    const t = u.sinusType  || "unknown";
+    const s = u.state      || "new";
+    const p = u.convPhase  || "probe";
+    stats.byType[t]  = (stats.byType[t]  || 0) + 1;
+    stats.byState[s] = (stats.byState[s] || 0) + 1;
+    stats.byPhase[p] = (stats.byPhase[p] || 0) + 1;
+  }
+  stats.conversionRate = stats.totalUsers
+    ? ((stats.converted / stats.totalUsers) * 100).toFixed(1) + "%"
+    : "0%";
+  res.json(stats);
+});
+
+// ─── ADMIN API: DATA ──────────────────────────────────────────
+app.get("/admin/data", async (req, res) => {
+  if (req.query.secret !== VERIFY_TOKEN) return res.status(401).json({ error: "Unauthorized" });
+  const all = Object.entries(userData).map(([id, u]) => ({
+    id,
+    platform:          u.platform || "unknown",
+    state:             u.state    || "new",
+    sinusType:         u.sinusType || null,
+    lang:              u.lang     || null,
+    duration:          u.duration || null,
+    selectedPlan:      u.selectedPlan || null,
+    lastMessageAt:     u.lastMessageAt || null,
+    ghostAttempts:     u.ghostAttempts || 0,
+    enrolledAt:        u.enrolledAt || null,
+    history:           (u.history || []).slice(-40), // last 40 messages
+  }));
+  // ─── SHEETS HISTORICAL DATA ─────────────────────────────────
+  if (SHEET_URL) {
+    try {
+      const _sr = await fetch(SHEET_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'conversations'})});
+      const _sl = await _sr.json();
+      const _rows = Array.isArray(_sl) ? _sl : [];
+      console.log('[ADMIN] Sheets rows:', _rows.length);
+      const _cm = {};
+      for (const _row of _rows) {
+        const _sid = String(_row.SenderID || _row.senderId || _row.id || '').trim();
+        if (!_sid) continue;
+        if (!_cm[_sid]) {const _p=String(_row.Platform||_row.platform||'').toLowerCase();const _plt=_p.includes('messenger')||_p.includes('facebook')||_p.includes('fb')?'messenger':_p.includes('instagram')?'instagram':'whatsapp';_cm[_sid]={msgs:[],lastTs:0,platform:_plt};}
+        const _ts = _row.Timestamp ? new Date(_row.Timestamp).getTime() : 0;
+        const _role = String(_row.Role || _row.role || 'user').toLowerCase();
+        const _content = String(_row.Message || _row.message || _row.content || '');
+        _cm[_sid].msgs.push({ts:_ts, role:_role, content:_content});
+        if (_ts > _cm[_sid].lastTs) _cm[_sid].lastTs = _ts;
       }
-    }
-    const payload = JSON.parse(rawBody.toString());
-    if (payload.event !== 'payment.captured') return;
-    const payment = payload.payload?.payment?.entity;
-    if (!payment) return;
-
-    const orderId = payment.id || 'N/A';
-    const amount = (payment.amount / 100).toFixed(0);
-    const email = payment.email || '';
-    const name = payment.notes?.name || payment.notes?.billing_name || email.split('@')[0] || 'Customer';
-    let phone = (payment.contact || '').replace(/\D/g, '');
-    if (phone.startsWith('91') && phone.length === 12) phone = phone.slice(2);
-
-    console.log(`💰 Payment: ${orderId} | ${name} | ${phone} | ₹${amount}`);
-
-    if (GOOGLE_SHEET_URL) {
-      await fetch(GOOGLE_SHEET_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          timestamp: new Date().toISOString(),
-          platform: 'Razorpay',
-          senderId: phone || email,
-          name,
-          message: `PAID ₹${amount} | Order: ${orderId}`,
-          temperature: '✅ Paid',
-          lastStage: 'payment_complete',
-          symptom: '',
-          email,
-          orderId,
-          amount: `₹${amount}`
-        })
-      });
-    }
-
-    if (phone && WHATSAPP_TOKEN && WHATSAPP_PHONE_ID) {
-      const waPhone = `91${phone}`;
-      await sendWAMessage(waPhone,
-        `✅ *Payment Confirmed!*\n\nOrder ID: ${orderId}\nAmount: ₹${amount}\n\n*${name} Ji, aapka order register ho gaya hai.* 🙏\n\nKal subah tak aapko Day 1 protocol milega.\n\n— *Sachin, Ayusomam Herbals* 🌿`
-      );
-      setTimeout(async () => {
-        await sendWAMessage(waPhone,
-          `Namaskar *${name} Ji* 🙏\n\nAapne sahi decision liya.\n\nAbhi ke liye ek kaam: subah uthke 1 glass gunguna paani peeyein — khaali pet.\n\nKal main personally aapka Day 1 routine bhejunga. 🌿`
-        );
-      }, 8000);
-    }
-  } catch (e) {
-    console.error('Razorpay webhook error:', e.message);
+      for (const [_sid, _conv] of Object.entries(_cm)) {
+        _conv.msgs.sort((a,b)=>a.ts-b.ts);
+        const _hist = _conv.msgs.map(m=>({role:m.role, content:m.content}));
+        if (userData[_sid]) {
+          const _ex = new Set((userData[_sid].history||[]).map(m=>m.content));
+          userData[_sid].history = [..._hist.filter(m=>!_ex.has(m.content)), ...(userData[_sid].history||[])];
+          if (!userData[_sid].lastMessageAt) userData[_sid].lastMessageAt = _conv.lastTs||null;
+        } else {
+          userData[_sid] = {lang:null,sinusType:null,state:'unknown',platform:_conv.platform||'whatsapp',duration:null,selectedPlan:null,lastMessageAt:_conv.lastTs||null,ghostAttempts:0,enrolledAt:null,history:_hist.slice(-60),source:'sheets'};
+        }
+      }
+      console.log('[ADMIN] Merged convs:', Object.keys(_cm).length);
+    } catch(e){console.warn('[ADMIN] Sheets err:',e.message);}
   }
+
+  all.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+
+  const stats = {
+    total:       all.length,
+    converted:   all.filter((u) => u.state === "post_payment" || u.state === "done").length,
+    pitched:     all.filter((u) => ["pitched","awaiting_payment","awaiting_commitment"].includes(u.state)).length,
+    active:      all.filter((u) => !["new","done","post_payment"].includes(u.state)).length,
+    ghosted:     all.filter((u) => u.ghostAttempts > 0).length,
+  };
+  stats.conversionRate = stats.total ? ((stats.converted / stats.total) * 100).toFixed(1) : "0";
+  res.json({ stats, leads: all });
 });
 
-// ============================================================
-// BOT CONTROL
-// ============================================================
-app.post('/bot-control', (req, res) => {
-  const { userId, action } = req.body;
-  if (!userId || !action) return res.status(400).json({ error: 'userId and action required' });
-  if (action === 'BOT_OFF') {
-    userState[userId] = 'human_takeover';
-    res.json({ success: true, message: `Bot OFF for ${userId}` });
-  } else if (action === 'BOT_ON') {
-    delete userState[userId];
-    convHistory[userId] = [];
-    res.json({ success: true, message: `Bot ON for ${userId}` });
-  } else {
-    res.status(400).json({ error: 'action must be BOT_ON or BOT_OFF' });
-  }
-});
-
-// ============================================================
-// WEBSITE CHATBOT LEAD ENDPOINT
-// ============================================================
-app.post('/website-lead', async (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
+// ─── ADMIN API: REPLY ─────────────────────────────────────────
+app.post("/admin/reply", async (req, res) => {
+  if (req.body.secret !== VERIFY_TOKEN) return res.status(401).json({ error: "Unauthorized" });
+  const { userId, platform, message } = req.body;
+  if (!userId || !platform || !message) return res.status(400).json({ error: "Missing fields" });
   try {
-    const { name, phone, sinusType, stage, message } = req.body;
-    const senderId = phone ? `WEB_${String(phone).replace(/\D/g, '')}` : `WEB_${Date.now()}`;
-    console.log(`WEBSITE LEAD: ${name} | ${phone} | ${sinusType} | ${stage}`);
-    await updateLead(
-      senderId, '🟡 Warm', stage || 'website_chat', sinusType || '',
-      name || 'Website Visitor',
-      (name ? name + ' — ' : '') + (sinusType || 'website lead'),
-      'Website'
-    );
-    res.json({ success: true });
+    await sendMessage(platform, userId, message);
+    // Inject into history so it appears in the thread
+    if (userData[userId]) {
+      userData[userId].history = userData[userId].history || [];
+      userData[userId].history.push({ role: "assistant", content: message });
+    }
+    await logToSheet(userId, platform, userData[userId]?.sinusType || null, "admin_reply", "", message);
+    res.json({ ok: true });
   } catch (e) {
-    console.error('Website lead error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
-app.options('/website-lead', (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
-  res.sendStatus(200);
+// ─── ADMIN DASHBOARD SPA ──────────────────────────────────────
+// ─── FOLLOW-UP SCHEDULER ─────────────────────────────────────────────────────
+let globalFollowupEnabled = true;
+const FU_SCHED = {interested:[1,3,7],pitched:[1,3],ghosted:[14],unknown:[2,5]};
+const FU_MSGS = {
+  interested:[
+    "Hello! 🙏 Just checking in — have you had a chance to think about our sinus treatment program? Many patients see relief in the first week itself. Happy to answer any questions 😊",
+    "Hi! One of our patients with similar symptoms recovered completely in 3 weeks with our herbal program. Would you like to know how it could help you too? 🌿",
+    "This is our last follow-up. If you'd ever like to explore our sinus treatment, we're always here. Wishing you good health! 🙏 — Ayusomam Herbals"
+  ],
+  pitched:[
+    "Hello! 🙏 Just checking — did you have any questions about the treatment program we discussed? We're here to help you decide with confidence.",
+    "Hi! We still have a spot in our current batch. The program has helped 200+ patients with chronic sinus. Would you like to proceed? We can also discuss flexible options 🌿"
+  ],
+  ghosted:[
+    "Hello! 🙏 Hope you're doing well. If your sinus issues are still bothering you, our herbal treatment might be exactly what you need. Many patients who tried everything else found relief with us. Would love to help 😊"
+  ],
+  unknown:[
+    "Hello! 🙏 Following up on your inquiry about our sinus treatment. Are you still interested? We're here to help!",
+    "Hi! A gentle check-in from Ayusomam Herbals. If you have questions about our sinus program, feel free to ask anytime 🌿"
+  ]
+};
+function getFUMsg(state,n){const t=FU_MSGS[state]||FU_MSGS.unknown;return t[n]||t[t.length-1];}
+function shouldFU(lead){
+  if(!globalFollowupEnabled||lead.autoFollowup===false)return false;
+  if(lead.state==='converted'||lead.state==='post_payment'||lead.enrolledAt)return false;
+  const s=FU_SCHED[lead.state]||FU_SCHED.unknown;const n=lead.followupCount||0;
+  if(n>=s.length)return false;
+  const last=lead.lastFollowupAt||lead.lastMessageAt;if(!last)return false;
+  return(Date.now()-new Date(last).getTime())/86400000>=s[n];
+}
+async function runFUScheduler(){
+  if(!globalFollowupEnabled)return;
+  console.log('[FU] Scheduler running...');let sent=0;
+  for(const[uid,lead]of Object.entries(userData)){
+    if(!shouldFU(lead))continue;
+    try{
+      const msg=getFUMsg(lead.state,lead.followupCount||0);
+      await sendMessage(lead.platform||'messenger',uid,msg);
+      lead.followupCount=(lead.followupCount||0)+1;lead.lastFollowupAt=Date.now();
+      (lead.history=lead.history||[]).push({role:'assistant',content:'[Auto FU] '+msg});
+      sent++;await new Promise(r=>setTimeout(r,1200));
+    }catch(e){console.warn('[FU] Failed:',uid,e.message);}
+  }
+  console.log('[FU] Done, sent:',sent);
+}
+setInterval(runFUScheduler,6*60*60*1000);
+console.log('[FU] Scheduler ready, runs every 6h');
+app.post('/admin/toggle-global',(req,res)=>{
+  if(req.body.secret!==VERIFY_TOKEN)return res.status(403).json({error:'forbidden'});
+  globalFollowupEnabled=!!req.body.enabled;res.json({ok:true,globalFollowupEnabled});
 });
-
-// ============================================================
-// TRANSLATE ENDPOINT (Claude API)
-// ============================================================
-app.options('/translate', (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
-  res.sendStatus(200);
+app.post('/admin/toggle-followup',(req,res)=>{
+  if(req.body.secret!==VERIFY_TOKEN)return res.status(403).json({error:'forbidden'});
+  const{userId,enabled}=req.body;
+  if(!userId||!userData[userId])return res.status(404).json({error:'not found'});
+  userData[userId].autoFollowup=!!enabled;res.json({ok:true,autoFollowup:userData[userId].autoFollowup});
 });
+app.post('/admin/send-followup',async(req,res)=>{
+  if(req.body.secret!==VERIFY_TOKEN)return res.status(403).json({error:'forbidden'});
+  const{userId}=req.body;if(!userId||!userData[userId])return res.status(404).json({error:'not found'});
+  const lead=userData[userId];
+  try{
+    const msg=getFUMsg(lead.state,lead.followupCount||0);
+    await sendMessage(lead.platform||'messenger',userId,msg);
+    lead.followupCount=(lead.followupCount||0)+1;lead.lastFollowupAt=Date.now();
+    (lead.history=lead.history||[]).push({role:'assistant',content:'[Manual FU] '+msg});
+    res.json({ok:true,message:msg,followupCount:lead.followupCount});
+  }catch(e){res.status(500).json({error:e.message});}
+});
+app.get('/admin/followup-status',(req,res)=>{
+  if(req.query.secret!==VERIFY_TOKEN)return res.status(403).json({error:'forbidden'});
+  const out={};
+  for(const[uid,lead]of Object.entries(userData)){
+    const s=FU_SCHED[lead.state]||FU_SCHED.unknown;const n=lead.followupCount||0;
+    const last=lead.lastFollowupAt||lead.lastMessageAt;let nextIn=null;
+    if(n<s.length&&last){const d=(Date.now()-new Date(last).getTime())/86400000;nextIn=Math.max(0,Math.ceil(s[n]-d));}
+    out[uid]={autoFollowup:lead.autoFollowup!==false,followupCount:n,nextInDays:nextIn};
+  }
+  res.json({globalFollowupEnabled,statuses:out});
+});
+app.get("/admin", (req, res) => {
+  if (req.query.secret !== VERIFY_TOKEN) {
+    return res.send(`<!DOCTYPE html><html><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f5f5f5">
+      <form method="GET" action="/admin" style="background:#fff;padding:32px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.1);text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">🌿</div>
+        <h2 style="margin:0 0 20px;color:#1a1a1a">Ayusomam Admin</h2>
+        <input name="secret" type="password" placeholder="Enter secret token" style="padding:10px 16px;border:1px solid #ddd;border-radius:8px;font-size:15px;width:220px"/>
+        <br/><br/>
+        <button type="submit" style="background:#2e7d32;color:#fff;border:none;padding:10px 28px;border-radius:8px;font-size:15px;cursor:pointer">Login</button>
+      </form></body></html>`);
+  }
 
-const translateCache = {};
+  const secret = req.query.secret;
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Ayusomam Admin</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a1a;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+    .topbar{background:#2e7d32;color:#fff;padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:10}
+    .topbar h1{font-size:17px;font-weight:600}
+    .topbar-right{display:flex;align-items:center;gap:16px;font-size:13px;opacity:.9}
+    .filter-bar{display:flex;gap:8px;padding:10px 16px;background:#fff;border-bottom:1px solid #e8e8e8;flex-shrink:0}
+    .filter-btn{padding:5px 14px;border-radius:20px;border:1px solid #ddd;background:#fff;font-size:13px;cursor:pointer;transition:all .15s}
+    .filter-btn.active{background:#2e7d32;color:#fff;border-color:#2e7d32}
+    .layout{display:flex;flex:1;overflow:hidden}
+    .sidebar{width:320px;flex-shrink:0;background:#fff;border-right:1px solid #e8e8e8;display:flex;flex-direction:column;overflow:hidden}
+    .sidebar-header{padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#666;font-weight:500}
+    .lead-list{flex:1;overflow-y:auto}
+    .lead-item{padding:12px 16px;border-bottom:1px solid #f5f5f5;cursor:pointer;transition:background .1s}
+    .lead-item:hover{background:#f9f9f9}
+    .lead-item.active{background:#e8f5e9}
+    .lead-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+    .lead-name{font-size:14px;font-weight:500;color:#1a1a1a}
+    .lead-time{font-size:11px;color:#aaa}
+    .lead-meta{display:flex;gap:6px;align-items:center}
+    .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500}
+    .badge-fb{background:#e3f2fd;color:#1565c0}
+    .badge-wa{background:#e8f5e9;color:#2e7d32}
+    .badge-ig{background:#fce4ec;color:#c62828}
+    .badge-state{background:#f5f5f5;color:#555}
+    .badge-converted{background:#e8f5e9;color:#2e7d32}
+    .badge-pitched{background:#fff3e0;color:#e65100}
+    .badge-ghosted{background:#fafafa;color:#999}
+    .fu-banner{display:flex;align-items:center;justify-content:space-between;background:#e8f5e9;border-bottom:1px solid #c8e6c9;padding:8px 16px;font-size:13px}
+    .fu-banner-left{display:flex;align-items:center;gap:8px;color:#2e7d32;font-weight:500}
+    .toggle-wrap{display:flex;align-items:center;gap:5px;font-size:12px}
+    .toggle-sw{position:relative;display:inline-block;width:38px;height:20px;flex-shrink:0}
+    .toggle-sw input{opacity:0;width:0;height:0}
+    .toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#ccc;border-radius:20px;transition:.3s}
+    .toggle-slider:before{position:absolute;content:"";height:14px;width:14px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+    input:checked+.toggle-slider{background:#2e7d32}
+    input:checked+.toggle-slider:before{transform:translateX(18px)}
+    .fu-row{display:flex;align-items:center;justify-content:space-between;margin-top:5px;padding-top:5px;border-top:1px dashed #f0f0f0}
+    .fu-info{font-size:11px;color:#999}
+    .fu-btn{font-size:11px;padding:3px 9px;border:1px solid #2e7d32;color:#2e7d32;background:#fff;border-radius:12px;cursor:pointer;white-space:nowrap}
+    .fu-btn:hover{background:#e8f5e9}.fu-btn:disabled{opacity:.4;cursor:default}
+    .chat-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+    .chat-header{padding:14px 20px;background:#fff;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;gap:12px}
+    .chat-header-info h2{font-size:15px;font-weight:600}
+    .chat-header-info p{font-size:12px;color:#888;margin-top:2px}
+    .stats-bar{display:flex;gap:12px;padding:10px 20px;background:#fff;border-bottom:1px solid #f0f0f0;flex-shrink:0}
+    .stat-pill{background:#f4f6f8;border-radius:8px;padding:6px 14px;text-align:center}
+    .stat-pill .val{font-size:18px;font-weight:700;color:#2e7d32}
+    .stat-pill .lbl{font-size:11px;color:#888;margin-top:1px}
+    .messages{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+    .msg{max-width:72%;padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+    .msg-user{background:#e8f5e9;color:#1a1a1a;align-self:flex-start;border-bottom-left-radius:4px}
+    .msg-bot{background:#fff;color:#1a1a1a;align-self:flex-end;border-bottom-right-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+    .msg-time{font-size:10px;color:#bbb;margin-top:3px;text-align:right}
+    .empty-state{flex:1;display:flex;align-items:center;justify-content:center;color:#bbb;flex-direction:column;gap:8px}
+    .empty-state span{font-size:40px}
+    .reply-box{padding:12px 16px;background:#fff;border-top:1px solid #e8e8e8;display:flex;gap:10px;align-items:flex-end}
+    .reply-input{flex:1;border:1px solid #ddd;border-radius:12px;padding:10px 14px;font-size:14px;resize:none;outline:none;font-family:inherit;max-height:120px;min-height:42px;transition:border .15s}
+    .reply-input:focus{border-color:#2e7d32}
+    .send-btn{background:#2e7d32;color:#fff;border:none;border-radius:12px;padding:10px 20px;font-size:14px;cursor:pointer;white-space:nowrap;font-weight:500;transition:opacity .15s}
+    .send-btn:disabled{opacity:.5;cursor:default}
+    .platform-icon{font-size:18px}
+    .no-convo{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#bbb}
+    .no-convo .icon{font-size:48px}
+    .no-convo p{font-size:15px}
+    ::-webkit-scrollbar{width:4px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:#ddd;border-radius:4px}
+  </style>
+</head>
+<body>
+<div class="topbar">
+  <h1>🌿 Ayusomam Dashboard</h1>
+  <div class="topbar-right">
+    <span id="clock"></span>
+    <button onclick="loadData()" style="background:rgba(255,255,255,.2);border:none;color:#fff;padding:5px 12px;border-radius:8px;cursor:pointer;font-size:13px">↻ Refresh</button>
+  </div>
+</div>
 
-app.post('/translate', async (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
+<div class="stats-bar" id="statsBar">
+  <div class="stat-pill"><div class="val" id="s-total">—</div><div class="lbl">Total</div></div>
+  <div class="stat-pill"><div class="val" id="s-active">—</div><div class="lbl">Active</div></div>
+  <div class="stat-pill"><div class="val" id="s-pitched" style="color:#e65100">—</div><div class="lbl">In Checkout</div></div>
+  <div class="stat-pill"><div class="val" id="s-converted">—</div><div class="lbl">Converted</div></div>
+  <div class="stat-pill"><div class="val" id="s-rate">—</div><div class="lbl">Conv. Rate</div></div>
+  <div class="stat-pill"><div class="val" id="s-ghosted" style="color:#999">—</div><div class="lbl">Ghosted</div></div>
+</div>
+
+<div class="filter-bar">
+  <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+  <button class="filter-btn" onclick="setFilter('messenger',this)">📘 Messenger</button>
+  <button class="filter-btn" onclick="setFilter('whatsapp',this)">💬 WhatsApp</button>
+  <button class="filter-btn" onclick="setFilter('instagram',this)">📸 Instagram</button>
+  <button class="filter-btn" onclick="setFilter('post_payment',this)">✅ Converted</button>
+  <button class="filter-btn" onclick="setFilter('pitched',this)">🔥 In Checkout</button>
+</div>
+
+<div class="fu-banner" id="fuBanner">
+  <div class="fu-banner-left">🔔 Auto Follow-ups</div>
+  <div class="toggle-wrap">
+    <span class="fu-info" id="fuGlobalLabel" style="color:#2e7d32;font-weight:600;margin-right:4px">ON</span>
+    <label class="toggle-sw" style="margin:0 6px">
+      <input type="checkbox" id="globalFuToggle" checked onchange="toggleGlobal(this.checked)">
+      <span class="toggle-slider"></span>
+    </label>
+    <span class="fu-info">Global</span>
+  </div>
+</div>
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-header" id="leadCount">Loading...</div>
+    <div class="lead-list" id="leadList"></div>
+  </div>
+  <div class="chat-panel" id="chatPanel">
+    <div class="no-convo">
+      <div class="icon">💬</div>
+      <p>Select a conversation to view</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const SECRET = '${secret}';
+let allLeads = [];
+let activeFilter = 'all';
+let activeUserId = null;
+let autoRefreshTimer = null;
+
+const platformIcon  = { messenger:'📘', whatsapp:'💬', instagram:'📸', unknown:'💬' };
+const platformBadge = { messenger:'badge-fb', whatsapp:'badge-wa', instagram:'badge-ig', unknown:'badge-fb' };
+const stateColor    = { post_payment:'badge-converted', awaiting_payment:'badge-pitched', pitched:'badge-pitched', awaiting_commitment:'badge-pitched' };
+
+function timeAgo(ts) {
+  if (!ts) return '—';
+  const m = Math.round((Date.now() - ts) / 60000);
+  if (m < 1)  return 'just now';
+  if (m < 60) return m + 'm ago';
+  if (m < 1440) return Math.round(m/60) + 'h ago';
+  return Math.round(m/1440) + 'd ago';
+}
+
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderLeads();
+}
+
+async function loadData() {
   try {
-    const { text, lang } = req.body;
-    if (!text || !lang || lang === 'hinglish') return res.json({ translated: text });
-    if (!CLAUDE_API_KEY) return res.json({ translated: text });
+    const r = await fetch('/admin/data?secret=' + SECRET);
+    const d = await r.json();
+    allLeads = d.leads || [];
+    const s = d.stats || {};
+    document.getElementById('s-total').textContent     = s.total || 0;
+    document.getElementById('s-active').textContent    = s.active || 0;
+    document.getElementById('s-pitched').textContent   = s.pitched || 0;
+    document.getElementById('s-converted').textContent = s.converted || 0;
+    document.getElementById('s-rate').textContent      = (s.conversionRate || '0') + '%';
+    document.getElementById('s-ghosted').textContent   = s.ghosted || 0;
+    renderLeads();
+    if (activeUserId) renderChat(activeUserId);
+  } catch(e) { console.error(e); }
+}
 
-    const cacheKey = `${lang}:${text.slice(0, 80)}`;
-    if (translateCache[cacheKey]) return res.json({ translated: translateCache[cacheKey] });
+function renderLeads() {
+  let leads = allLeads;
+  if (activeFilter === 'messenger')   leads = leads.filter(l => l.platform === 'messenger');
+  if (activeFilter === 'whatsapp')    leads = leads.filter(l => l.platform === 'whatsapp');
+  if (activeFilter === 'instagram')   leads = leads.filter(l => l.platform === 'instagram');
+  if (activeFilter === 'post_payment') leads = leads.filter(l => l.state === 'post_payment' || l.state === 'done');
+  if (activeFilter === 'pitched')     leads = leads.filter(l => ['pitched','awaiting_payment','awaiting_commitment'].includes(l.state));
 
-    const langNames = { english: 'English', hindi: 'Hindi (Devanagari script)', telugu: 'Telugu script', tamil: 'Tamil script', kannada: 'Kannada script' };
-    const langName = langNames[lang] || lang;
+  document.getElementById('leadCount').textContent = leads.length + ' conversation' + (leads.length !== 1 ? 's' : '');
+  const list = document.getElementById('leadList');
+  list.innerHTML = leads.map(l => {
+    const icon    = platformIcon[l.platform] || '💬';
+    const bCls    = platformBadge[l.platform] || 'badge-fb';
+    const sCls    = stateColor[l.state] || 'badge-state';
+    const lastMsg = (l.history || []).filter(m => m.role === 'user').slice(-1)[0];
+    const preview = lastMsg ? lastMsg.content.substring(0,50) + (lastMsg.content.length > 50 ? '…' : '') : 'No messages yet';
+    return \`<div class="lead-item\${l.id === activeUserId ? ' active' : ''}" onclick="selectLead('\${l.id}')">
+      <div class="lead-top">
+        <span class="lead-name">\${icon} \${l.id.substring(0,12)}…</span>
+        <span class="lead-time">\${timeAgo(l.lastMessageAt)}</span>
+      </div>
+      <div class="lead-meta" style="margin-bottom:4px">
+        <span class="badge \${bCls}">\${l.platform}</span>
+        <span class="badge \${sCls}">\${l.state}</span>
+        \${l.sinusType ? '<span class="badge" style="background:#f3e5f5;color:#6a1b9a">' + l.sinusType.replace(/_/g,' ') + '</span>' : ''}
+      </div>
+      <div style="font-size:12px;color:#999;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">\${preview}</div>
+         <div class="fu-row" onclick="event.stopPropagation()">
+        <div class="toggle-wrap">
+          <label class="toggle-sw" style="margin:0">
+            <input type="checkbox" \${l.autoFollowup!==false?'checked':''} onchange="toggleFU('\${l.id}',this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="fu-info" style="margin:0 5px">Auto FU</span>
+          <span class="fu-info" style="color:\${computeFuTxt(l).includes('Due')?'#e65100':'#888'}">\${computeFuTxt(l)}</span>
+        </div>
+        <button class="fu-btn" data-fu-btn="\${l.id}" onclick="sendFUNow('\${l.id}')">Send now</button>
+      </div>
+ </div>\`;
+  }).join('');
+}
 
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': CLAUDE_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: `Translate this message to ${langName}. Keep emojis, formatting, numbers, payment links, WhatsApp numbers, Ayurvedic terms (Pratishyaya, dosha, Vata, Pitta, Kapha, srotas, ama, nasya) and brand name "Ayusomam Herbals" exactly as-is. Keep Rs. as-is. Just return the translated text, nothing else:\n\n${text}` }]
-      })
+function selectLead(id) {
+  activeUserId = id;
+  renderLeads();
+  renderChat(id);
+}
+
+function renderChat(id) {
+  const lead = allLeads.find(l => l.id === id);
+  if (!lead) return;
+  const icon  = platformIcon[lead.platform] || '💬';
+  const panel = document.getElementById('chatPanel');
+  const history = lead.history || [];
+
+  panel.innerHTML = \`
+    <div class="chat-header">
+      <span class="platform-icon">\${icon}</span>
+      <div class="chat-header-info">
+        <h2>\${lead.platform.charAt(0).toUpperCase()+lead.platform.slice(1)} · \${lead.id}</h2>
+        <p>\${lead.sinusType ? lead.sinusType.replace(/_/g,' ') + ' · ' : ''}\${lead.state} · \${lead.lang || 'hin'}\${lead.duration ? ' · ' + lead.duration : ''}</p>
+      </div>
+    </div>
+    <div class="messages" id="msgArea">
+      \${history.length === 0
+        ? '<div class="empty-state"><span>💬</span><p>No messages yet</p></div>'
+        : history.map(m => \`
+          <div>
+            <div class="msg \${m.role === 'user' ? 'msg-user' : 'msg-bot'}">\${m.content}</div>
+          </div>\`).join('')}
+    </div>
+    <div class="reply-box">
+      <textarea class="reply-input" id="replyInput" placeholder="Type a message to send via \${lead.platform}…" rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendReply()}"
+        oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendReply()">Send ↗</button>
+    </div>\`;
+
+  // Scroll to bottom
+  const msgArea = document.getElementById('msgArea');
+  if (msgArea) msgArea.scrollTop = msgArea.scrollHeight;
+}
+
+async function sendReply() {
+  const input = document.getElementById('replyInput');
+  const btn   = document.getElementById('sendBtn');
+  const msg   = input.value.trim();
+  if (!msg || !activeUserId) return;
+  const lead = allLeads.find(l => l.id === activeUserId);
+  if (!lead) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try {
+    const r = await fetch('/admin/reply', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ secret: SECRET, userId: activeUserId, platform: lead.platform, message: msg }),
     });
-    const data = await r.json();
-    const translated = data.content?.[0]?.text || text;
-    translateCache[cacheKey] = translated;
-    res.json({ translated });
-  } catch (e) {
-    console.error('Translate error:', e.message);
-    res.json({ translated: req.body.text });
-  }
+    const d = await r.json();
+    if (d.ok) {
+      input.value = '';
+      input.style.height = 'auto';
+      // Add to local history immediately
+      lead.history = lead.history || [];
+      lead.history.push({ role: 'assistant', content: msg });
+      renderChat(activeUserId);
+    } else {
+      alert('Send failed: ' + (d.error || 'Unknown error'));
+    }
+  } catch(e) { alert('Error: ' + e.message); }
+  btn.disabled = false;
+  btn.textContent = 'Send ↗';
+}
+
+// Clock
+function toggleGlobal(enabled) {
+  fetch('/admin/toggle-global',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:SEC,enabled})})
+    .then(r=>r.json()).then(d=>{
+      document.getElementById('fuGlobalLabel').textContent=d.globalFollowupEnabled?'ON':'OFF';
+      document.getElementById('fuBanner').style.opacity=d.globalFollowupEnabled?'1':'0.5';
+    });
+}
+function toggleFU(userId,enabled){
+  fetch('/admin/toggle-followup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:SEC,userId,enabled})})
+    .then(r=>r.json()).then(()=>loadData());
+}
+function sendFUNow(userId){
+  const btn=document.querySelector('[data-fu-btn="'+userId+'"]');
+  if(btn){btn.disabled=true;btn.textContent='Sending...';}
+  fetch('/admin/send-followup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:SEC,userId})})
+    .then(r=>r.json())
+    .then(d=>{
+      if(d.ok){alert('Sent! (Follow-up #'+d.followupCount+')\\n\\n'+d.message.substring(0,100)+'...');loadData();}
+      else{alert('Error: '+(d.error||'unknown'));if(btn){btn.disabled=false;btn.textContent='Send now';}}
+    }).catch(()=>{if(btn){btn.disabled=false;btn.textContent='Send now';}});
+}
+function computeFuTxt(l){
+  const s={interested:[1,3,7],pitched:[1,3],ghosted:[14],unknown:[2,5]};
+  const sched=s[l.state]||s.unknown;const n=l.followupCount||0;
+  if(n>=sched.length)return 'Done ✓';
+  const last=l.lastFollowupAt||l.lastMessageAt;if(!last)return '—';
+  const d=Math.max(0,Math.ceil(sched[n]-(Date.now()-new Date(last).getTime())/86400000));
+  return d<=0?'Due now!':'In '+d+'d';
+}
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'});
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+// Auto-refresh data every 30s
+loadData();
+setInterval(loadData, 30000);
+</script>
+</body>
+</html>`);
 });
 
-// ============================================================
-// WEBSITE CHATBOT ENDPOINT
-// ============================================================
-app.options('/website-chat', (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
-  res.sendStatus(200);
+// ─── HEALTH CHECK ─────────────────────────────────────────────
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    version: "5.0",
+    uptime: process.uptime(),
+    users: Object.keys(userData).length,
+  });
 });
 
-app.post('/website-chat', async (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
+// ─── START ────────────────────────────────────────────────────
+// ── WEBSITE CHAT WIDGET ─────────────────────────────────────────────
+app.get('/widget', (req, res) => {
+  res.setHeader('Content-Type', 'text/html');
+  res.send(
+    '<!DOCTYPE html><html lang="en"><head>' +
+    '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">' +
+    '<title>Ayusomam Herbals Chat</title>' +
+    '<style>' +
+    '*{margin:0;padding:0;box-sizing:border-box}' +
+    'body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f5f5f5}' +
+    '#chat{width:380px;height:600px;background:#fff;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.15);display:flex;flex-direction:column;overflow:hidden}' +
+    '.hd{background:linear-gradient(135deg,#2d5a27,#4a8c42);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:12px}' +
+    '.ic{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:20px}' +
+    '.hd h3{font-size:16px;margin:0}.hd p{font-size:12px;opacity:.85;margin:0}' +
+    '#msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}' +
+    '.msg{max-width:78%;padding:10px 14px;border-radius:18px;font-size:14px;line-height:1.5}' +
+    '.bot{background:#f0f0f0;color:#333;align-self:flex-start;border-bottom-left-radius:4px}' +
+    '.usr{background:#2d5a27;color:#fff;align-self:flex-end;border-bottom-right-radius:4px}' +
+    '.typ{align-self:flex-start;padding:10px 14px;background:#f0f0f0;border-radius:18px;border-bottom-left-radius:4px}' +
+    '.typ span{display:inline-block;width:7px;height:7px;background:#999;border-radius:50%;animation:b 1.2s infinite;margin:0 2px}' +
+    '.typ span:nth-child(2){animation-delay:.2s}.typ span:nth-child(3){animation-delay:.4s}' +
+    '@keyframes b{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}' +
+    '#ft{padding:12px 16px;border-top:1px solid #eee;display:flex;gap:8px}' +
+    '#inp{flex:1;border:1px solid #ddd;border-radius:24px;padding:10px 16px;font-size:14px;outline:none}' +
+    '#inp:focus{border-color:#4a8c42}' +
+    '#btn{background:#2d5a27;color:#fff;border:none;border-radius:50%;width:40px;height:40px;cursor:pointer;font-size:18px}' +
+    '#btn:hover{background:#4a8c42}' +
+    '</style></head><body>' +
+    '<div id="chat">' +
+    '<div class="hd"><div class="ic">🌿</div><div><h3>Ayusomam Herbals</h3><p>Sinus Treatment Expert</p></div></div>' +
+    '<div id="msgs"><div class="msg bot">Namaste! 🌿 How can I help you today?</div></div>' +
+    '<div id="ft"><input id="inp" type="text" placeholder="Type your message..." autocomplete="off"><button id="btn">&#9658;</button></div>' +
+    '</div>' +
+    '<script>' +
+    'var sid="ws_"+Math.random().toString(36).substr(2,9)+"_"+Date.now();' +
+    'var msgs=document.getElementById("msgs"),inp=document.getElementById("inp");' +
+    'function addMsg(t,c){var d=document.createElement("div");d.className="msg "+c;d.textContent=t;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;}' +
+    'function showTyping(){var d=document.createElement("div");d.className="typ";d.id="ti";d.innerHTML="<span></span><span></span><span></span>";msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;}' +
+    'function hideTyping(){var t=document.getElementById("ti");if(t)t.remove();}' +
+    'async function send(){var t=inp.value.trim();if(!t)return;inp.value="";addMsg(t,"usr");showTyping();' +
+    'try{var r=await fetch("/widget-chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:sid,message:t})});' +
+    'var d=await r.json();hideTyping();(d.replies||["Sorry, something went wrong."]).forEach(function(m){addMsg(m,"bot");});}' +
+    'catch(e){hideTyping();addMsg("Connection error. Please refresh.","bot");}}' +
+    'document.getElementById("btn").onclick=send;' +
+    'inp.addEventListener("keydown",function(e){if(e.key==="Enter")send();});' +
+    '<\/script></body></html>'
+  );
+});
+
+app.post('/widget-chat', async (req, res) => {
   try {
-    const { senderId, message } = req.body;
-    if (!senderId || !message) {
-      return res.status(400).json({ error: 'senderId and message required' });
-    }
-
-    const webSenderId = `WEB_${senderId}`;
-    const replies = [];
-
-    // Collect replies instead of sending via FB/WA
-    const collectReply = async (recipientId, text) => {
-      replies.push(text);
-    };
-
-    // Set platform for this user
-    if (!userProfile[webSenderId]) userProfile[webSenderId] = {};
-    userProfile[webSenderId].platform = 'website';
-
-    await processMessage(webSenderId, message.trim(), collectReply, 'Website');
-
-    // Log to sheet on first message
-    if (!userProfile[webSenderId]._webLogged) {
-      userProfile[webSenderId]._webLogged = true;
-      await updateLead(
-        webSenderId, '🟡 Warm', 'website_chat_started', '',
-        'Website Visitor', message, 'Website'
-      );
-    }
-
-    res.json({ replies });
-  } catch (e) {
-    console.error('Website chat error:', e.message);
-    res.status(500).json({ error: 'Internal server error' });
+    const { sessionId, message } = req.body;
+    if (!sessionId || !message) return res.status(400).json({ error: 'Missing fields' });
+    widgetPending[sessionId] = [];
+    await handleMessage(sessionId, message, 'website');
+    await new Promise(resolve => setTimeout(resolve, 3500));
+    const replies = widgetPending[sessionId] || [];
+    delete widgetPending[sessionId];
+    res.json({ replies: replies.length ? replies : ['Thank you! Our team will get back to you shortly.'] });
+  } catch (err) {
+    console.error('Widget-chat error:', err);
+    res.status(500).json({ replies: ['Sorry, something went wrong. Please try again.'] });
   }
 });
-
-// ============================================================
-// FOLLOW-UP ENGINE (runs every 30 min)
-// ============================================================
-const HOUR_24 = 24 * 60 * 60 * 1000;
-const HOUR_48 = 48 * 60 * 60 * 1000;
-
-setInterval(async () => {
-  const now = Date.now();
-  for (const [userId, tracker] of Object.entries(followUpTracker)) {
-    const state = userState[userId];
-    const sinusType = userProfile[userId]?.symptom || 'congestive';
-    const sendFn = tracker.platform === 'whatsapp' ? sendWAMessage : sendMessage;
-
-    // Skip if user already converted or in human takeover
-    if (['plan_selected', 'done', 'human_takeover'].includes(state)) {
-      delete followUpTracker[userId];
-      continue;
-    }
-
-    const elapsed = now - tracker.pitchedAt;
-
-    // 24hr follow-up
-    if (!tracker.followUp1Sent && elapsed >= HOUR_24) {
-      const msg = FOLLOWUP_24HR[sinusType] || FOLLOWUP_24HR.congestive;
-      await sendFn(userId, msg);
-      tracker.followUp1Sent = true;
-      await updateLead(userId, '🟡 Warm', 'followup_24hr', sinusType, '', '', tracker.platform);
-      console.log(`📩 24hr follow-up sent: ${userId} [${tracker.platform}]`);
-    }
-
-    // 48hr follow-up
-    if (!tracker.followUp2Sent && elapsed >= HOUR_48) {
-      const msg = FOLLOWUP_48HR[sinusType] || FOLLOWUP_48HR.congestive;
-      await sendFn(userId, msg);
-      tracker.followUp2Sent = true;
-      await updateLead(userId, '🟡 Warm', 'followup_48hr_final', sinusType, '', '', tracker.platform);
-      console.log(`📩 48hr final follow-up sent: ${userId} [${tracker.platform}]`);
-      // Remove after last follow-up
-      delete followUpTracker[userId];
-    }
-  }
-}, 30 * 60 * 1000); // Check every 30 minutes
-
-// ============================================================
-// START
-// ============================================================
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Ayusomam Herbals Bot v3 — Running
-Port      : ${PORT}
-Mode      : ✅ Rule-Based (Strict)
-Facebook  : /webhook
-WhatsApp  : /whatsapp
-Razorpay  : /razorpay-webhook
-Website   : /website-lead
-Web Chat  : /website-chat
-Plans     : ₹499 (P1) + ₹1,299 (P2)
-Follow-up : ✅ 24hr + 48hr auto (every 30 min check)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  `);
+  console.log(`SALESOM v5.0 running on port ${PORT}`);
+  console.log(`  Sinus types: Reactive Sensitivity, Chronic Congestion, Deep Inflammation, Spray Dependency, Drainage Blockage, Structural Congestion`);
+  console.log(`  Structured flow: Duration menu > Symptom multi-select > Insights > Type reveal > Hope pitch > Commitment > Payment`);
+  console.log(`  Ghosting recovery: 24hr and 72hr`);
+  console.log(`  Day milestones: Day 5, 7, 10, 13`);
+  console.log(`  Plans: 7-Day Sinus Reset Rs. 499 | 14-Day Sinus Restoration Rs. 1299`);
 });
