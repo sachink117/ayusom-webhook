@@ -184,25 +184,97 @@ function sleep(ms) {
 }
 
 // ─── GOOGLE SHEETS LOGGING ────────────────────────────────────
+// Sheet expects Apps Script doPost() that handles two actions:
+//   action: "log_message"   → Conversations tab (every message)
+//   action: "update_lead"   → Leads tab (upsert by userId)
+//
+// LEADS TAB columns (in order):
+// Timestamp | UserId | Platform | Name | Language | SinusType |
+// Duration | Symptoms | UsedAllopathy | ConvPhase | State |
+// SelectedPlan | EnrolledAt | GhostAttempts | MilestonesSent |
+// LastMessageAt | TotalMessages | LastUserMsg | LastBotReply
+//
+// CONVERSATIONS TAB columns (in order):
+// Timestamp | UserId | Platform | SinusType | State | Phase |
+// UserMessage | BotReply
+
 async function logToSheet(userId, platform, sinusType, state, msg, botReply) {
   if (!SHEET_URL) return;
+  const user = userData[userId] || {};
   try {
+    // 1. Log every message to Conversations tab
     await fetch(SHEET_URL, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({
+        action:    "log_message",
         timestamp: new Date().toISOString(),
         userId,
         platform,
-        sinusType: sinusType || "unknown",
-        state,
-        userMsg: msg?.substring(0, 200),
-        botReply: botReply?.substring(0, 200),
+        sinusType: sinusType || user.sinusType || "unknown",
+        state:     state     || user.state     || "new",
+        phase:     user.convPhase || "probe",
+        userMsg:   (msg      || "").substring(0, 300),
+        botReply:  (botReply || "").substring(0, 300),
+      }),
+    });
+
+    // 2. Upsert lead profile to Leads tab
+    await fetch(SHEET_URL, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        action:          "update_lead",
+        timestamp:       new Date().toISOString(),
+        userId,
+        platform,
+        name:            user.name            || "",
+        language:        user.lang            || "hin",
+        sinusType:       user.sinusType       || sinusType || "unknown",
+        duration:        user.duration        || "",
+        symptoms:        user.symptoms        || "",
+        usedAllopathy:   user.usedAllopathy   === true  ? "Yes"
+                       : user.usedAllopathy   === false ? "No" : "Not asked",
+        convPhase:       user.convPhase       || "probe",
+        state:           user.state           || state || "new",
+        selectedPlan:    user.selectedPlan    || "",
+        enrolledAt:      user.enrolledAt      ? new Date(user.enrolledAt).toISOString() : "",
+        ghostAttempts:   user.ghostAttempts   || 0,
+        milestonesSent:  (user.milestonesSent || []).join(","),
+        lastMessageAt:   user.lastMessageAt   ? new Date(user.lastMessageAt).toISOString() : "",
+        totalMessages:   Math.floor((user.history || []).length / 2),
+        lastUserMsg:     (msg      || "").substring(0, 200),
+        lastBotReply:    (botReply || "").substring(0, 200),
       }),
     });
   } catch (e) {
     console.error("Sheet log error:", e.message);
   }
+}
+
+// ─── NAME EXTRACTION FROM CONVERSATION ───────────────────────
+// Called when AI response likely got user's name
+function extractNameFromText(text) {
+  if (!text) return null;
+  // Common Hindi/English intro patterns
+  const patterns = [
+    /(?:mera naam|my name is|main hun|i am|i'm|naam hai)\s+([A-Za-z\u0900-\u097F]+)/i,
+    /^([A-Za-z]{3,20})\s+(?:hun|hoon|here|bol raha|bol rahi)/i,
+  ];
+  for (const p of patterns) {
+    const m = text.match(p);
+    if (m && m[1] && m[1].length > 2) return m[1];
+  }
+  return null;
+}
+
+// ─── SYMPTOM + DURATION EXTRACTION ───────────────────────────
+function extractDuration(text) {
+  if (!text) return null;
+  const m = text.match(/(\d+)\s*(?:saal|year|sal|mahine|month|hafte|week|din|day)/i);
+  if (m) return m[0];
+  if (/bahut samay|kaafi samay|long time|years/i.test(text)) return "Long term (unspecified)";
+  return null;
 }
 
 // ─── SALESOM SYSTEM PROMPT ────────────────────────────────────
@@ -653,6 +725,43 @@ async function handleMessage(senderId, messageText, platform) {
       user.sinusType  = detected;
       user.convPhase  = "mirror";
       if (user.state === "lang_offered") user.state = "asked_symptoms";
+    }
+  }
+
+  // ── EXTRACT NAME IF NOT YET CAPTURED ──
+  if (!user.name) {
+    const extractedName = extractNameFromText(text);
+    if (extractedName) user.name = extractedName;
+  }
+
+  // ── EXTRACT DURATION IF NOT YET CAPTURED ──
+  if (!user.duration) {
+    const extractedDuration = extractDuration(text);
+    if (extractedDuration) user.duration = extractedDuration;
+  }
+
+  // ── CAPTURE SYMPTOMS (first substantive message after welcome) ──
+  if (!user.symptoms && text.length > 20 && user.state !== "new" && user.state !== "lang_offered") {
+    user.symptoms = text.substring(0, 250);
+  }
+
+  // ── DETECT ALLOPATHY USAGE FROM TEXT ──
+  if (user.usedAllopathy === null) {
+    const t = text.toLowerCase();
+    if (/antibiotic|antihistamine|steroid|flonase|nasocort|otrivin|spray|dawai|dawa|medicine|tablet/.test(t)) {
+      user.usedAllopathy = true;
+    } else if (/nahi|no|never|kabhi nahi|koi nahi/.test(t)) {
+      user.usedAllopathy = false;
+    }
+  }
+
+  // ── DETECT SELECTED PLAN FROM USER TEXT ──
+  if (!user.selectedPlan) {
+    const t = text.toLowerCase();
+    if (t.includes("499") || t.includes("reset") || t.includes("7 day") || t.includes("7-day")) {
+      user.selectedPlan = "reset";
+    } else if (t.includes("1299") || t.includes("1,299") || t.includes("restoration") || t.includes("14 day") || t.includes("14-day")) {
+      user.selectedPlan = "restoration";
     }
   }
 
