@@ -353,7 +353,7 @@ async function logToSheet(userId, platform, sinusType, state, msg, botReply) {
         state:     state     || user.state     || "new",
         phase:     user.convPhase || "probe",
         userMsg:   (msg      || "").substring(0, 300),
-        botReply:  (botReply || "").substring(0, 300),
+        botReply:  cleanText(botReply || "").substring(0, 300),
       }),
     });
 
@@ -747,7 +747,7 @@ setInterval(async () => {
           await sendMessage(user.platform, userId, msg);
           user.ghostAttempts  = 1;
           user.lastMessageAt  = now;
-          await logToSheet(userId, user.platform, user.sinusType, "ghost_1", "", msg);
+          // ghost_1 — no sheet log (would create blank row)
         }
       } else if (hoursSince >= 72 && hoursSince < 73 && (user.ghostAttempts || 0) === 1) {
         const msg = getGhostMessage(user, 2);
@@ -755,7 +755,7 @@ setInterval(async () => {
           await sendMessage(user.platform, userId, msg);
           user.ghostAttempts  = 2;
           user.lastMessageAt  = now;
-          await logToSheet(userId, user.platform, user.sinusType, "ghost_2", "", msg);
+          // ghost_2 — no sheet log (would create blank row)
         }
       }
     }
@@ -812,6 +812,16 @@ async function handleMessage(senderId, messageText, platform) {
   if (_engReq) user.lang = 'eng';
   else if (_hinReq) user.lang = 'hin';
   else user.lang = detectLang(text) || user.lang || 'hin';
+
+  // ── LANGUAGE SWITCH INTERCEPTION ──────────────────────────────────────
+  if ((_engReq || _hinReq) && text.trim().split(/\s+/).length <= 6) {
+    const ack = user.lang === 'eng'
+      ? 'Sure! I'll reply in English now. Please continue.'
+      : 'Bilkul! Ab Hindi mein baat karte hain. Bataiye kya takleef hai?';
+    await sendWithTyping(platform, userId, ack);
+    userData[userId] = user;
+    return;
+  }
 
   // ── RED FLAG — highest priority ──────────────────────────
   if (hasRedFlag(text)) {
