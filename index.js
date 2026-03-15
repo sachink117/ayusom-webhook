@@ -1240,6 +1240,86 @@ app.post("/admin/reply", async (req, res) => {
 });
 
 // ─── ADMIN DASHBOARD SPA ──────────────────────────────────────
+// ─── FOLLOW-UP SCHEDULER ─────────────────────────────────────────────────────
+let globalFollowupEnabled = true;
+const FU_SCHED = {interested:[1,3,7],pitched:[1,3],ghosted:[14],unknown:[2,5]};
+const FU_MSGS = {
+  interested:[
+    "Hello! 🙏 Just checking in — have you had a chance to think about our sinus treatment program? Many patients see relief in the first week itself. Happy to answer any questions 😊",
+    "Hi! One of our patients with similar symptoms recovered completely in 3 weeks with our herbal program. Would you like to know how it could help you too? 🌿",
+    "This is our last follow-up. If you'd ever like to explore our sinus treatment, we're always here. Wishing you good health! 🙏 — Ayusomam Herbals"
+  ],
+  pitched:[
+    "Hello! 🙏 Just checking — did you have any questions about the treatment program we discussed? We're here to help you decide with confidence.",
+    "Hi! We still have a spot in our current batch. The program has helped 200+ patients with chronic sinus. Would you like to proceed? We can also discuss flexible options 🌿"
+  ],
+  ghosted:[
+    "Hello! 🙏 Hope you're doing well. If your sinus issues are still bothering you, our herbal treatment might be exactly what you need. Many patients who tried everything else found relief with us. Would love to help 😊"
+  ],
+  unknown:[
+    "Hello! 🙏 Following up on your inquiry about our sinus treatment. Are you still interested? We're here to help!",
+    "Hi! A gentle check-in from Ayusomam Herbals. If you have questions about our sinus program, feel free to ask anytime 🌿"
+  ]
+};
+function getFUMsg(state,n){const t=FU_MSGS[state]||FU_MSGS.unknown;return t[n]||t[t.length-1];}
+function shouldFU(lead){
+  if(!globalFollowupEnabled||lead.autoFollowup===false)return false;
+  if(lead.state==='converted'||lead.state==='post_payment'||lead.enrolledAt)return false;
+  const s=FU_SCHED[lead.state]||FU_SCHED.unknown;const n=lead.followupCount||0;
+  if(n>=s.length)return false;
+  const last=lead.lastFollowupAt||lead.lastMessageAt;if(!last)return false;
+  return(Date.now()-new Date(last).getTime())/86400000>=s[n];
+}
+async function runFUScheduler(){
+  if(!globalFollowupEnabled)return;
+  console.log('[FU] Scheduler running...');let sent=0;
+  for(const[uid,lead]of Object.entries(userData)){
+    if(!shouldFU(lead))continue;
+    try{
+      const msg=getFUMsg(lead.state,lead.followupCount||0);
+      await sendMessage(lead.platform||'messenger',uid,msg);
+      lead.followupCount=(lead.followupCount||0)+1;lead.lastFollowupAt=Date.now();
+      (lead.history=lead.history||[]).push({role:'assistant',content:'[Auto FU] '+msg});
+      sent++;await new Promise(r=>setTimeout(r,1200));
+    }catch(e){console.warn('[FU] Failed:',uid,e.message);}
+  }
+  console.log('[FU] Done, sent:',sent);
+}
+setInterval(runFUScheduler,6*60*60*1000);
+console.log('[FU] Scheduler ready, runs every 6h');
+app.post('/admin/toggle-global',(req,res)=>{
+  if(req.body.secret!==VERIFY_TOKEN)return res.status(403).json({error:'forbidden'});
+  globalFollowupEnabled=!!req.body.enabled;res.json({ok:true,globalFollowupEnabled});
+});
+app.post('/admin/toggle-followup',(req,res)=>{
+  if(req.body.secret!==VERIFY_TOKEN)return res.status(403).json({error:'forbidden'});
+  const{userId,enabled}=req.body;
+  if(!userId||!userData[userId])return res.status(404).json({error:'not found'});
+  userData[userId].autoFollowup=!!enabled;res.json({ok:true,autoFollowup:userData[userId].autoFollowup});
+});
+app.post('/admin/send-followup',async(req,res)=>{
+  if(req.body.secret!==VERIFY_TOKEN)return res.status(403).json({error:'forbidden'});
+  const{userId}=req.body;if(!userId||!userData[userId])return res.status(404).json({error:'not found'});
+  const lead=userData[userId];
+  try{
+    const msg=getFUMsg(lead.state,lead.followupCount||0);
+    await sendMessage(lead.platform||'messenger',userId,msg);
+    lead.followupCount=(lead.followupCount||0)+1;lead.lastFollowupAt=Date.now();
+    (lead.history=lead.history||[]).push({role:'assistant',content:'[Manual FU] '+msg});
+    res.json({ok:true,message:msg,followupCount:lead.followupCount});
+  }catch(e){res.status(500).json({error:e.message});}
+});
+app.get('/admin/followup-status',(req,res)=>{
+  if(req.query.secret!==VERIFY_TOKEN)return res.status(403).json({error:'forbidden'});
+  const out={};
+  for(const[uid,lead]of Object.entries(userData)){
+    const s=FU_SCHED[lead.state]||FU_SCHED.unknown;const n=lead.followupCount||0;
+    const last=lead.lastFollowupAt||lead.lastMessageAt;let nextIn=null;
+    if(n<s.length&&last){const d=(Date.now()-new Date(last).getTime())/86400000;nextIn=Math.max(0,Math.ceil(s[n]-d));}
+    out[uid]={autoFollowup:lead.autoFollowup!==false,followupCount:n,nextInDays:nextIn};
+  }
+  res.json({globalFollowupEnabled,statuses:out});
+});
 app.get("/admin", (req, res) => {
   if (req.query.secret !== VERIFY_TOKEN) {
     return res.send(`<!DOCTYPE html><html><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f5f5f5">
@@ -1287,6 +1367,19 @@ app.get("/admin", (req, res) => {
     .badge-converted{background:#e8f5e9;color:#2e7d32}
     .badge-pitched{background:#fff3e0;color:#e65100}
     .badge-ghosted{background:#fafafa;color:#999}
+    .fu-banner{display:flex;align-items:center;justify-content:space-between;background:#e8f5e9;border-bottom:1px solid #c8e6c9;padding:8px 16px;font-size:13px}
+    .fu-banner-left{display:flex;align-items:center;gap:8px;color:#2e7d32;font-weight:500}
+    .toggle-wrap{display:flex;align-items:center;gap:5px;font-size:12px}
+    .toggle-sw{position:relative;display:inline-block;width:38px;height:20px;flex-shrink:0}
+    .toggle-sw input{opacity:0;width:0;height:0}
+    .toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#ccc;border-radius:20px;transition:.3s}
+    .toggle-slider:before{position:absolute;content:"";height:14px;width:14px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+    input:checked+.toggle-slider{background:#2e7d32}
+    input:checked+.toggle-slider:before{transform:translateX(18px)}
+    .fu-row{display:flex;align-items:center;justify-content:space-between;margin-top:5px;padding-top:5px;border-top:1px dashed #f0f0f0}
+    .fu-info{font-size:11px;color:#999}
+    .fu-btn{font-size:11px;padding:3px 9px;border:1px solid #2e7d32;color:#2e7d32;background:#fff;border-radius:12px;cursor:pointer;white-space:nowrap}
+    .fu-btn:hover{background:#e8f5e9}.fu-btn:disabled{opacity:.4;cursor:default}
     .chat-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
     .chat-header{padding:14px 20px;background:#fff;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;gap:12px}
     .chat-header-info h2{font-size:15px;font-weight:600}
@@ -1343,6 +1436,17 @@ app.get("/admin", (req, res) => {
   <button class="filter-btn" onclick="setFilter('pitched',this)">🔥 In Checkout</button>
 </div>
 
+<div class="fu-banner" id="fuBanner">
+  <div class="fu-banner-left">🔔 Auto Follow-ups</div>
+  <div class="toggle-wrap">
+    <span class="fu-info" id="fuGlobalLabel" style="color:#2e7d32;font-weight:600;margin-right:4px">ON</span>
+    <label class="toggle-sw" style="margin:0 6px">
+      <input type="checkbox" id="globalFuToggle" checked onchange="toggleGlobal(this.checked)">
+      <span class="toggle-slider"></span>
+    </label>
+    <span class="fu-info">Global</span>
+  </div>
+</div>
 <div class="layout">
   <div class="sidebar">
     <div class="sidebar-header" id="leadCount">Loading...</div>
@@ -1427,7 +1531,18 @@ function renderLeads() {
         \${l.sinusType ? '<span class="badge" style="background:#f3e5f5;color:#6a1b9a">' + l.sinusType.replace(/_/g,' ') + '</span>' : ''}
       </div>
       <div style="font-size:12px;color:#999;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">\${preview}</div>
-    </div>\`;
+         <div class="fu-row" onclick="event.stopPropagation()">
+        <div class="toggle-wrap">
+          <label class="toggle-sw" style="margin:0">
+            <input type="checkbox" ${l.autoFollowup!==false?'checked':''} onchange="toggleFU('${l.id}',this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="fu-info" style="margin:0 5px">Auto FU</span>
+          <span class="fu-info" style="color:${computeFuTxt(l).includes('Due')?'#e65100':'#888'}">${computeFuTxt(l)}</span>
+        </div>
+        <button class="fu-btn" data-fu-btn="${l.id}" onclick="sendFUNow('${l.id}')">Send now</button>
+      </div>
+ </div>\`;
   }).join('');
 }
 
@@ -1505,6 +1620,35 @@ async function sendReply() {
 }
 
 // Clock
+function toggleGlobal(enabled) {
+  fetch('/admin/toggle-global',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:SEC,enabled})})
+    .then(r=>r.json()).then(d=>{
+      document.getElementById('fuGlobalLabel').textContent=d.globalFollowupEnabled?'ON':'OFF';
+      document.getElementById('fuBanner').style.opacity=d.globalFollowupEnabled?'1':'0.5';
+    });
+}
+function toggleFU(userId,enabled){
+  fetch('/admin/toggle-followup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:SEC,userId,enabled})})
+    .then(r=>r.json()).then(()=>loadData());
+}
+function sendFUNow(userId){
+  const btn=document.querySelector('[data-fu-btn="'+userId+'"]');
+  if(btn){btn.disabled=true;btn.textContent='Sending...';}
+  fetch('/admin/send-followup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:SEC,userId})})
+    .then(r=>r.json())
+    .then(d=>{
+      if(d.ok){alert('Sent! (Follow-up #'+d.followupCount+')\n\n'+d.message.substring(0,100)+'...');loadData();}
+      else{alert('Error: '+(d.error||'unknown'));if(btn){btn.disabled=false;btn.textContent='Send now';}}
+    }).catch(()=>{if(btn){btn.disabled=false;btn.textContent='Send now';}});
+}
+function computeFuTxt(l){
+  const s={interested:[1,3,7],pitched:[1,3],ghosted:[14],unknown:[2,5]};
+  const sched=s[l.state]||s.unknown;const n=l.followupCount||0;
+  if(n>=sched.length)return 'Done ✓';
+  const last=l.lastFollowupAt||l.lastMessageAt;if(!last)return '—';
+  const d=Math.max(0,Math.ceil(sched[n]-(Date.now()-new Date(last).getTime())/86400000));
+  return d<=0?'Due now!':'In '+d+'d';
+}
 function updateClock() {
   document.getElementById('clock').textContent = new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'});
 }
