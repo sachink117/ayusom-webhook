@@ -1183,11 +1183,11 @@ app.get("/admin/data", async (req, res) => {
         for (const sl of _sl) {
           const sid = String(sl.id || '').trim();
           if (!sid) continue;
-          if (memMap[sid]) {
-            const ms = new Set((memMap[sid].history||[]).map(m=>m.content));
-            memMap[sid].history=[...(sl.history||[]).filter(m=>!ms.has(m.content)),...memMap[sid].history];
+          if (userData[sid]) {
+            const ms = new Set((userData[sid].history||[]).map(m=>m.content));
+            userData[sid].history=[...(sl.history||[]).filter(m=>!ms.has(m.content)),...userData[sid].history];
           } else {
-            memMap[sid]={id:sid,platform:(sl.platform||'unknown').toLowerCase(),state:sl.state||'unknown',sinusType:sl.sinusType||null,lang:sl.lang||null,duration:sl.duration||null,selectedPlan:sl.selectedPlan||null,lastMessageAt:sl.lastActive?new Date(sl.lastActive).getTime():null,ghostAttempts:0,enrolledAt:null,history:(sl.history||[]).slice(-60),source:'sheets'};
+            userData[sid]={lang:sl.lang||null,sinusType:sl.sinusType||null,state:sl.state||'unknown',platform:(sl.platform||'unknown').toLowerCase(),duration:sl.duration||null,selectedPlan:sl.selectedPlan||null,lastMessageAt:sl.lastActive?new Date(sl.lastActive).getTime():null,ghostAttempts:0,enrolledAt:null,history:(sl.history||[]).slice(-60),source:'sheets'};
           }
         }
       }
