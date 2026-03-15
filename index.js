@@ -1,15 +1,12 @@
 // ============================================================
-// AYUSOMAM MESSENGER BOT — Version 3.5
-// Fix: Language detection per-message bi-directional
-//      All hardcoded strings Hinglish only (no encoding issues)
-//      AI handles Devanagari / English / Hinglish automatically
-// New: Website trust mentions at 2 key touchpoints (reveal + link)
-// New: Follow-up diagnostic questions after symptom selection
-//      (naak band → discharge type | smell nahi → when it happened)
-//      Refines sinus type: allergic / congestive / infective / polyp
-// Fix: Remove "Bhai/Yaar" from AI responses (stricter prompt + post-filter)
-// New: Free relief steps when user says no money / baad mein / free tips
-// Fix: Restore /website-chat endpoint (lost in v3.x rewrites)
+// AYUSOMAM MESSENGER BOT — Version 3.6
+// Fix: Bengali language detection added (\u0980-\u09FF range)
+// Fix: Severity question removed — faster flow to conversion
+// New: asked_allopathy state — after symptoms + followups,
+//      ask if allopathy gave only temporary relief → cycle-break hook
+// Fix: "Starter Kit" renamed to "Home Kit" everywhere
+// Fix: Pitch quick replies now show "14-Din Program" and "Home Kit"
+// Fix: SALESOM prompt + AI lang instruction includes Bengali
 // ============================================================
 const express = require("express");
 const fetch = require("node-fetch");
@@ -42,96 +39,60 @@ setInterval(() => processedMessages.clear(), 10 * 60 * 1000);
 const conversationLog = {}; // { senderId: [{role, text, ts}] }
 
 // ─── SALESOM SYSTEM PROMPT ───────────────────────────────────
-const SALESOM_SYSTEM_PROMPT = `SALESOM — MASTER SYSTEM PROMPT
-Ayusomam Herbals | Sinus Sales Specialist
+const SALESOM_SYSTEM_PROMPT = `You are SALESOM — a warm, sharp sinus consultant for Ayusomam Herbals.
+You text like a real person on WhatsApp. Never sound like a bot or script.
 
-IDENTITY
-Tu SALESOM hai — Ayusomam Herbals ka Sinus Sales Specialist aur Ayurvedic Consultation AI.
-- Brand: Ayusomam Herbals (ayusomamherbals.com)
-- Consultant name: Sachin
-- Platform: WhatsApp / Facebook Messenger / Instagram
-- Core expertise: Charaka Samhita + Ashtanga Hridayam based Pratishyaya (Sinus) management
-- Mission: Type-specific Ayurvedic sinus consultation → 14-Din Protocol conversion
+LANGUAGE — MOST IMPORTANT RULE
+Read what language the user is writing in RIGHT NOW and match it exactly:
+- They write in Hindi (Devanagari letters) → you reply in Hindi (Devanagari). No Roman letters.
+- They write in Hinglish / Roman Hindi → you reply in Hinglish. This is the default.
+- They write in English → you reply in English only.
+- They write in Bengali (Bengali script) → you reply in Bengali script only. No Hinglish, no Hindi.
+- They write in Marathi → you reply in Marathi.
+If they switch language mid-chat, you switch instantly. Never ask which language to use.
+Short messages like "ok", "haan", "yes" → keep the last language used.
 
-LANGUAGE RULES — HIGHEST PRIORITY
-Detect from the user's CURRENT message script/words:
-1. Devanagari script (Hindi letters like "मुझे", "नाक") → Reply ONLY in Devanagari Hindi. Use: niyam/dinchrya/lakshan/din instead of protocol/routine/symptoms/day. Max 10% English.
-2. Roman Hindi / Hinglish words ("mujhe", "naak", "band", "hai", "kya", "sinus", "theek", "haan") → Reply in Hinglish (Roman Hindi). This is the DEFAULT.
-3. Pure English sentences (no Hindi phonetics, full English grammar) → Reply in English.
-4. Marathi words ("mala", "aahe", "naak", "band") → Reply in Marathi.
-CRITICAL:
-- DEFAULT is Hinglish — when in doubt, use Hinglish
-- Never mix Devanagari + Roman in one reply
-- Short/ambiguous texts ("ok","yes","haan","done") → keep previous conversation language
-- NEVER ask the user which language to use
+TONE — HOW YOU SOUND
+You sound like a knowledgeable friend who genuinely wants to help.
+- Warm, direct, calm. Never pushy.
+- Never say: Bhai, Yaar, Boss, Dost — not even once.
+- No bullet lists. No long paragraphs. No formal letter tone.
+- Max 2 short lines per message. Mobile-first.
+- React naturally. If someone is suffering say "Yeh sach mein mushkil hota hai" — not "I understand your concern."
 
-TONE — NON-NEGOTIABLE
-❌ NEVER address user as: Bhai, Yaar, Boss, Dost — ZERO TOLERANCE. Not even once.
-❌ NEVER use bullet lists, long paragraphs, formal letter style.
-✅ ALWAYS: Caring, warm, professional. Like a knowledgeable friend, not a salesman.
-✅ Address the user with "Aap" if needed — never Bhai/Yaar/Boss.
-MAX 2-3 SHORT LINES per message. Mobile screen readable. No walls of text.
-
-5 SINUS TYPES
-TYPE 1 — VATAJA-KAPHAJA (ALLERGIC)
-Triggers: dust, cold, seasonal, morning sneezing, watery eyes
-Treatment: Anu Tailam Nasya + Anulom-Vilom
-Days: 4-5 sneezing reduces | 7 triggers less | 14 big improvement
-
-TYPE 2 — KAPHAJA (CONGESTIVE)
-Triggers: after cold/infection, smell/taste loss, heaviness
-KEY: Dairy = enemy. Must stop.
-Treatment: Til Taila Nasya + Gandoosha Kriya
-Days: 5-7 smell returns | 8-10 morning clear | 12-14 mostly restored
-
-TYPE 3 — PITTAJA (HEAT/INFECTIVE)
-Triggers: burning, yellow/green discharge, worse in heat, antibiotics helped temporarily
-CRITICAL: NO eucalyptus/camphor steam — worsens it
-Treatment: Narikela Taila Nasya + Sheetali Pranayama + plain water steam only
-Days: 3-4 burning reduces | 5 noticeable | 14 mostly resolved
-
-TYPE 4 — AUSHADHA ASAKTI (SPRAY DEPENDENCY)
-Triggers: can't sleep without spray, rebound congestion, failed cold turkey
-CRITICAL: NEVER cold turkey — graduated protocol only
-Treatment: Gau Ghrita Nasya + Bhramari Pranayama + gradual reduction
-Days: 4-5 first hours spray-free | 8-10 half night | 14 night spray optional
-
-TYPE 5 — DNS (DEVIATED NASAL SEPTUM)
-Triggers: one side ALWAYS blocked (not alternating), history of nose injury/trauma, one-sided headache
-KEY: Structural issue + soft tissue inflammation — Ayurveda reduces inflammation, swelling, congestion around the deviation.
-Treatment: Til Taila Nasya + Nasya Kriya + Bhramari Pranayama (structural support)
-Days: 5-7 breathing improves | 10 congestion eases | 14 significant comfort
-Note: Severe DNS may need ENT consult, but 80%+ see major relief without surgery.
+SINUS TYPES YOU KNOW
+Allergic: watery discharge, sneezing, triggered by dust/cold/season → Anu Tailam Nasya
+Congestive: thick white discharge, morning heaviness, smell/taste loss, dairy worsens it → Til Taila + Gandoosha. Dairy = off completely.
+Infective: yellow/green discharge, burning, antibiotics helped then came back → NO eucalyptus steam.
+Spray Dependency: can't sleep without spray, tried stopping and failed → NEVER cold turkey, graduated only.
+DNS: ONE side always blocked, nose injury history → inflammation around deviation is treatable.
 
 PRICING
-- Rs.499 — Starter Kit (14 days, self-guided)
-- Rs.1,299 — 14-Din Nasal Restoration (RECOMMENDED — daily personal WhatsApp check-in)
+Rs.499 — Sinus Reset Plan (product + protocol delivered, self-guided)
+Rs.1,299 — 14-Din Restore Program (kit delivered + daily personal WhatsApp check-in, protocol adjusted as needed)
+Rs.1,299 also gets 7 extra days free = 21 days total. Only Rs.800 more.
 
-UPSELL RULE (Rs.499 -> Rs.1,299):
-Rs.1,299 mein 7 din FREE extra milte hain = 21 din total. Sirf Rs.800 zyada.
-For 2+ year cases this extended time makes real difference. Mention naturally.
+WHEN SOMEONE MENTIONS ALLOPATHY / MEDICINE / DOCTOR
+Say something like: "Doctor se medicine li aur kuch din better tha, phir wapas? Yeh isliye hota hai — medicine bahar ka kaam karti hai, andar ki wajah wahi rehti hai. Tab tak yeh cycle nahi tootegi jab tak root pe kaam na ho."
+Then naturally lead to the solution.
 
 OBJECTIONS
-"Mahanga" -> ENT visit Rs.1,000-2,000 for just prescription. Here 14 days daily personal guidance = Rs.1,299 once.
-"Pehle try kiya" -> Was it type-specific? Kaphaja protocol Pittaja mein WORSE karta hai.
-"Guarantee?" -> Patients who followed exactly saw change by Day 5-7.
-"Abhi nahi" -> Jo cycle chal rahi hai woh apne aap nahi toot ti. Koi specific reason?
-"DNS ka ilaj hoga?" -> DNS mein asli problem inflammation + congestion hai structure ke around. Woh theek hota hai — breathing improve hoti hai.
+Expensive → "ENT visit hi Rs.1,500-2,000 sirf ek prescription ke liye. Yahan 14 din daily check-in Rs.1,299 mein."
+Already tried → "Jo try kiya — woh aapke type ke hisaab se tha? Galat protocol se fark nahi padta, seedha bura bhi ho sakta hai."
+Guarantee → "Jo log exactly follow karte hain unhe Day 5-7 mein fark dikhta hai. Hum daily track karte hain."
+Not now → "Jo cycle chal rahi hai woh khud nahi tootegi. Aur cost toh roz chal rahi hai — time, energy, sleep."
+Photo of product → "Haan bhejta hun — aur saath mein briefly batata hun kya milta hai exactly."
 
-RED FLAGS — REFER TO DOCTOR
-Fever 102F+ | Blood in discharge | Severe one-sided facial pain | Vision changes | Kids under 6
+RED FLAGS → refer to doctor
+102F+ fever | Blood in discharge | Sudden vision change | Kids under 6
 
-POWER CLOSES
-"Jo condition abhi hai — kya 1 saal aur comfortable hain iske saath? Agar nahi — 14 din try worth it hai."
-
-CRITICAL DEPLOYMENT RULES:
-- MAX 2-3 LINES per reply. No exceptions. Short, warm, direct.
-- POST-PITCH: Type identified, pitch done. Do NOT restart diagnosis.
-- NEVER include payment links in your reply — system handles them separately.
-- NEVER send payment link unless user explicitly says yes/interested/bhejo link.
-- If user says yes/wants to buy — respond warmly with confirmation only. NO links in your text. System handles.
-- POST-PAYMENT: Be supportive. No payment links. For Rs.499 users mention upgrade naturally.
-- Under 60 words per reply. Quality over quantity.`;
+RULES — NEVER BREAK
+- Max 2 short lines per message. Always.
+- No payment links in your text — system sends them separately.
+- Never restart diagnosis once type is identified.
+- Never mention Rs.499 as "Starter Kit" or "Home Kit" — call it "Sinus Reset Plan" only.
+- Never mention Rs.1,299 as "Full Program" alone — call it "14-Din Restore Program".
+- Under 50 words per reply. Quality beats quantity every time.`;
 
 // ─── LANGUAGE DETECTION — BI-DIRECTIONAL PER MESSAGE ─────────
 // Returns: "dev" (Devanagari), "eng" (English), "rom" (Hinglish/default)
@@ -140,6 +101,10 @@ function detectLang(text) {
   // 1. Devanagari — even 2 chars is enough to confirm Hindi script
   const devanagariCount = (text.match(/[\u0900-\u097F]/g) || []).length;
   if (devanagariCount >= 2) return "dev";
+
+  // 1b. Bengali script (\u0980-\u09FF)
+  const bengaliCount = (text.match(/[\u0980-\u09FF]/g) || []).length;
+  if (bengaliCount >= 2) return "ben";
 
   // 2. Hinglish patterns — any of these = Hinglish, not English
   const hinglishWords = /\b(hai|hain|nahin|nahi|kya|kaise|mujhe|mera|aur|lekin|kyunki|thoda|bilkul|naak|band|spray|smell|theek|achha|haan|kaafi|bhi|se|mein|ko|ki|ka|ho|tha|thi|the|raha|rahi|rahe|hua|hui|hue|laga|lagi|lage|saal|mahine|mahina|din|roz|subah|raat|dono|ek|do|teen|char|paanch|bahut|bohot|jyada|kuch|sab|abhi|kab|kahan|kyun|toh|phir|par|lekin|matlab|samjha|batao|poochh|dekho|lelo|bhejo|sahi|galat|problem|takleef|dard|naak|sar|sir|ankh|muh|band|khula|bhari|halki|severe|mild|moderate|waqt|wala|wali|wale|apna|apni|apne|unka|unki|unke|inka|inki|inke|kitna|kitni|kitne|kaun|kaisa|kaisi|kaise|lena|dena|karna|hona|jana|aana|rahna|bolna|sunna|dekhna|chahna|sochna)\b/i;
@@ -301,15 +266,35 @@ const DURATION_Q = {
   dev: { text: "\u092F\u0939 \u0924\u0915\u0932\u0940\u092B \u0906\u092A\u0915\u094B \u0915\u093F\u0924\u0928\u0947 \u0938\u092E\u092F \u0938\u0947 \u0939\u0948? \uD83C\uDF3F", replies: ["6 \u092E\u0939\u0940\u0928\u0947 \u0938\u0947 \u0915\u092E", "1-2 \u0938\u093E\u0932 \u0938\u0947", "3-4 \u0938\u093E\u0932 \u0938\u0947", "5-10 \u0938\u093E\u0932 \u0938\u0947", "10+ \u0938\u093E\u0932 \u0938\u0947"] },
 };
 
-// ─── DURATION ACK — handles all 5 options ─────────────────────
-function getDurationAck(text) {
+// ─── DURATION ACK — Multilingual, handles all 5 options ──────
+function getDurationAck(text, lang) {
   const tl = text.toLowerCase();
-  const isMon = /mahine|mahina|month|kum|6 mah/.test(tl);
-  if (isMon) return "Theek hai — abhi bahut sahi waqt hai shuru karne ka. \uD83C\uDF3F\nYeh stage mein results bahut fast milte hain.";
+  const L = lang || "rom";
+  const isMon = /mahine|mahina|month|kum|6 mah|less than|months/.test(tl);
   const num = parseInt((text.match(/\d+/) || [])[0]) || 0;
-  if (/10\+|10 saal|das saal/.test(tl) || num >= 10) return "10+ saal... \uD83D\uDE2E\u200D\uD83D\uDCA8\nItne waqt mein body adjust ho chuki hai — lekin andar ki wajah abhi bhi treat ho sakti hai.\nDhyan se dekhte hain aapka case.";
-  if (/5|6|7|8|9/.test(text) || num >= 5) return `${num || 5}+ saal se hai — matlab andar kuch set ho chuka hai. \uD83D\uDE2E\u200D\uD83D\uDCA8\nSahi protocol se fark padta hai — pehle type samajhte hain.`;
-  if (/3|4/.test(text) || num >= 3) return `${num || 3}-4 saal se chal raha hai — temporary nahi raha ab yeh. \uD83C\uDF3F\nSahi jagah aaye hain.`;
+  const is10plus = /10\+|10 saal|das saal|10 year/.test(tl) || num >= 10;
+  const is5plus = /5|6|7|8|9/.test(text) || num >= 5;
+  const is3plus = /3|4/.test(text) || num >= 3;
+
+  if (L === "eng") {
+    if (isMon) return "Good — you're catching this early. \uD83C\uDF3F\nAt this stage, results come faster with the right approach.";
+    if (is10plus) return "10+ years is a long time — the body has adapted around it.\nBut the root cause can still be treated. Let's understand your type.";
+    if (is5plus) return `${num || 5}+ years — something has set in deeper. \uD83C\uDF3F\nThe right protocol makes a real difference. Let's identify your type first.`;
+    if (is3plus) return `${num || 3}-4 years — this is no longer temporary. \uD83C\uDF3F\nYou're in the right place.`;
+    return `${num || 1}-2 years — this can still be fully resolved. \uD83C\uDF3F\nLet's identify your type first.`;
+  }
+  if (L === "dev") {
+    if (isMon) return "\u0920\u0940\u0915 \u0939\u0948 \u2014 \u0905\u092D\u0940 \u0936\u0941\u0930\u0941 \u0915\u0930\u0928\u0947 \u0915\u093E \u0938\u0939\u0940 \u0935\u0915\u094D\u0924 \u0939\u0948\u0964 \uD83C\uDF3F\n\u0907\u0938 stage \u092E\u0947\u0902 results \u0924\u0947\u091C\u093C \u0906\u0924\u0947 \u0939\u0948\u0902\u0964";
+    if (is10plus) return "10+ \u0938\u093E\u0932 \u0938\u0947 \u0939\u0948 \u2014 body \u0905\u0921\u091C\u0938\u094D\u091F \u0939\u094B \u091A\u0941\u0915\u0940 \u0939\u0948\u0964\n\u0932\u0947\u0915\u093F\u0928 \u0905\u0902\u0926\u0930 \u0915\u0940 \u0935\u091C\u0939 \u0905\u092D\u0940 \u092D\u0940 treat \u0939\u094B \u0938\u0915\u0924\u0940 \u0939\u0948\u0964";
+    if (is5plus) return `${num || 5}+ \u0938\u093E\u0932 \u0938\u0947 \u0939\u0948 \u2014 \u0905\u0902\u0926\u0930 \u0915\u0941\u091B set \u0939\u094B \u091A\u0941\u0915\u093E \u0939\u0948\u0964 \uD83C\uDF3F\n\u0938\u0939\u0940 protocol \u0938\u0947 \u092B\u0930\u094D\u0915 \u092A\u095C\u0924\u093E \u0939\u0948\u0964`;
+    if (is3plus) return `${num || 3}-4 \u0938\u093E\u0932 \u0938\u0947 \u0939\u0948 \u2014 temporary \u0928\u0939\u0940\u0902 \u0930\u0939\u093E \u0905\u092C \u092F\u0939\u0964 \uD83C\uDF3F`;
+    return `${num || 1}-2 \u0938\u093E\u0932 \u0938\u0947 \u0939\u0948 \u2014 \u0905\u092D\u0940 \u092A\u0942\u0930\u0940 \u0924\u0930\u0939 \u0920\u0940\u0915 \u0939\u094B \u0938\u0915\u0924\u093E \u0939\u0948\u0964 \uD83C\uDF3F`;
+  }
+  // Default: Hinglish
+  if (isMon) return "Theek hai — abhi bahut sahi waqt hai shuru karne ka. \uD83C\uDF3F\nYeh stage mein results bahut fast milte hain.";
+  if (is10plus) return "10+ saal se hai — body kaafi adjust ho chuki hai.\nLekin andar ki wajah abhi bhi treat ho sakti hai. Dhyan se dekhte hain.";
+  if (is5plus) return `${num || 5}+ saal se hai — matlab andar kuch set ho chuka hai. \uD83C\uDF3F\nSahi protocol se fark padta hai — pehle type samajhte hain.`;
+  if (is3plus) return `${num || 3}-4 saal se chal raha hai — temporary nahi raha ab yeh. \uD83C\uDF3F\nSahi jagah aaye hain.`;
   return `${num || 1}-2 saal se hai — abhi bhi theek ho sakta hai completely. \uD83C\uDF3F\nPehle type identify karte hain.`;
 }
 
@@ -426,6 +411,37 @@ function getFollowupQ2(refinedType, lang) {
   return null; // No second follow-up for other types
 }
 
+// ─── ALLOPATHY QUESTION — Conversion hook ────────────────────
+function getAllopathyQ(lang) {
+  const L = lang || "rom";
+  if (L === "eng") return {
+    text: "One quick question — have you taken doctor's medicine for this before? Did it help for a bit but then it came back? \uD83C\uDF3F",
+    replies: ["Yes \u2014 worked then came back", "Never tried medicine", "Currently on medicine"],
+  };
+  if (L === "dev") return {
+    text: "\u090F\u0915 \u0938\u0935\u093E\u0932 \u2014 \u0915\u094D\u092F\u093E \u092A\u0939\u0932\u0947 \u0921\u0949\u0915\u094D\u091F\u0930 \u0938\u0947 \u0926\u0935\u093E\u0908 \u0932\u0940? \u0915\u0941\u091B \u0926\u093F\u0928 \u0920\u0940\u0915 \u0939\u0941\u0906 \u092B\u093F\u0930 \u0935\u093E\u092A\u0938? \uD83C\uDF3F",
+    replies: ["\u0939\u093E\u0902 \u2014 \u0920\u0940\u0915 \u0939\u0941\u0906 \u092B\u093F\u0930 \u0935\u093E\u092A\u0938", "\u0915\u092D\u0940 \u0926\u0935\u093E\u0908 \u0928\u0939\u0940\u0902 \u0932\u0940", "\u0905\u092D\u0940 \u0926\u0935\u093E\u0908 \u091A\u0932 \u0930\u0939\u0940 \u0939\u0948"],
+  };
+  // Hinglish / Bengali default
+  return {
+    text: "Ek sawaal \u2014 kya pehle doctor se dawai li thi? Kuch din theek hua phir wapas aaya? \uD83C\uDF3F",
+    replies: ["Haan \u2014 theek hua phir wapas aaya", "Kabhi dawai nahi li", "Abhi bhi dawai chal rahi hai"],
+  };
+}
+
+// ─── ALLOPATHY ACK — Cycle-break hook ────────────────────────
+function getAllopathyAck(text, lang) {
+  const tl = text.toLowerCase();
+  const L = lang || "rom";
+  const usedAllopathy = /haan|yes|theek hua|worked|came back|wapas|chal rahi|currently/.test(tl);
+
+  if (!usedAllopathy) return null; // No hook needed if never tried
+
+  if (L === "eng") return "Exactly — that's how allopathy works. Suppresses the symptom, but the root cause stays.\n\nThe cycle only breaks when we treat from inside. That's what this protocol does.";
+  if (L === "dev") return "\u092F\u0939\u0940 \u0939\u094B\u0924\u093E \u0939\u0948 \u2014 \u0926\u0935\u093E\u0908 \u0909\u092A\u0930 \u0938\u0947 \u0915\u093E\u092E \u0915\u0930\u0924\u0940 \u0939\u0948, \u0905\u0902\u0926\u0930 \u0915\u0940 \u0935\u091C\u0939 \u0935\u0948\u0938\u0940 \u0939\u0940 \u0930\u0939\u0924\u0940 \u0939\u0948\u0964\n\nYeh cycle tab tak nahi tootegi jab tak andar se kaam na ho \u2014 yehi is protocol ka kaam hai.";
+  return "Yeh hota hi hai \u2014 dawai baahaar se kaam karti hai, andar ki wajah waisi hi rehti hai.\n\nYeh cycle nahi tootegi jab tak root pe kaam na ho \u2014 isi ke liye yeh protocol hai.";
+}
+
 // ─── REFINE TYPE FROM FOLLOW-UP ANSWER ───────────────────────
 function refineTypeFromFollowup(initialType, followupText) {
   const tl = followupText.toLowerCase();
@@ -497,15 +513,22 @@ const REVEAL = {
   dns: getRevealMsg("dns", "rom"),
 };
 
-// ─── PITCH MESSAGES — Hinglish only ─────────────────────────
+// ─── PITCH MESSAGES — Multilingual ───────────────────────────
 const TYPE_NAMES = {
   allergic: "Allergic Sinus", congestive: "Congestive Sinus",
   spray: "Spray Dependency", infective: "Infective Sinus", polyp: "Polyp Sinus",
   dns: "DNS (Deviated Nasal Septum)",
 };
-function getPitch(type) {
+function getPitch(type, lang) {
   const tname = TYPE_NAMES[type] || "Congestive Sinus";
-  return `Aapke *${tname}* ke liye khas 14-din program hai. \uD83C\uDF3F\n\n\uD83C\uDF31 *Rs.499* — Self-guided kit (WhatsApp support)\n\uD83C\uDF3F *Rs.1,299* — 14-Din Full Program _(sabse zyada liya jaata hai)_\n\u2705 Day 1 personally connect | roz WhatsApp check | agar takleef ho — usi din niyam badlega\n\nENT visit hi Rs.1,000-2,000 — yahan 14 din daily personal guidance sirf Rs.1,299. \uD83C\uDF3F`;
+  const L = lang || "rom";
+  if (L === "eng") {
+    return `Two options for *${tname}*. \uD83C\uDF3F\n\n\uD83C\uDF31 *Rs.499* — Sinus Reset Plan _(product + protocol delivered, you follow at home)_\n\uD83C\uDF3F *Rs.1,299* — 14-Din Restore Program _(most chosen)_\n\u2705 Day 1 personal onboarding | daily WhatsApp check-in | protocol adjusted same day if needed\n\nENT visit alone costs Rs.1,000-2,000. Here you get 14 days of daily personal guidance for Rs.1,299. \uD83C\uDF3F`;
+  }
+  if (L === "dev") {
+    return `*${tname}* \u0915\u0947 \u0932\u093F\u090F \u0926\u094B options \u0939\u0948\u0902\u0964 \uD83C\uDF3F\n\n\uD83C\uDF31 *Rs.499* \u2014 Sinus Reset Plan _(\u0909\u0924\u094D\u092A\u093E\u0926 + protocol deliver, \u0918\u0930 \u092A\u0930 \u0916\u0941\u0926 follow \u0915\u0930\u0947\u0902)_\n\uD83C\uDF3F *Rs.1,299* \u2014 14-Din Restore Program _(sabse zyada liya jaata hai)_\n\u2705 Day 1 personal onboarding | \u0930\u094B\u091C WhatsApp check | \u091C\u093C\u0930\u0942\u0930\u0924 \u0939\u094B \u0924\u094B \u0909\u0938\u0940 \u0926\u093F\u0928 protocol \u092C\u0926\u0932\u0947\u0917\u093E\n\nENT visit \u0905\u0915\u0947\u0932\u0947 Rs.1,000-2,000 \u2014 \u092F\u0939\u093E\u0902 14 \u0926\u093F\u0928 daily guidance \u0938\u093F\u0930\u094D\u092B Rs.1,299\u0964 \uD83C\uDF3F`;
+  }
+  return `*${tname}* ke liye do options hain. \uD83C\uDF3F\n\n\uD83C\uDF31 *Rs.499* — Sinus Reset Plan _(product + protocol deliver hoga, ghar pe khud follow karo)_\n\uD83C\uDF3F *Rs.1,299* — 14-Din Restore Program _(sabse zyada liya jaata hai)_\n\u2705 Day 1 personally connect | roz WhatsApp check | agar takleef ho — usi din niyam badlega\n\nENT visit hi Rs.1,000-2,000 — yahan 14 din daily personal guidance sirf Rs.1,299. \uD83C\uDF3F`;
 }
 
 // ─── POST-PAYMENT EXPLANATION ────────────────────────────────
@@ -525,7 +548,7 @@ function getUpsell(lang) {
     return "\u090F\u0915 \u092C\u093E\u0924 \u092C\u0924\u093E\u0924\u093E \u0939\u0942\u0901 \u2014 \uD83C\uDF3F\n\n\u20B91,299 \u0935\u093E\u0932\u0947 \u0915\u093E\u0930\u094D\u092F\u0915\u094D\u0930\u092E \u092E\u0947\u0902 *7 \u0926\u093F\u0928 \u092E\u0941\u092B\u094D\u0924* \u092E\u093F\u0932\u0924\u0947 \u0939\u0948\u0902 \u2192 \u0915\u0941\u0932 *21 \u0926\u093F\u0928*, \u0935\u0939\u0940 \u0935\u093F\u0936\u0947\u0937\u091C\u094D\u091E, \u0935\u0939\u0940 WhatsApp \u0938\u0939\u093E\u092F\u0924\u093E\u0964\n\n\u0938\u093F\u0930\u094D\u092B\u093C \u20B9800 \u091C\u093C\u094D\u092F\u093E\u0926\u093E \u092E\u0947\u0902 50% \u091C\u093C\u094D\u092F\u093E\u0926\u093E \u0938\u092E\u092F\u0964 \u0932\u0902\u092C\u0947 \u0938\u092E\u092F \u0938\u0947 \u092A\u0930\u0947\u0936\u093E\u0928 \u0932\u094B\u0917\u094B\u0902 \u0915\u094B \u092F\u0939 \u0905\u0924\u093F\u0930\u093F\u0915\u094D\u0924 \u0938\u092E\u092F \u092C\u0939\u0941\u0924 \u0915\u093E\u092E \u0906\u0924\u093E \u0939\u0948\u0964\n\n\u0938\u094B\u091A\u0928\u093E \u0939\u0948? \u092C\u0938 *upgrade* \u0932\u093F\u0916\u0947\u0902 \u2014 link \u092D\u0947\u091C \u0926\u0947\u0924\u093E \u0939\u0942\u0901\u0964 \uD83C\uDF3F";
   }
   // Default: Hinglish
-  return "Ek baat batata hun — \uD83C\uDF3F\n\nRs.1,299 wale program mein *7 din bilkul free* milte hain -> total *21 din*, wahi specialist, wahi WhatsApp support.\n\nSirf Rs.800 zyada mein 50% zyada waqt. Jo log lambe waqt se pareshan hain, unhe yeh extra time bahut kaam aata hai.\n\nSochna hai? Bas *upgrade* likho — link bhej deta hun. \uD83C\uDF3F";
+  return "Ek baat batata hun — \uD83C\uDF3F\n\n14-Din Restore Program mein *7 din bilkul free* milte hain \u2192 total *21 din*, wahi specialist, wahi WhatsApp support.\n\nSirf Rs.800 zyada mein 50% zyada waqt. Jo log lambe waqt se pareshan hain, unhe yeh extra time bahut kaam aata hai.\n\nSochna hai? Bas *upgrade* likho — link bhej deta hun. \uD83C\uDF3F";
 }
 
 // ─── WEBSITE TRUST MENTIONS ──────────────────────────────────
@@ -601,6 +624,7 @@ async function callSalesom(userMessage, userData, forceLang) {
     const lang = forceLang || userData.lastLang || "rom";
     const langInstruction =
       lang === "dev" ? "User ne Devanagari mein likha hai. SIRF Devanagari mein jawab do. Minimum English. protocol=niyam, symptoms=lakshan, day=din, routine=dinchrya" :
+      lang === "ben" ? "User ne Bengali mein likha hai. SIRF Bengali script mein jawab do. Roman ya Hindi transliteration mat karo — asli Bengali lipi mein likhna hai." :
       lang === "eng" ? "User wrote in English. Reply in English only." :
       "User wrote in Hinglish/Roman Hindi. Reply in Hinglish (Roman Hindi).";
 
@@ -608,8 +632,8 @@ async function callSalesom(userMessage, userData, forceLang) {
 [CONTEXT]
 - Sinus type: ${sinusLabels[userData.sinusType] || "Unknown"}
 - Duration: ${userData.duration || "Not specified"}
-- Severity: ${userData.severity || "Not specified"}
 - Current state: ${userData.state}
+- Allopathy history: ${userData.usedAllopathy || "Not asked"}
 - Selected plan: ${userData.selectedPlan ? "Rs." + userData.selectedPlan : "Not selected"}
 - Post-pitch reply #: ${userData.postPitchReplies || 0}
 [END CONTEXT]
@@ -710,7 +734,7 @@ async function handleMessage(senderId, messageText, senderName) {
     userData.state = "post_payment";
     userData.postPaymentReplies = 0;
     const days = userData.selectedPlan === 1299 ? 21 : 14;
-    await sendWithTyping(senderId, `Payment pakki ho gayi! \uD83C\uDF3F\n\nAapke *${days}-Din Nasal Restoration* ki shuruaat hone waali hai.\n\nMain jald hi WhatsApp pe personally connect karunga — 85951 60713\n\nAyusomam mein aapka swagat hai! \uD83C\uDF3F`);
+    await sendWithTyping(senderId, `Payment pakki ho gayi! \uD83C\uDF3F\n\nAapka *${days}-Din Sinus Restore Program* shuru hone waala hai.\n\nMain jald hi personally connect karunga — 85951 60713\n\nAyusomam mein aapka swagat hai! \uD83C\uDF3F`);
     await logToSheet(senderId, senderName, "Payment confirmed", "PAID", userData.sinusType);
     return;
   }
@@ -723,7 +747,7 @@ async function handleMessage(senderId, messageText, senderName) {
     const linkRepeat = /link|payment link/.test(textLower);
 
     if (upgradeQ && userData.selectedPlan === 499) {
-      await sendWithTyping(senderId, `Badhiya! \uD83C\uDF3F\n\n*Rs.1,299 — 21-Din Full Program*\n\uD83C\uDF3F ${PAYMENT_1299}\n\nPayment ke baad yahan "done" likhna — personally connect honge.`);
+      await sendWithTyping(senderId, `Badhiya! \uD83C\uDF3F\n\n*14-Din Restore Program — Rs.1,299* _(21 din total with 7 free)_\n\uD83C\uDF3F ${PAYMENT_1299}\n\nPayment ke baad yahan "done" likhna — personally connect honge.`);
       return;
     }
     if (linkRepeat) {
@@ -775,20 +799,12 @@ async function handleMessage(senderId, messageText, senderName) {
 
   if (userData.state === "asked_duration") {
     userData.duration = text;
-    userData.state = "asked_severity";
-    const sq = SEVERITY_Q[sc] || SEVERITY_Q.rom;
-    await sendWithTyping(senderId, getDurationAck(text));
-    await new Promise((r) => setTimeout(r, 800));
-    await sendQRWithTyping(senderId, sq.text, sq.replies);
-    await logToSheet(senderId, senderName, "Duration: " + text, "DURATION", "");
-    return;
-  }
-
-  if (userData.state === "asked_severity") {
-    userData.severity = text;
     userData.state = "asked_symptoms";
     const smq = SYMPTOMS_Q[sc] || SYMPTOMS_Q.rom;
+    await sendWithTyping(senderId, getDurationAck(text, sc));
+    await new Promise((r) => setTimeout(r, 800));
     await sendQRWithTyping(senderId, smq.text, smq.replies);
+    await logToSheet(senderId, senderName, "Duration: " + text, "DURATION", "");
     return;
   }
 
@@ -812,17 +828,14 @@ async function handleMessage(senderId, messageText, senderName) {
       return;
     }
 
-    // No follow-up needed — go straight to reveal
-    userData.state = "revealed";
-    userData.postPitchReplies = 0;
-    userData.history = [];
-    const thinkMsg = sc === "eng" ? "Analysing... \uD83C\uDF3F" : sc === "dev" ? "\u0926\u0947\u0916 \u0930\u0939\u0947 \u0939\u0948\u0902... \uD83C\uDF3F" : "Dekh rahe hain... \uD83C\uDF3F";
-    await sendWithTyping(senderId, thinkMsg);
-    await new Promise((r) => setTimeout(r, 700));
-    await sendWithTyping(senderId, getRevealMsg(sinusType, sc));
+    // No follow-up needed — ask allopathy question before reveal
+    userData.state = "asked_allopathy";
+    const aq = getAllopathyQ(sc);
+    const ackSym = sc === "eng" ? "Got it. \uD83C\uDF3F" : sc === "dev" ? "\u0920\u0940\u0915 \u0939\u0948\u0964 \uD83C\uDF3F" : "Theek hai. \uD83C\uDF3F";
+    await sendWithTyping(senderId, ackSym);
     await new Promise((r) => setTimeout(r, 600));
-    await sendWithTyping(senderId, getWebsiteLine("trust", sc));
-    await logToSheet(senderId, senderName, "Symptoms: " + text, "REVEALED", sinusType);
+    await sendQRWithTyping(senderId, aq.text, aq.replies);
+    await logToSheet(senderId, senderName, "Symptoms: " + text, "ALLOPATHY_Q", sinusType);
     return;
   }
 
@@ -847,34 +860,58 @@ async function handleMessage(senderId, messageText, senderName) {
       }
     }
 
-    // All follow-ups done — go to reveal
+    // All follow-ups done — ask allopathy question before reveal
+    userData.state = "asked_allopathy";
+    const aqf = getAllopathyQ(sc);
+    const clearMsg = sc === "eng" ? "Got it — one last thing. \uD83C\uDF3F"
+      : sc === "dev" ? "\u0938\u092E\u091D \u0917\u092F\u093E \u2014 \u090F\u0915 \u0906\u0916\u093F\u0930\u0940 \u0938\u0935\u093E\u0932\u0964 \uD83C\uDF3F"
+      : "Samajh gaya — ek aur cheez batao. \uD83C\uDF3F";
+    await sendWithTyping(senderId, clearMsg);
+    await new Promise((r) => setTimeout(r, 600));
+    await sendQRWithTyping(senderId, aqf.text, aqf.replies);
+    await logToSheet(senderId, senderName, "Followup: " + text, "ALLOPATHY_Q", refinedType);
+    return;
+  }
+
+  if (userData.state === "asked_allopathy") {
+    const tl = text.toLowerCase();
+    // Store allopathy history for AI context
+    const usedAllopathy = /haan|yes|theek hua|worked|came back|wapas|chal rahi|currently/.test(tl);
+    userData.usedAllopathy = usedAllopathy ? "Used allopathy — temporary relief only" : "Never used / no allopathy";
+
+    // Send cycle-break hook if they used allopathy
+    const ackHook = getAllopathyAck(text, sc);
+    if (ackHook) {
+      await sendWithTyping(senderId, ackHook);
+      await new Promise((r) => setTimeout(r, 700));
+    }
+
+    // Now reveal sinus type
     userData.state = "revealed";
     userData.postPitchReplies = 0;
     userData.history = [];
-    const clearMsg = sc === "eng" ? "Understood — clear picture now. \uD83C\uDF3F"
-      : sc === "dev" ? "\u0938\u092E\u091D \u0917\u092F\u093E \u2014 ab clear \u0939\u0948\u0964 \uD83C\uDF3F"
-      : "Samajh gaya — ab clear picture aa gayi. \uD83C\uDF3F";
-    await sendWithTyping(senderId, clearMsg);
+    const thinkMsg = sc === "eng" ? "Analysing your case... \uD83C\uDF3F" : sc === "dev" ? "\u0906\u092A\u0915\u093E case \u0926\u0947\u0916 \u0930\u0939\u0947 \u0939\u0948\u0902... \uD83C\uDF3F" : "Aapka case dekh rahe hain... \uD83C\uDF3F";
+    await sendWithTyping(senderId, thinkMsg);
     await new Promise((r) => setTimeout(r, 700));
-    await sendWithTyping(senderId, getRevealMsg(refinedType, sc));
+    await sendWithTyping(senderId, getRevealMsg(userData.sinusType, sc));
     await new Promise((r) => setTimeout(r, 600));
     await sendWithTyping(senderId, getWebsiteLine("trust", sc));
-    await logToSheet(senderId, senderName, "Followup: " + text, "REVEALED", refinedType);
+    await logToSheet(senderId, senderName, "Allopathy: " + text, "REVEALED", userData.sinusType);
     return;
   }
 
   if (userData.state === "revealed") {
     userData.state = "pitched";
-    await sendWithTyping(senderId, getPitch(userData.sinusType));
+    await sendWithTyping(senderId, getPitch(userData.sinusType, sc));
     await new Promise((r) => setTimeout(r, 700));
     const pitchOptText = sc === "eng" ? "Which option works for you? \uD83C\uDF3F"
       : sc === "dev" ? "\u0915\u094C\u0928\u0938\u093E option \u0938\u0939\u0940 \u0932\u0917\u0924\u093E \u0939\u0948? \uD83C\uDF3F"
       : "Kaunsa option sahi lagta hai? \uD83C\uDF3F";
     const pitchReplies = sc === "eng"
-      ? ["Full Program (Rs.1,299)", "Starter Kit (Rs.499)", "I have a question first"]
+      ? ["14-Din Restore Program (Rs.1,299)", "Sinus Reset Plan (Rs.499)", "I have a question first"]
       : sc === "dev"
-      ? ["Full Program (Rs.1,299)", "Starter Kit (Rs.499)", "\u092A\u0939\u0932\u0947 \u0938\u0935\u093E\u0932 \u0939\u0948"]
-      : ["Full Program (Rs.1,299)", "Starter Kit (Rs.499)", "Pehle sawaal hai"];
+      ? ["14-Din Restore Program (Rs.1,299)", "Sinus Reset Plan (Rs.499)", "\u092A\u0939\u0932\u0947 \u0938\u0935\u093E\u0932 \u0939\u0948"]
+      : ["14-Din Restore Program (Rs.1,299)", "Sinus Reset Plan (Rs.499)", "Pehle sawaal hai"];
     await sendQRWithTyping(senderId, pitchOptText, pitchReplies);
     await logToSheet(senderId, senderName, "Pitched: " + userData.sinusType, "PITCHED", userData.sinusType);
     return;
@@ -907,21 +944,21 @@ async function handleMessage(senderId, messageText, senderName) {
     }
 
         // Payment link ONLY when user clearly shows interest/intent — not by default
-    const userSaidYes = /\bhaan\b|\bha\b|yes\b|theek hai|ok\b|okay\b|shuru|karna hai|chahta|chahti|le leta|le lungi|lena hai|interested|1299|499|full program|starter kit|bhejo|link bhejo|link chahiye|lena chahta|lena chahti/.test(textLower);
+    const userSaidYes = /\bhaan\b|\bha\b|yes\b|theek hai|ok\b|okay\b|shuru|karna hai|chahta|chahti|le leta|le lungi|lena hai|interested|1299|499|full program|starter kit|home kit|sinus reset|restore program|bhejo|link bhejo|link chahiye|lena chahta|lena chahti/.test(textLower);
 
     if (userSaidYes) {
-      const wants1299 = /1299|full program|full|poora/.test(textLower);
-      const wants499 = /499|starter|chota|basic/.test(textLower);
+      const wants1299 = /1299|full program|restore program|full|poora/.test(textLower);
+      const wants499 = /499|starter|home kit|sinus reset|reset plan|chota|basic/.test(textLower);
       if (wants1299) userData.selectedPlan = 1299;
       else if (wants499) userData.selectedPlan = 499;
 
       let commitMsg;
       if (userData.selectedPlan === 1299)
-        commitMsg = "Bahut acha! \uD83C\uDF3F\n\n*Rs.1,299 — 14-Din Nasal Restoration* — yahi lena hai?\n\nEk baar *haan* bol do — phir payment link bhejta hun.";
+        commitMsg = "Bahut acha kadam! \uD83C\uDF3F\n\n*14-Din Restore Program (Rs.1,299)* — yahi lena hai?\n\nEk baar *haan* bol do — phir payment link bhejta hun.";
       else if (userData.selectedPlan === 499)
-        commitMsg = "Theek hai! \uD83C\uDF3F\n\n*Rs.499 Starter Kit* — yahi lena hai?\n\nEk baar *haan* bol do — phir link bhejta hun.";
+        commitMsg = "Perfect! \uD83C\uDF3F\n\n*Sinus Reset Plan (Rs.499)* — yahi lena hai?\n\nEk baar *haan* bol do — phir link bhejta hun.";
       else
-        commitMsg = "Bahut acha kadam! \uD83C\uDF3F\n\nKaunsa option lena hai — *Rs.499 Starter* ya *Rs.1,299 Full Program*?";
+        commitMsg = "Batao — *Sinus Reset Plan (Rs.499)* lena hai ya *14-Din Restore Program (Rs.1,299)*? \uD83C\uDF3F";
 
       userData.state = "committing";
       await sendWithTyping(senderId, commitMsg);
@@ -944,16 +981,16 @@ async function handleMessage(senderId, messageText, senderName) {
   // ─── COMMITTING — SEND LINK ONLY AFTER CONFIRM ───────────────
   if (userData.state === "committing") {
     const confirmed = /haan|ha |yes|theek|ok\b|okay|bilkul|zaroor|confirm/.test(textLower);
-    const wants1299 = /1299|full|poora/.test(textLower);
-    const wants499 = /499|starter/.test(textLower);
+    const wants1299 = /1299|restore program|full|poora/.test(textLower);
+    const wants499 = /499|sinus reset|reset plan|starter|home kit/.test(textLower);
     if (wants1299) userData.selectedPlan = 1299;
     if (wants499) userData.selectedPlan = 499;
 
     if (confirmed || wants1299 || wants499) {
       const websiteLine = getWebsiteLine("confirm", sc);
       const linkMsg = userData.selectedPlan === 499
-        ? `Rs.499 Starter Kit\n\nPayment link:\n\uD83C\uDF31 ${PAYMENT_499}\n\n${websiteLine}\n\nPayment ke baad yahan *done* likhna — agla step batata hun. \uD83C\uDF3F`
-        : `Rs.1,299 — 14-Din Nasal Restoration\n\nPayment link:\n\uD83C\uDF3F ${PAYMENT_1299}\n\n${websiteLine}\n\nPayment ke baad yahan *done* likhna — personally connect honge. \uD83C\uDF3F`;
+        ? `*Sinus Reset Plan — Rs.499*\n\nPayment link:\n\uD83C\uDF31 ${PAYMENT_499}\n\n${websiteLine}\n\nPayment ke baad yahan *done* likhna — agla step batata hun. \uD83C\uDF3F`
+        : `*14-Din Restore Program — Rs.1,299*\n\nPayment link:\n\uD83C\uDF3F ${PAYMENT_1299}\n\n${websiteLine}\n\nPayment ke baad yahan *done* likhna — personally connect honge. \uD83C\uDF3F`;
       userData.state = "pitched";
       userData.postPitchReplies = 0;
       await sendWithTyping(senderId, linkMsg);
