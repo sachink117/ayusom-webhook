@@ -816,7 +816,7 @@ async function handleMessage(senderId, messageText, platform) {
   // ── LANGUAGE SWITCH INTERCEPTION ──────────────────────────────────────
   if ((_engReq || _hinReq) && text.trim().split(/\s+/).length <= 6) {
     const ack = user.lang === 'eng'
-      ? 'Sure! I'll reply in English now. Please continue.'
+      ? "Sure! I'll reply in English now. Please continue."
       : 'Bilkul! Ab Hindi mein baat karte hain. Bataiye kya takleef hai?';
     await sendWithTyping(platform, userId, ack);
     userData[userId] = user;
