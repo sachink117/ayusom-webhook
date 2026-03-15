@@ -1179,7 +1179,31 @@ app.get("/admin/data", async (req, res) => {
     try {
       const _sr = await fetch(SHEET_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'conversations'})});
       const _sl = await _sr.json();
-      console.log('[ADMIN] Raw resp:', JSON.stringify(_sl).substring(0,400));
+      const _rows = Array.isArray(_sl) ? _sl : [];
+      console.log('[ADMIN] Sheets rows:', _rows.length);
+      const _cm = {};
+      for (const _row of _rows) {
+        const _sid = String(_row.SenderID || _row.senderId || _row.id || '').trim();
+        if (!_sid) continue;
+        if (!_cm[_sid]) _cm[_sid] = {msgs:[], lastTs:0};
+        const _ts = _row.Timestamp ? new Date(_row.Timestamp).getTime() : 0;
+        const _role = String(_row.Role || _row.role || 'user').toLowerCase();
+        const _content = String(_row.Message || _row.message || _row.content || '');
+        _cm[_sid].msgs.push({ts:_ts, role:_role, content:_content});
+        if (_ts > _cm[_sid].lastTs) _cm[_sid].lastTs = _ts;
+      }
+      for (const [_sid, _conv] of Object.entries(_cm)) {
+        _conv.msgs.sort((a,b)=>a.ts-b.ts);
+        const _hist = _conv.msgs.map(m=>({role:m.role, content:m.content}));
+        if (userData[_sid]) {
+          const _ex = new Set((userData[_sid].history||[]).map(m=>m.content));
+          userData[_sid].history = [..._hist.filter(m=>!_ex.has(m.content)), ...(userData[_sid].history||[])];
+          if (!userData[_sid].lastMessageAt) userData[_sid].lastMessageAt = _conv.lastTs||null;
+        } else {
+          userData[_sid] = {lang:null,sinusType:null,state:'unknown',platform:'whatsapp',duration:null,selectedPlan:null,lastMessageAt:_conv.lastTs||null,ghostAttempts:0,enrolledAt:null,history:_hist.slice(-60),source:'sheets'};
+        }
+      }
+      console.log('[ADMIN] Merged convs:', Object.keys(_cm).length);
     } catch(e){console.warn('[ADMIN] Sheets err:',e.message);}
   }
 
