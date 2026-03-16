@@ -36,9 +36,9 @@ function saveIgCookies(cookies) {
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
-
   _igUsername = INSTAGRAM_USERNAME;
-  _igPassword  = INSTAGRAM_PASSWORD;  try {
+  _igPassword  = INSTAGRAM_PASSWORD;
+  try {
     const { chromium } = require('playwright');
     igBrowser = await chromium.launch({
       headless: true,
@@ -54,20 +54,25 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
       locale: 'en-US',
       extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' },
     });
-    // Mask navigator.webdriver to bypass Instagram bot detection
+    // Mask automation signals to bypass Instagram bot detection
     await igContext.addInitScript(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      Object.defineProperty(navigator, 'plugins',   { get: () => [1, 2, 3, 4, 5] });
+      Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+      window.chrome = { runtime: {}, loadTimes: function(){}, csi: function(){}, app: {} };
     });
     igPage = await igContext.newPage();
 
+    // Restore saved cookies if available
     const saved = await loadIgCookies();
     if (saved && saved.length > 0) {
       await igContext.addCookies(saved);
-      console.log('[IG-PW] Loaded saved cookies');
+      console.log('[IG-PW] Loaded saved cookies:', saved.length);
     }
 
     await igPage.goto('https://www.instagram.com/direct/inbox/', { timeout: 30000 });
     await _sleep(3000);
+    console.log('[IG-PW] Init inbox URL:', igPage.url());
 
     if (igPage.url().includes('login')) {
       console.log('[IG-PW] Session expired — logging in...');
@@ -78,7 +83,8 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
 
     igReady = true;
     console.log('Instagram Playwright: ready, polling every 3 min');
-    pollInstagramDMs();
+    console.log('[IG-PW] Module loaded and ready');
+    // Skip immediate poll — let session stabilize before first poll at 3 min
     setInterval(pollInstagramDMs, 3 * 60 * 1000);
   } catch (e) {
     console.error('[IG-PW] Init error:', e.message);
@@ -121,25 +127,31 @@ async function loginInstagramPW(username = _igUsername, password = _igPassword) 
     if (!gotUname) throw new Error('Username input not found — see page text above');
     const gotPw = await tryFill(pwSelectors, password);
     if (!gotPw) throw new Error('Password input not found');
+
     // Click submit or press Enter (button selector can vary)
     const submitBtn = await igPage.$('button[type="submit"], button:has-text("Log in"), button:has-text("Log In")').catch(() => null);
     if (submitBtn) { await submitBtn.click(); }
     else { await igPage.keyboard.press('Enter'); }
     await _sleep(6000);
+    console.log('[IG-PW] Post-submit URL:', igPage.url());
 
+    // Dismiss "Save your login info?" and "Turn on notifications?" prompts
     const notNow1 = igPage.locator('button:has-text("Not Now"), button:has-text("Not now")').first();
     if (await notNow1.isVisible({ timeout: 4000 }).catch(() => false)) await notNow1.click();
     await _sleep(1000);
-
     const notNow2 = igPage.locator('button:has-text("Not Now"), button:has-text("Not now")').first();
     if (await notNow2.isVisible({ timeout: 4000 }).catch(() => false)) await notNow2.click();
     await _sleep(1000);
 
-    saveIgCookies(await igContext.cookies());
+    const cookies = await igContext.cookies();
+    const sessionCookie = cookies.find(c => c.name === 'sessionid');
+    console.log('[IG-PW] Cookies:', cookies.length, '| sessionid:', sessionCookie ? 'PRESENT' : 'MISSING');
+    saveIgCookies(cookies);
     console.log('[IG-PW] Logged in, cookies saved');
 
     await igPage.goto('https://www.instagram.com/direct/inbox/', { timeout: 30000 });
     await _sleep(3000);
+    console.log('[IG-PW] Post-login inbox URL:', igPage.url());
   } catch (e) {
     console.error('[IG-PW] Login error:', e.message);
   }
@@ -151,13 +163,21 @@ async function pollInstagramDMs() {
   try {
     await igPage.goto('https://www.instagram.com/direct/inbox/', { timeout: 30000 });
     await _sleep(3000);
+    console.log('[IG-PW] Poll URL:', igPage.url());
 
+    // Re-login if session expired — then continue (don't return early)
     if (igPage.url().includes('login')) {
       console.log('[IG-PW] Session expired — re-logging in...');
       await loginInstagramPW();
-      return;
+      console.log('[IG-PW] Post-relogin URL:', igPage.url());
+      if (igPage.url().includes('login')) {
+        console.log('[IG-PW] Still on login after re-login — aborting poll');
+        return;
+      }
+      // We are on inbox now — fall through to poll DMs
     }
 
+    // Collect unique DM thread links from the inbox
     const allLinks = await igPage.$$('a[href*="/direct/t/"]');
     const seenHrefs = new Set();
     const threads = [];
@@ -176,6 +196,7 @@ async function pollInstagramDMs() {
         const threadId  = href.replace(/\//g, '').replace('directt', '');
         const senderId  = 'ig_pw_' + threadId;
 
+        // Get last visible message text — try multiple selector patterns
         const msgEls = await igPage.$$(
           'div[class*="_aa6j"], div[dir="auto"]:not(header *), [class*="messageText"]'
         );
@@ -192,6 +213,7 @@ async function pollInstagramDMs() {
 
         console.log('[IG-PW] DM (' + threadId + '): "' + msgText.substring(0, 80) + '"');
 
+        // Process with AI — non-blocking (handleMessage -> sendInstagramMessagePW)
         _handleMessage(senderId, msgText, 'instagram_playwright')
           .catch(e => console.error('[IG-PW] handleMessage error:', e.message));
 
@@ -201,6 +223,7 @@ async function pollInstagramDMs() {
       }
     }
 
+    // Persist fresh cookies after each poll cycle
     saveIgCookies(await igContext.cookies());
   } catch (e) {
     console.error('[IG-PW] Poll error:', e.message);
@@ -219,6 +242,7 @@ async function sendInstagramMessagePW(senderId, text) {
       await _sleep(2000);
     }
 
+    // Find message input (Instagram uses contenteditable div)
     const inputEl = await igPage.waitForSelector(
       '[contenteditable="true"][role="textbox"], div[contenteditable="true"][data-testid], textarea[placeholder*="essage"]',
       { timeout: 8000 }
@@ -246,6 +270,6 @@ module.exports = {
     _handleMessage = handleMessage;
     _sleep         = sleep;
     await initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD);
-    return sendInstagramMessagePW;
+    return sendInstagramMessagePW;   // returned so index.js can call it from sendMessage
   }
 };
