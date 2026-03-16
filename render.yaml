@@ -4,9 +4,9 @@ services:
     runtime: node
     repo: https://github.com/sachink117/ayusom-webhook
     branch: main
-    buildCommand: npm install
+    buildCommand: npm install && npx playwright install chromium --with-deps
     startCommand: npm start
-    plan: free
+    plan: starter
     autoDeploy: true
     envVars:
       - key: PAGE_ACCESS_TOKEN
@@ -24,4 +24,8 @@ services:
       - key: RAZORPAY_WEBHOOK_SECRET
         sync: false
       - key: VERIFY_TOKEN
+        sync: false
+      - key: INSTAGRAM_USERNAME
+        sync: false
+      - key: INSTAGRAM_PASSWORD
         sync: false
