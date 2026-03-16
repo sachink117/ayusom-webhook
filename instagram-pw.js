@@ -618,16 +618,24 @@ async function pollInstagramDMs() {
     }
 
     // Collect all thread hrefs from inbox (no clicking â just read hrefs)
-    const allLinks = await igPage.$$('a[href*="/direct/t/"]');
-    const seenHrefs = new Set();
-    const threadHrefs = [];
-    for (const link of allLinks) {
-      const href = await link.getAttribute('href').catch(() => null);
-      if (href && !seenHrefs.has(href)) {
-        seenHrefs.add(href);
-        threadHrefs.push(href);
-      }
-    }
+    // Wait for thread list to render (Instagram SPA needs time)
+    await igPage.waitForSelector('a[href*="/direct/t/"]', { timeout: 12000 }).catch(() => null);
+
+    // Collect thread hrefs via evaluate (more reliable than $$ for SPAs)
+    const threadHrefs = await igPage.evaluate(() => {
+      const seen = new Set();
+      const hrefs = [];
+      document.querySelectorAll('a').forEach(a => {
+        try {
+          const path = a.pathname || new URL(a.href).pathname;
+          if (path && path.includes('/direct/t/') && !seen.has(path)) {
+            seen.add(path);
+            hrefs.push(path);
+          }
+        } catch (e) {}
+      });
+      return hrefs;
+    }).catch(() => []);
     console.log('[IG-PW] Found ' + threadHrefs.length + ' DM threads');
 
     // Process up to 15 threads in parallel batches of POOL_SIZE
