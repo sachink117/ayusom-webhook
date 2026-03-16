@@ -1818,6 +1818,137 @@ setInterval(loadData, 30000);
 </html>`);
 });
 
+// ─── VIDEO LANDING PAGE — SINUS LEAD CAPTURE ─────────────────
+app.get("/sinus", (req, res) => {
+  const src = req.query.src || 'direct';
+  res.setHeader('Content-Type', 'text/html');
+  res.send(`<!DOCTYPE html><html lang="hi"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Apna Sinus Type Jaano — FREE | Ayusomam Herbals</title>
+<meta name="description" content="6 type ke sinus hote hain. Apna sinus type identify karo aur sahi Ayurvedic treatment pao. Free assessment by Ayusomam Herbals.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0a0a0a;color:#fff;min-height:100vh}
+.hero{background:linear-gradient(135deg,#1a3a1a 0%,#0d1f0d 50%,#0a0a0a 100%);padding:40px 20px 30px;text-align:center}
+.logo{font-size:14px;color:#4caf50;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px}
+h1{font-size:28px;line-height:1.3;margin-bottom:12px}
+h1 span{color:#4caf50}
+.sub{color:#aaa;font-size:15px;line-height:1.5;max-width:340px;margin:0 auto 24px}
+.badge{display:inline-block;background:#1b5e20;color:#a5d6a7;padding:6px 16px;border-radius:20px;font-size:13px;margin-bottom:24px}
+.types{padding:20px;max-width:400px;margin:0 auto}
+.types h2{font-size:18px;margin-bottom:16px;text-align:center;color:#81c784}
+.type-card{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px}
+.type-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.t1 .type-icon{background:#1a237e20;color:#7986cb}
+.t2 .type-icon{background:#01579b20;color:#4fc3f7}
+.t3 .type-icon{background:#bf360c20;color:#ff8a65}
+.t4 .type-icon{background:#4a148c20;color:#ce93d8}
+.t5 .type-icon{background:#33691e20;color:#aed581}
+.t6 .type-icon{background:#e6511520;color:#ffab91}
+.type-name{font-size:14px;font-weight:600}
+.type-hint{font-size:12px;color:#888;margin-top:2px}
+.cta-section{padding:30px 20px;text-align:center;max-width:400px;margin:0 auto}
+.cta-section h2{font-size:20px;margin-bottom:8px}
+.cta-section p{color:#aaa;font-size:14px;margin-bottom:20px}
+.cta-btn{display:block;width:100%;padding:16px;border-radius:12px;font-size:16px;font-weight:700;text-decoration:none;text-align:center;margin-bottom:12px;border:none;cursor:pointer}
+.wa-btn{background:#25D366;color:#fff}
+.wa-btn:hover{background:#1da851}
+.chat-btn{background:#1b5e20;color:#fff;border:1px solid #2e7d32}
+.chat-btn:hover{background:#2e7d32}
+.trust{display:flex;justify-content:center;gap:20px;margin-top:20px;flex-wrap:wrap}
+.trust-item{font-size:12px;color:#888;display:flex;align-items:center;gap:4px}
+.free-tag{color:#4caf50;font-weight:700}
+.footer{text-align:center;padding:20px;color:#555;font-size:12px;border-top:1px solid #1a1a1a;margin-top:20px}
+</style></head><body>
+<div class="hero">
+<div class="logo">Ayusomam Herbals</div>
+<h1>Sinus Ka <span>Asli Solution</span><br>Type Se Shuru Hota Hai</h1>
+<p class="sub">6 type ke sinus hote hain. Har ek ka treatment alag hai. Pehle apna type jaano — phir sahi protocol lo.</p>
+<span class="badge">500+ logon ne apna type jaana</span>
+</div>
+<div class="types">
+<h2>6 Sinus Types</h2>
+<div class="type-card t1"><div class="type-icon">🌬</div><div><div class="type-name">Reactive Sensitivity</div><div class="type-hint">Sneezing, watery nose, allergy triggers</div></div></div>
+<div class="type-card t2"><div class="type-icon">🔵</div><div><div class="type-name">Chronic Congestion</div><div class="type-hint">Naak band, heavy head, subah zyada</div></div></div>
+<div class="type-card t3"><div class="type-icon">🔥</div><div><div class="type-name">Deep Inflammation</div><div class="type-hint">Yellow mucus, burning, headache</div></div></div>
+<div class="type-card t4"><div class="type-icon">💊</div><div><div class="type-name">Spray Dependency</div><div class="type-hint">Spray ke bina naak nahi khulti</div></div></div>
+<div class="type-card t5"><div class="type-icon">🫁</div><div><div class="type-name">Drainage Blockage</div><div class="type-hint">Post-nasal drip, throat mein balgam</div></div></div>
+<div class="type-card t6"><div class="type-icon">🦴</div><div><div class="type-name">Structural Congestion</div><div class="type-hint">Deviated septum, one-sided block</div></div></div>
+</div>
+<div class="cta-section">
+<h2>Apna Sinus Type Jaano</h2>
+<p><span class="free-tag">FREE</span> — 2 minute mein pata chalega</p>
+<a href="https://wa.me/918595160713?text=SINUS" class="cta-btn wa-btn" id="wa-cta">WhatsApp Pe Jaano →</a>
+<a href="/widget" class="cta-btn chat-btn" id="chat-cta">Yahan Chat Karo →</a>
+<div class="trust">
+<div class="trust-item">🌿 100% Ayurvedic</div>
+<div class="trust-item">🤖 AI-Powered Assessment</div>
+<div class="trust-item">📱 WhatsApp Support</div>
+</div>
+</div>
+<div class="footer">Ayusomam Herbals — Ayurvedic Sinus Treatment Since 2023</div>
+<script>
+// Track video lead source
+(function(){
+  var src='${src}';
+  var ts=new Date().toISOString();
+  fetch('/video-lead',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({source:src,timestamp:ts,page:'sinus-landing',action:'page_view'})
+  }).catch(function(){});
+  document.getElementById('wa-cta').addEventListener('click',function(){
+    fetch('/video-lead',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({source:src,timestamp:ts,page:'sinus-landing',action:'whatsapp_click'})
+    }).catch(function(){});
+  });
+  document.getElementById('chat-cta').addEventListener('click',function(){
+    fetch('/video-lead',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({source:src,timestamp:ts,page:'sinus-landing',action:'chat_click'})
+    }).catch(function(){});
+  });
+})();
+</script>
+</body></html>`);
+});
+
+// ─── VIDEO LEAD TRACKING ENDPOINT ────────────────────────────
+app.post("/video-lead", async (req, res) => {
+  const { source, timestamp, page, action } = req.body || {};
+  const leadData = {
+    source: source || 'unknown',
+    timestamp: timestamp || new Date().toISOString(),
+    page: page || 'sinus-landing',
+    action: action || 'unknown',
+    ip: req.headers['x-forwarded-for'] || req.ip
+  };
+  console.log(`[VIDEO-LEAD] ${leadData.action} from ${leadData.source} at ${leadData.timestamp}`);
+
+  // Log to Google Sheets if configured
+  if (SHEET_URL) {
+    try {
+      const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
+      await fetch(SHEET_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'video_lead',
+          source: leadData.source,
+          event: leadData.action,
+          timestamp: leadData.timestamp,
+          page: leadData.page
+        })
+      });
+    } catch(e) { console.error('[VIDEO-LEAD] Sheet log error:', e.message); }
+  }
+
+  // Store in Firestore if available
+  if (db) {
+    try {
+      await db.collection('video_leads').add(leadData);
+    } catch(e) { console.error('[VIDEO-LEAD] Firestore error:', e.message); }
+  }
+  res.json({ ok: true });
+});
+
 // ─── HEALTH CHECK ─────────────────────────────────────────────
 app.get("/health", (req, res) => {
   res.json({
