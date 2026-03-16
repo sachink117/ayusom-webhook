@@ -39,11 +39,21 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
     const { chromium } = require('playwright');
     igBrowser = await chromium.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process']
+      args: [
+        '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process',
+        '--disable-blink-features=AutomationControlled',
+        '--lang=en-US,en',
+      ]
     });
     igContext = await igBrowser.newContext({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
       viewport:  { width: 1280, height: 800 },
+      locale: 'en-US',
+      extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' },
+    });
+    // Mask navigator.webdriver to bypass Instagram bot detection
+    await igContext.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
     });
     igPage = await igContext.newPage();
 
