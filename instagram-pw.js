@@ -3,20 +3,50 @@
 // Polls Instagram DMs every 3 minutes via headless Chromium browser.
 // No Meta API token needed — uses real browser session.
 //
-// Usage (called from index.js):
-//   const igMod = require('./instagram-pw');
-//   sendInstagramMessagePW = await igMod.init({ db, handleMessage, sleep, INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD });
+// Requires env vars: INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD, TOTP_SECRET
+// TOTP_SECRET: base32 key from Instagram's authenticator app setup (e.g. "JBSWY3DPEHPK3PXP")
 
 let igBrowser = null;
 let igContext  = null;
 let igPage     = null;
 let igReady    = false;
 
-const igSeenMessages = new Set();   // dedup: "threadId::msgSnippet"
-const igThreadUrls   = new Map();   // senderId -> thread URL (for replies)
+const igSeenMessages = new Set();
+const igThreadUrls   = new Map();
 
 let _db, _handleMessage, _sleep;
-let _igUsername, _igPassword;   // stored for re-login from pollInstagramDMs
+let _igUsername, _igPassword;
+
+// ── TOTP generator (no external deps — uses Node built-in crypto) ─────────────
+function generateTOTP(secret) {
+  const base32Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  for (const char of secret.toUpperCase().replace(/[\s=]/g, '')) {
+    const val = base32Chars.indexOf(char);
+    if (val === -1) continue;
+    bits += val.toString(2).padStart(5, '0');
+  }
+  const bytes = [];
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    bytes.push(parseInt(bits.slice(i, i + 8), 2));
+  }
+  const key = Buffer.from(bytes);
+  const time = Math.floor(Date.now() / 1000 / 30);
+  const timeBuf = Buffer.alloc(8);
+  timeBuf.writeBigUInt64BE(BigInt(time));
+  const crypto = require('crypto');
+  const hmac = crypto.createHmac('sha1', key);
+  hmac.update(timeBuf);
+  const digest = hmac.digest();
+  const offset = digest[digest.length - 1] & 0x0f;
+  const code = (
+    ((digest[offset]     & 0x7f) << 24) |
+    ((digest[offset + 1] & 0xff) << 16) |
+    ((digest[offset + 2] & 0xff) <<  8) |
+     (digest[offset + 3] & 0xff)
+  ) % 1000000;
+  return code.toString().padStart(6, '0');
+}
 
 // ── Cookie persistence (Firestore) ──────────────────────────────────────────
 async function loadIgCookies() {
@@ -54,7 +84,6 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
       locale: 'en-US',
       extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' },
     });
-    // Mask automation signals to bypass Instagram bot detection
     await igContext.addInitScript(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
       Object.defineProperty(navigator, 'plugins',   { get: () => [1, 2, 3, 4, 5] });
@@ -63,7 +92,6 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
     });
     igPage = await igContext.newPage();
 
-    // Restore saved cookies if available
     const saved = await loadIgCookies();
     if (saved && saved.length > 0) {
       await igContext.addCookies(saved);
@@ -84,7 +112,6 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
     igReady = true;
     console.log('Instagram Playwright: ready, polling every 3 min');
     console.log('[IG-PW] Module loaded and ready');
-    // Skip immediate poll — let session stabilize before first poll at 3 min
     setInterval(pollInstagramDMs, 3 * 60 * 1000);
   } catch (e) {
     console.error('[IG-PW] Init error:', e.message);
@@ -98,21 +125,13 @@ async function loginInstagramPW(username = _igUsername, password = _igPassword) 
     await igPage.goto('https://www.instagram.com/accounts/login/', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await _sleep(3000);
     console.log('[IG-PW] Login page URL:', igPage.url());
-    console.log('[IG-PW] Login page title:', await igPage.title());
 
-    // Dismiss cookie consent if present (EU/region popup)
     const cookieBtn = igPage.locator('button:has-text("Allow all cookies"), button:has-text("Accept all"), button:has-text("Allow essential and optional cookies")').first();
     if (await cookieBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await cookieBtn.click();
-      console.log('[IG-PW] Dismissed cookie consent');
       await _sleep(2000);
     }
 
-    // Log page content to diagnose what Instagram is actually showing
-    const pgText = await igPage.evaluate(() => (document.body || document.documentElement).innerText.substring(0, 300).replace(/\n/g,' '));
-    console.log('[IG-PW] Page text:', pgText);
-
-    // Try multiple selectors — Instagram sometimes changes input attributes
     const tryFill = async (selectors, value) => {
       for (const sel of selectors) {
         const found = await igPage.$(sel).catch(() => null);
@@ -124,16 +143,45 @@ async function loginInstagramPW(username = _igUsername, password = _igPassword) 
     const pwSelectors    = ['input[name="password"]','input[aria-label*="password" i]','input[autocomplete="current-password"]','input[type="password"]'];
 
     const gotUname = await tryFill(unameSelectors, username);
-    if (!gotUname) throw new Error('Username input not found — see page text above');
+    if (!gotUname) throw new Error('Username input not found');
     const gotPw = await tryFill(pwSelectors, password);
     if (!gotPw) throw new Error('Password input not found');
 
-    // Click submit or press Enter (button selector can vary)
     const submitBtn = await igPage.$('button[type="submit"], button:has-text("Log in"), button:has-text("Log In")').catch(() => null);
     if (submitBtn) { await submitBtn.click(); }
     else { await igPage.keyboard.press('Enter'); }
     await _sleep(6000);
     console.log('[IG-PW] Post-submit URL:', igPage.url());
+
+    // ── Handle Two-Factor Authentication ──────────────────────────────────────
+    if (igPage.url().includes('two_factor') || igPage.url().includes('challenge')) {
+      console.log('[IG-PW] 2FA page detected:', igPage.url());
+      const totpSecret = process.env.TOTP_SECRET;
+      if (!totpSecret) {
+        throw new Error('2FA required but TOTP_SECRET env var is not set');
+      }
+      const totpCode = generateTOTP(totpSecret);
+      console.log('[IG-PW] Generated TOTP code:', totpCode);
+
+      // Try common 2FA input selectors
+      const codeInput = await igPage.$(
+        'input[name="verificationCode"], input[aria-label*="code" i], input[inputmode="numeric"], input[type="number"], input[autocomplete="one-time-code"]'
+      ).catch(() => null);
+
+      if (codeInput) {
+        await codeInput.fill(totpCode);
+        await _sleep(500);
+        const twoFaSubmit = await igPage.$('button[type="submit"]').catch(() => null);
+        if (twoFaSubmit) { await twoFaSubmit.click(); }
+        else { await igPage.keyboard.press('Enter'); }
+        await _sleep(5000);
+        console.log('[IG-PW] Post-2FA URL:', igPage.url());
+      } else {
+        const pgSnippet = await igPage.evaluate(() => document.body.innerText.substring(0, 200));
+        console.log('[IG-PW] 2FA input not found — page:', pgSnippet);
+        throw new Error('2FA input not found on two_factor page');
+      }
+    }
 
     // Dismiss "Save your login info?" and "Turn on notifications?" prompts
     const notNow1 = igPage.locator('button:has-text("Not Now"), button:has-text("Not now")').first();
@@ -165,7 +213,6 @@ async function pollInstagramDMs() {
     await _sleep(3000);
     console.log('[IG-PW] Poll URL:', igPage.url());
 
-    // Re-login if session expired — then continue (don't return early)
     if (igPage.url().includes('login')) {
       console.log('[IG-PW] Session expired — re-logging in...');
       await loginInstagramPW();
@@ -174,10 +221,8 @@ async function pollInstagramDMs() {
         console.log('[IG-PW] Still on login after re-login — aborting poll');
         return;
       }
-      // We are on inbox now — fall through to poll DMs
     }
 
-    // Collect unique DM thread links from the inbox
     const allLinks = await igPage.$$('a[href*="/direct/t/"]');
     const seenHrefs = new Set();
     const threads = [];
@@ -196,7 +241,6 @@ async function pollInstagramDMs() {
         const threadId  = href.replace(/\//g, '').replace('directt', '');
         const senderId  = 'ig_pw_' + threadId;
 
-        // Get last visible message text — try multiple selector patterns
         const msgEls = await igPage.$$(
           'div[class*="_aa6j"], div[dir="auto"]:not(header *), [class*="messageText"]'
         );
@@ -213,7 +257,6 @@ async function pollInstagramDMs() {
 
         console.log('[IG-PW] DM (' + threadId + '): "' + msgText.substring(0, 80) + '"');
 
-        // Process with AI — non-blocking (handleMessage -> sendInstagramMessagePW)
         _handleMessage(senderId, msgText, 'instagram_playwright')
           .catch(e => console.error('[IG-PW] handleMessage error:', e.message));
 
@@ -223,7 +266,6 @@ async function pollInstagramDMs() {
       }
     }
 
-    // Persist fresh cookies after each poll cycle
     saveIgCookies(await igContext.cookies());
   } catch (e) {
     console.error('[IG-PW] Poll error:', e.message);
@@ -242,7 +284,6 @@ async function sendInstagramMessagePW(senderId, text) {
       await _sleep(2000);
     }
 
-    // Find message input (Instagram uses contenteditable div)
     const inputEl = await igPage.waitForSelector(
       '[contenteditable="true"][role="textbox"], div[contenteditable="true"][data-testid], textarea[placeholder*="essage"]',
       { timeout: 8000 }
@@ -270,6 +311,6 @@ module.exports = {
     _handleMessage = handleMessage;
     _sleep         = sleep;
     await initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD);
-    return sendInstagramMessagePW;   // returned so index.js can call it from sendMessage
+    return sendInstagramMessagePW;
   }
 };
