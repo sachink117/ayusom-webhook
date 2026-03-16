@@ -201,7 +201,7 @@ async function loginInstagramPW(username = _igUsername, password = _igPassword) 
         await _sleep(5000);
         const postUrl = igPage.url();
         console.log('[IG-PW] Post-2FA URL (offset ' + offset + '):', postUrl);
-        if (!postUrl.includes('two_factor') && !postUrl.includes('challenge')) {
+        if (!postUrl.includes('two_factor') && !postUrl.includes('codeentry') && !postUrl.includes('challenge')) {
           console.log('[IG-PW] 2FA SUCCESS with offset', offset, '(clock drift:', offset * 30, 's)');
           twoFaDone = true;
           break;
