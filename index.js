@@ -12,7 +12,7 @@
 // ✅ Commitment first, manual payment details shared by you after yes
 // ✅ Diet always last in program descriptionh
 // ✅ No dashes — full stops and line breaks only
-// ✅ All 6 sinus types with wellness naming for reveals
+// ✅ All 6 sinus types with wellness naming for revealsh
 // ✅ Language mirroring across all Indian languages
 // ✅ Ghosting recovery + Day milestones (5, 7, 10, 13)
 // ✅ Red flag detection → ENT referral
@@ -41,6 +41,8 @@ const RAZORPAY_LINK_1299 = process.env.RAZORPAY_LINK_1299 || "https://rzp.io/rzp
 const WHATSAPP_TOKEN           = process.env.WHATSAPP_TOKEN;
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const widgetPending            = {};
+const INSTAGRAM_USERNAME       = process.env.INSTAGRAM_USERNAME;
+const INSTAGRAM_PASSWORD       = process.env.INSTAGRAM_PASSWORD;
 
 const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
@@ -95,6 +97,11 @@ if (db) {
     })
     .catch(e => console.error('Firestore startup load error:', e.message));
 }
+
+// ─── PLAYWRIGHT INSTAGRAM DM HANDLER (module) ──────────────────────────────────
+// Loaded lazily when INSTAGRAM_USERNAME env var is set.
+// See instagram-pw.js for the full Playwright browser automation code.
+let sendInstagramMessagePW = null;
 
 // ─── PRICING ─────────────────────────────────────────────────
 const PRICES = {
@@ -348,6 +355,7 @@ async function sendMessage(platform, userId, text) {
   for (const chunk of chunks) {
     if      (platform === "twilio")    await sendTwilioMessage(userId, chunk);
     else if (platform === "instagram") await sendInstagramMessage(userId, chunk);
+    else if (platform === "instagram_playwright" && sendInstagramMessagePW) await sendInstagramMessagePW(userId, chunk);
     else if (platform === "whatsapp")  await sendWhatsAppMessage(userId, chunk);
     else if (platform === "website")   { if (widgetPending[userId]) widgetPending[userId].push(chunk); }
     else                               await sendFBMessage(userId, chunk);
@@ -1892,4 +1900,13 @@ app.listen(PORT, () => {
   console.log(`  Ghosting recovery: 24hr and 72hr`);
   console.log(`  Day milestones: Day 5, 7, 10, 13`);
   console.log(`  Plans: 7-Day Sinus Reset Rs. 499 | 14-Day Sinus Restoration Rs. 1299`);
+
+  // Start Playwright Instagram DM poller (runs only if credentials are set)
+  if (INSTAGRAM_USERNAME) setTimeout(async () => {
+    try {
+      const igMod = require('./instagram-pw');
+      sendInstagramMessagePW = await igMod.init({ db, handleMessage, sleep, INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD });
+      console.log('[IG-PW] Module loaded and ready');
+    } catch(e) { console.error('[IG-PW] Module load error:', e.message); }
+  }, 8000);
 });
