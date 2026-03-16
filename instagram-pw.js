@@ -76,8 +76,8 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
 // ── Login ────────────────────────────────────────────────────────────────────
 async function loginInstagramPW(username, password) {
   try {
-    await igPage.goto('https://www.instagram.com/accounts/login/', { timeout: 30000 });
-    await igPage.waitForSelector('input[name="username"]', { timeout: 15000 });
+    await igPage.goto('https://www.instagram.com/accounts/login/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await igPage.waitForSelector('input[name="username"]', { timeout: 60000 });
     await igPage.fill('input[name="username"]', username);
     await igPage.fill('input[name="password"]', password);
     await igPage.click('button[type="submit"]');
