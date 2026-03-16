@@ -160,25 +160,42 @@ async function loginInstagramPW(username = _igUsername, password = _igPassword) 
       if (!totpSecret) {
         throw new Error('2FA required but TOTP_SECRET env var is not set');
       }
+      // Log 2FA page to diagnose which method Instagram is showing
+      const pageText2fa = await igPage.evaluate(() => document.body.innerText).catch(() => '');
+      console.log('[IG-PW] 2FA page text:', pageText2fa.slice(0, 400).replace(/\n/g, ' | '));
+
+      // Instagram defaults to SMS 2FA — try to switch to authenticator app first
+      try {
+        const allEls = await igPage.$$('a, button, span[role="button"]');
+        for (const el of allEls) {
+          const txt = (await el.textContent().catch(() => '')).trim();
+          if (/authentication app|authenticator app|use an app|use app|totp/i.test(txt)) {
+            console.log('[IG-PW] Switching to authenticator app, clicked:', txt);
+            await el.click();
+            await _sleep(2000);
+            break;
+          }
+        }
+      } catch(e) { console.log('[IG-PW] Auth-app switch error (non-fatal):', e.message); }
+
       const totpCode = generateTOTP(totpSecret);
       console.log('[IG-PW] Generated TOTP code:', totpCode);
-
-      // Try common 2FA input selectors
       const codeInput = await igPage.$(
         'input[name="verificationCode"], input[aria-label*="code" i], input[inputmode="numeric"], input[type="number"], input[autocomplete="one-time-code"]'
       ).catch(() => null);
-
       if (codeInput) {
+        await codeInput.click();
+        await _sleep(300);
+        await codeInput.fill('');
+        await _sleep(200);
         await codeInput.fill(totpCode);
         await _sleep(500);
         const twoFaSubmit = await igPage.$('button[type="submit"]').catch(() => null);
         if (twoFaSubmit) { await twoFaSubmit.click(); }
         else { await igPage.keyboard.press('Enter'); }
-        await _sleep(5000);
+        await _sleep(6000);
         console.log('[IG-PW] Post-2FA URL:', igPage.url());
       } else {
-        const pgSnippet = await igPage.evaluate(() => document.body.innerText.substring(0, 200));
-        console.log('[IG-PW] 2FA input not found — page:', pgSnippet);
         throw new Error('2FA input not found on two_factor page');
       }
     }
