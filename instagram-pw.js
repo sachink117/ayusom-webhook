@@ -154,7 +154,7 @@ async function loginInstagramPW(username = _igUsername, password = _igPassword) 
     console.log('[IG-PW] Post-submit URL:', igPage.url());
 
     // ── Handle Two-Factor Authentication ──────────────────────────────────────
-    if (igPage.url().includes('two_factor') || igPage.url().includes('challenge')) {
+    if (igPage.url().includes('two_factor') || igPage.url().includes('codeentry') || igPage.url().includes('challenge')) {
       console.log('[IG-PW] 2FA page detected:', igPage.url());
       const totpSecret = process.env.TOTP_SECRET;
       if (!totpSecret) {
