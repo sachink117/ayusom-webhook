@@ -18,7 +18,7 @@ let _db, _handleMessage, _sleep;
 let _igUsername, _igPassword;
 
 // ── TOTP generator (no external deps — uses Node built-in crypto) ─────────────
-function generateTOTP(secret) {
+function generateTOTP(secret, timeOffset = 0) {
   const base32Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   let bits = '';
   for (const char of secret.toUpperCase().replace(/[\s=]/g, '')) {
@@ -31,7 +31,7 @@ function generateTOTP(secret) {
     bytes.push(parseInt(bits.slice(i, i + 8), 2));
   }
   const key = Buffer.from(bytes);
-  const time = Math.floor(Date.now() / 1000 / 30);
+  const time = Math.floor(Date.now() / 1000 / 30) + timeOffset;
   const timeBuf = Buffer.alloc(8);
   timeBuf.writeBigUInt64BE(BigInt(time));
   const crypto = require('crypto');
@@ -178,26 +178,36 @@ async function loginInstagramPW(username = _igUsername, password = _igPassword) 
         }
       } catch(e) { console.log('[IG-PW] Auth-app switch error (non-fatal):', e.message); }
 
-      const totpCode = generateTOTP(totpSecret);
-      console.log('[IG-PW] Generated TOTP code:', totpCode);
+            const serverTs = Math.floor(Date.now() / 1000);
+      console.log('[IG-PW] Server Unix timestamp:', serverTs, '| window:', Math.floor(serverTs / 30));
       const codeInput = await igPage.$(
         'input[name="verificationCode"], input[aria-label*="code" i], input[inputmode="numeric"], input[type="number"], input[autocomplete="one-time-code"]'
       ).catch(() => null);
-      if (codeInput) {
+      if (!codeInput) throw new Error('2FA input not found on two_factor page');
+
+      let twoFaDone = false;
+      for (const offset of [-2, -1, 0, 1, 2]) {
+        const totpCode = generateTOTP(totpSecret, offset);
+        console.log('[IG-PW] Trying TOTP offset', offset, 'code:', totpCode);
         await codeInput.click();
-        await _sleep(300);
-        await codeInput.fill('');
         await _sleep(200);
+        await codeInput.fill('');
+        await _sleep(100);
         await codeInput.fill(totpCode);
-        await _sleep(500);
+        await _sleep(400);
         const twoFaSubmit = await igPage.$('button[type="submit"]').catch(() => null);
         if (twoFaSubmit) { await twoFaSubmit.click(); }
         else { await igPage.keyboard.press('Enter'); }
-        await _sleep(6000);
-        console.log('[IG-PW] Post-2FA URL:', igPage.url());
-      } else {
-        throw new Error('2FA input not found on two_factor page');
+        await _sleep(5000);
+        const postUrl = igPage.url();
+        console.log('[IG-PW] Post-2FA URL (offset ' + offset + '):', postUrl);
+        if (!postUrl.includes('two_factor') && !postUrl.includes('challenge')) {
+          console.log('[IG-PW] 2FA SUCCESS with offset', offset, '(clock drift:', offset * 30, 's)');
+          twoFaDone = true;
+          break;
+        }
       }
+      if (!twoFaDone) console.log('[IG-PW] All TOTP windows failed — wrong secret or Instagram challenge');
     }
 
     // Dismiss "Save your login info?" and "Turn on notifications?" prompts
