@@ -1,6 +1,6 @@
 // instagram-pw.js
 // Playwright-based Instagram DM handler for Ayusomam Herbals bot.
-// Polls Instagram DMs every 3 minutes via headless Chromium browser.
+// Polls Instagram DMs every 1 minute via headless Chromium browser.h
 // No Meta API token needed — uses real browser session.
 //
 // Requires env vars: INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD, TOTP_SECRET
@@ -110,9 +110,9 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
     }
 
     igReady = true;
-    console.log('Instagram Playwright: ready, polling every 3 min');
+    console.log('Instagram Playwright: ready, polling every 1 min');
     console.log('[IG-PW] Module loaded and ready');
-    setInterval(pollInstagramDMs, 3 * 60 * 1000);
+    setInterval(pollInstagramDMs, 1 * 60 * 1000);
   } catch (e) {
     console.error('[IG-PW] Init error:', e.message);
     setTimeout(() => initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD), 5 * 60 * 1000);
