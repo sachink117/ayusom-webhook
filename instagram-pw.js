@@ -89,9 +89,25 @@ async function loginInstagramPW(username, password) {
       await _sleep(2000);
     }
 
-    await igPage.waitForSelector('input[name="username"]', { timeout: 60000 });
-    await igPage.fill('input[name="username"]', username);
-    await igPage.fill('input[name="password"]', password);
+    // Log page content to diagnose what Instagram is actually showing
+    const pgText = await igPage.evaluate(() => (document.body || document.documentElement).innerText.substring(0, 300).replace(/\n/g,' '));
+    console.log('[IG-PW] Page text:', pgText);
+
+    // Try multiple selectors — Instagram sometimes changes input attributes
+    const tryFill = async (selectors, value) => {
+      for (const sel of selectors) {
+        const found = await igPage.$(sel).catch(() => null);
+        if (found) { console.log('[IG-PW] Using selector:', sel); await found.fill(value); return true; }
+      }
+      return false;
+    };
+    const unameSelectors = ['input[name="username"]','input[aria-label*="username" i]','input[autocomplete="username"]','input[type="text"]'];
+    const pwSelectors    = ['input[name="password"]','input[aria-label*="password" i]','input[autocomplete="current-password"]','input[type="password"]'];
+
+    const gotUname = await tryFill(unameSelectors, username);
+    if (!gotUname) throw new Error('Username input not found — see page text above');
+    const gotPw = await tryFill(pwSelectors, password);
+    if (!gotPw) throw new Error('Password input not found');
     await igPage.click('button[type="submit"]');
     await _sleep(6000);
 
