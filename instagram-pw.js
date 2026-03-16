@@ -77,6 +77,18 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
 async function loginInstagramPW(username, password) {
   try {
     await igPage.goto('https://www.instagram.com/accounts/login/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await _sleep(3000);
+    console.log('[IG-PW] Login page URL:', igPage.url());
+    console.log('[IG-PW] Login page title:', await igPage.title());
+
+    // Dismiss cookie consent if present (EU/region popup)
+    const cookieBtn = igPage.locator('button:has-text("Allow all cookies"), button:has-text("Accept all"), button:has-text("Allow essential and optional cookies")').first();
+    if (await cookieBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await cookieBtn.click();
+      console.log('[IG-PW] Dismissed cookie consent');
+      await _sleep(2000);
+    }
+
     await igPage.waitForSelector('input[name="username"]', { timeout: 60000 });
     await igPage.fill('input[name="username"]', username);
     await igPage.fill('input[name="password"]', password);
