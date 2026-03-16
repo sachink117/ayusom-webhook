@@ -10,7 +10,7 @@
 // Ã¢ÂÂ Medicine cycle assumed for 3+ year cases
 // Ã¢ÂÂ Hope-led pitch: "14 din mein sinus theek ho sakta hai"
 // Ã¢ÂÂ Commitment first, manual payment details shared by you after yes
-// Ã¢ÂÂ Diet always last in program description
+// Ã¢ÂÂ Diet always last in program descriptionh
 // Ã¢ÂÂ No dashes Ã¢ÂÂ full stops and line breaks only
 // Ã¢ÂÂ All 6 sinus types with wellness naming for reveals
 // Ã¢ÂÂ Language mirroring across all Indian languages
@@ -266,7 +266,7 @@ async function sendFBMessage(recipientId, text) {
 async function sendInstagramMessage(recipientId, text) {
   // Must use Instagram Business Account ID as sender, not "me" (which resolves to the FB Page)
   const igAccountId = process.env.INSTAGRAM_ACCOUNT_ID || '17841445309536661';
-  const url = `https://graph.facebook.com/v18.0/${igAccountId}/messages`;
+  const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${INSTAGRAM_TOKEN}`;
   const res = await fetch(url, {
     method:  "POST",
     headers: {
