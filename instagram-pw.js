@@ -16,6 +16,7 @@ const igSeenMessages = new Set();   // dedup: "threadId::msgSnippet"
 const igThreadUrls   = new Map();   // senderId -> thread URL (for replies)
 
 let _db, _handleMessage, _sleep;
+let _igUsername, _igPassword;   // stored for re-login from pollInstagramDMs
 
 // ── Cookie persistence (Firestore) ──────────────────────────────────────────
 async function loadIgCookies() {
@@ -35,7 +36,9 @@ function saveIgCookies(cookies) {
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
-  try {
+
+  _igUsername = INSTAGRAM_USERNAME;
+  _igPassword  = INSTAGRAM_PASSWORD;  try {
     const { chromium } = require('playwright');
     igBrowser = await chromium.launch({
       headless: true,
@@ -84,7 +87,7 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
 }
 
 // ── Login ────────────────────────────────────────────────────────────────────
-async function loginInstagramPW(username, password) {
+async function loginInstagramPW(username = _igUsername, password = _igPassword) {
   try {
     await igPage.goto('https://www.instagram.com/accounts/login/', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await _sleep(3000);
