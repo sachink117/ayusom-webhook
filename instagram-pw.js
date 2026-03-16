@@ -118,7 +118,10 @@ async function loginInstagramPW(username, password) {
     if (!gotUname) throw new Error('Username input not found — see page text above');
     const gotPw = await tryFill(pwSelectors, password);
     if (!gotPw) throw new Error('Password input not found');
-    await igPage.click('button[type="submit"]');
+    // Click submit or press Enter (button selector can vary)
+    const submitBtn = await igPage.$('button[type="submit"], button:has-text("Log in"), button:has-text("Log In")').catch(() => null);
+    if (submitBtn) { await submitBtn.click(); }
+    else { await igPage.keyboard.press('Enter'); }
     await _sleep(6000);
 
     const notNow1 = igPage.locator('button:has-text("Not Now"), button:has-text("Not now")').first();
