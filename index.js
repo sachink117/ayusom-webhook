@@ -44,6 +44,20 @@ const widgetPending            = {};
 
 const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
+// ─── FIREBASE INIT ────────────────────────────────────────────
+let db = null;
+try {
+  const admin = require('firebase-admin');
+  if (!admin.apps.length) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+  }
+  db = admin.firestore();
+  console.log('✅ Firebase connected');
+} catch(e) {
+  console.warn('⚠️  Firebase not available — running in-memory only:', e.message);
+}
+
 // ─── IN-MEMORY STORE ─────────────────────────────────────────
 // userData[userId] = {
 //   lang, sinusType, convPhase, state, history,
@@ -56,6 +70,31 @@ const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 // }
 const userData = {};
 const processedMessages = new Set();
+
+// ─── FIRESTORE HELPERS ────────────────────────────────────────────
+async function loadUserFromFirestore(userId) {
+  if (!db || userData[userId]) return;
+  try {
+    const doc = await db.collection('users').doc(String(userId)).get();
+    if (doc.exists) userData[userId] = doc.data();
+  } catch(e) { console.error('Firestore load error:', e.message); }
+}
+
+function persistUserToFirestore(userId) {
+  if (!db || !userData[userId]) return;
+  db.collection('users').doc(String(userId)).set(userData[userId])
+    .catch(e => console.error('Firestore save error:', e.message));
+}
+
+// Load all existing users from Firestore on startup
+if (db) {
+  db.collection('users').get()
+    .then(snap => {
+      snap.forEach(doc => { userData[doc.id] = doc.data(); });
+      console.log(`✅ Loaded ${snap.size} users from Firestore`);
+    })
+    .catch(e => console.error('Firestore startup load error:', e.message));
+}
 
 // ─── PRICING ─────────────────────────────────────────────────
 const PRICES = {
@@ -803,6 +842,9 @@ async function handleMessage(senderId, messageText, platform) {
   if (!messageText || !messageText.trim()) return;
   const text = messageText.trim();
 
+  // Load user from Firestore if not in memory cache
+  await loadUserFromFirestore(senderId);
+
   // Init user
   if (!userData[senderId]) {
     userData[senderId] = {
@@ -1050,6 +1092,7 @@ async function handleMessage(senderId, messageText, platform) {
   }
 
   await logToSheet(senderId, platform, user.sinusType, user.state, text, reply);
+  persistUserToFirestore(senderId);   // fire-and-forget
 }
 
 // ─── FACEBOOK WEBHOOK ─────────────────────────────────────────
