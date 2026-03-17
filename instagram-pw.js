@@ -943,57 +943,78 @@ async function catchUpOldThreads() {
 }
 
 // ── Poll pending DM requests (new users who haven't been accepted yet) ─────────
+// Also checks the "General" folder (folder=1) where Instagram Business accounts
+// route new user messages instead of the traditional pending inbox.
 async function pollNewUserRequests() {
   if (!igReady || !igPage) return;
   try {
-    const pendingApi = await igPage.evaluate(async () => {
+    // Check BOTH pending inbox AND "General" folder (business accounts use folder=1)
+    const results = await igPage.evaluate(async () => {
       try {
         const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
-        const r = await fetch('/api/v1/direct_v2/pending_inbox/?limit=20', {
-          credentials: 'include',
-          headers: { 'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459' }
-        });
-        if (!r.ok) return { err: r.status };
-        return await r.json();
+        const hdrs = { 'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459' };
+        const [pendingRes, generalRes] = await Promise.all([
+          fetch('/api/v1/direct_v2/pending_inbox/?limit=20', { credentials: 'include', headers: hdrs }).then(r => r.ok ? r.json() : { err: r.status }).catch(e => ({ err: e.message })),
+          fetch('/api/v1/direct_v2/inbox/?folder=1&limit=20', { credentials: 'include', headers: hdrs }).then(r => r.ok ? r.json() : { err: r.status }).catch(e => ({ err: e.message })),
+        ]);
+        return { pending: pendingRes, general: generalRes };
       } catch(e) { return { err: e.message }; }
     }).catch(() => null);
 
-    if (!pendingApi?.inbox?.threads?.length) return;
+    if (!results) return;
 
-    console.log('[IG-PW] Pending requests:', pendingApi.inbox.threads.length);
+    // Collect threads from both sources
+    const pendingThreads = results.pending?.inbox?.threads || [];
+    const generalThreads = results.general?.inbox?.threads || [];
 
-    for (const thread of pendingApi.inbox.threads) {
+    // For general folder: only process threads where the last message is FROM the user (not the bot)
+    // and the thread hasn't been seen by Playwright yet
+    const newGeneralThreads = generalThreads.filter(t => {
+      const tid = t.thread_id;
+      const senderId = 'ig_pw_' + tid;
+      // Skip if already in main inbox processing (igSeenMessages would have it)
+      if (igLastUserReply.has(senderId)) return false;
+      // Only process if last message is from user (not bot)
+      const lastItem = t.items?.[0];
+      if (!lastItem) return false;
+      return String(lastItem.user_id) !== String(t.viewer_id);
+    });
+
+    const allNew = [...pendingThreads, ...newGeneralThreads];
+
+    if (allNew.length > 0) {
+      console.log('[IG-PW] New user requests: pending=' + pendingThreads.length + ' general=' + newGeneralThreads.length);
+    }
+
+    for (const thread of allNew) {
       const threadId = thread.thread_id;
+      const isPending = pendingThreads.includes(thread);
 
-      // Accept the message request first
-      await igPage.evaluate(async (tid) => {
-        try {
-          const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
-          await fetch('/api/v1/direct_v2/threads/' + tid + '/approve/', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'X-CSRFToken': tok,
-              'X-IG-App-ID': '936619743392459',
-              'Content-Type': 'application/x-www-form-urlencoded'
-            }
-          });
-        } catch(e) {}
-      }, threadId).catch(() => {});
-
-      console.log('[IG-PW] Accepted pending request:', threadId);
-
-      // Now process the thread using a free pool page
-      const href = '/direct/t/' + threadId + '/';
-      const poolEntry = igPagePool.find(p => !p.busy);
-      if (poolEntry) {
-        poolEntry.busy = true;
-        await processThread(poolEntry, href).catch(e => console.error('[IG-PW] New user thread error:', e.message));
-        poolEntry.busy = false;
+      // Accept the message request if it's in pending inbox
+      if (isPending) {
+        await igPage.evaluate(async (tid) => {
+          try {
+            const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+            await fetch('/api/v1/direct_v2/threads/' + tid + '/approve/', {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'X-CSRFToken': tok,
+                'X-IG-App-ID': '936619743392459',
+                'Content-Type': 'application/x-www-form-urlencoded'
+              }
+            });
+          } catch(e) {}
+        }, threadId).catch(() => {});
+        console.log('[IG-PW] Accepted pending request:', threadId);
       } else {
-        // All pool pages busy — use igPage as fallback
-        await processThread({ page: igPage }, href).catch(e => console.error('[IG-PW] New user thread error:', e.message));
+        console.log('[IG-PW] New thread from General folder:', threadId);
       }
+
+      // Process the thread
+      const href = '/direct/t/' + threadId + '/';
+      await processThread({ page: igPage }, href)
+        .catch(e => console.error('[IG-PW] New user thread error:', e.message));
 
       await _sleep(2000);
     }

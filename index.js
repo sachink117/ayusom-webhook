@@ -310,24 +310,36 @@ async function sendFBMessage(recipientId, text) {
 }
 
 async function sendInstagramMessage(recipientId, text) {
-  // Playwright bot handles Instagram DMs — skip Graph API (error #3 = no permission)
-  console.log('[IG] Skipping Graph API send — Playwright bot is active');
-  return;
-    // Must use Instagram Business Account ID as sender, not "me" (which resolves to the FB Page)
-  const igAccountId = process.env.INSTAGRAM_ACCOUNT_ID || '17841445309536661';
-  const url = `https://graph.facebook.com/v18.0/17841445309536661/messages?access_token=${INSTAGRAM_TOKEN}`;
-  const res = await fetch(url, {
-    method:  "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "Authorization": `Bearer ${INSTAGRAM_TOKEN}`
-    },
-    body:    JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
-  });
-  const json = await res.json();
-  if (json.error) console.error("[IG] Send error:", JSON.stringify(json.error));
-  else console.log("[IG] Message sent to", recipientId);
-  return json;
+  // Playwright bot handles most Instagram DMs via polling.
+  // But for NEW users (message requests), Playwright may not pick them up immediately.
+  // Try Graph API as fallback so new users don't get ignored.
+  if (!INSTAGRAM_TOKEN) {
+    console.log('[IG] No INSTAGRAM_TOKEN — skipping Graph API send (Playwright will handle)');
+    return;
+  }
+  try {
+    const igAccountId = process.env.INSTAGRAM_ACCOUNT_ID || '17841445309536661';
+    const url = `https://graph.facebook.com/v18.0/${igAccountId}/messages`;
+    const res = await fetch(url, {
+      method:  "POST",
+      headers: {
+        "Content-Type":  "application/json",
+        "Authorization": `Bearer ${INSTAGRAM_TOKEN}`
+      },
+      body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
+    });
+    const json = await res.json();
+    if (json.error) {
+      // Permission errors are expected if token doesn't have messaging scope
+      // Playwright will pick up the message on next poll cycle
+      console.log('[IG] Graph API send failed (Playwright will handle):', json.error.message || json.error.code);
+    } else {
+      console.log("[IG] Graph API message sent to", recipientId);
+    }
+    return json;
+  } catch(e) {
+    console.log('[IG] Graph API send error (Playwright will handle):', e.message);
+  }
 }
 
 async function sendWhatsAppMessage(to, body) {
