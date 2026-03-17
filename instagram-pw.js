@@ -564,8 +564,11 @@ async function processThread(poolEntry, href) {
   const threadUrl = 'https://www.instagram.com' + href;
 
   try {
-    await page.goto(threadUrl, { timeout: 20000 });
-    await _sleep(2200);
+    // Instagram's SPA redirects long thread IDs to short ones, causing ERR_ABORTED.
+    // This is normal — the page still lands on the thread, so we catch and continue.
+    await page.goto(threadUrl, { waitUntil: 'domcontentloaded', timeout: 20000 })
+      .catch(e => { if (!e.message.includes('ERR_ABORTED')) throw e; });
+    await _sleep(2500);
 
     // Check if session expired on this pool page
     if (page.url().includes('login')) {
@@ -811,7 +814,8 @@ async function sendInstagramMessagePW(senderId, text) {
         const threadIdPart = threadUrl.split('/').filter(Boolean).pop() || '';
         const currentUrl = page.url();
         if (!threadIdPart || !currentUrl.includes(threadIdPart)) {
-          await page.goto(threadUrl, { timeout: 15000 });
+          await page.goto(threadUrl, { waitUntil: 'domcontentloaded', timeout: 15000 })
+            .catch(e => { if (!e.message.includes('ERR_ABORTED')) throw e; });
           await _sleep(3000);
         }
       }
