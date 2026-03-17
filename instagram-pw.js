@@ -855,10 +855,29 @@ async function processThread(poolEntry, href) {
     igLastUserReply.set(senderId, Date.now());
     console.log('[IG-PW] DM (' + threadId + '): "' + msgText.substring(0, 80) + '"');
 
-    // ── Route ALL messages through SALESOM AI (same as WhatsApp) ──
-    // This gives Instagram users the exact same experience: welcome menu,
-    // duration/symptom capture, SALESOM AI objection handling, phase
-    // advancement, ghosting recovery, payment links, and milestone messages.
+    // ── Relevance filter: only respond to sinus/health-related DMs ──
+    // Existing users (already in conversation) always get a reply.
+    // New users only get a reply if their message is health/sinus related or a common trigger.
+    const _isExistingUser = _db ? await (async () => {
+      try {
+        const doc = await _db.collection('users').doc(senderId).get();
+        return doc.exists;
+      } catch(e) { return false; }
+    })() : false;
+
+    if (!_isExistingUser) {
+      const lower = msgText.toLowerCase();
+      const SINUS_KEYWORDS = /sinus|naak|nose|allergy|sneezing|cold|jukham|sardi|blocked|band|smell|breathing|mucus|congestion|headache|sir dard|sar dard|nasal|steam|spray|otrivin|sinusitis|post.?nasal|drip|ent|polyp|dns|deviated|septum|ayurved|herb|treatment|ilaj|ilaaj|dawai|dawa|medicine|doctor|clinic|hospital|problem|takleef|pareshani|dikkat|health|sehat|sukhapuri|theek|cure|remedy|upay|nuskha/;
+      const GREETING_TRIGGERS = /^(hi|hello|hey|namaste|namaskar|hlo|hii|hlw|good morning|good evening|sinus|help|interested|program|plan|price|kitna|batao|start|shuru|join|details|info)\b/i;
+      const REEL_TRIGGERS = /top comment|comment|reel|send|link|interested|want|chahiye|bhejo|dm|free|trick|tip/i;
+
+      if (!SINUS_KEYWORDS.test(lower) && !GREETING_TRIGGERS.test(lower) && !REEL_TRIGGERS.test(lower)) {
+        console.log('[IG-PW] Skipping non-sinus DM from new user:', msgText.substring(0, 60));
+        return;
+      }
+    }
+
+    // ── Route through SALESOM AI (same as WhatsApp) ──
     igActivePages.set(senderId, page);
     await _handleMessage(senderId, msgText, 'instagram_playwright')
       .catch(e => console.error('[IG-PW] handleMessage error:', e.message));
