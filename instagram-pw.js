@@ -19,12 +19,14 @@ const igActivePages = new Map(); // senderId -> pool page currently open on that
 // Qualification state per sender
 // Stages: 'awaiting_qual', 'awaiting_symptoms', 'awaiting_duration', 'qualified'
 const igQualStates = new Map();
+const igLastUserReply = new Map(); // senderId → timestamp of last user message (priority queue)
 
 // Page pool for parallel thread processing
 const igPagePool = [];
-const POOL_SIZE = 3;
+const POOL_SIZE = 1; // reduced: API-first means pool only needed for DOM fallback
 
 let _db, _handleMessage, _sleep;
+let _currentProcessingThreadId = null; // set by processThread so sendMessageOnPage knows thread without URL
 let _igUsername, _igPassword;
 
 // ââ TOTP generator (no external deps â uses Node built-in crypto) âââââââââââââ
@@ -277,7 +279,7 @@ async function sendMessageOnPage(page, text) {
   try {
     // ── Attempt 1: Instagram internal fetch API (PRIMARY — no typing, no interleaving) ──
     // Uses the same authenticated browser session, just calls the IG API directly.
-    const tid = page.url().match(/\/direct\/t\/(\d+)/)?.[1];
+    const tid = _currentProcessingThreadId || page.url().match(/\/direct\/t\/(\d+)/)?.[1];
     if (tid) {
       const res = await page.evaluate(async ([threadId, msg]) => {
         try {
@@ -767,25 +769,17 @@ async function loginInstagramPW(username = _igUsername, password = _igPassword) 
 
 // ââ Process a single DM thread on a specific pool page âââââââââââââââââââââââ
 async function processThread(poolEntry, href) {
-  const { page } = poolEntry;
+  // poolEntry is kept for API compatibility but igPage is used directly (no navigation)
   const threadId = href.replace(/\//g, '').replace('directt', '');
   const senderId = 'ig_pw_' + threadId;
-  const threadUrl = 'https://www.instagram.com' + href;
+  const threadUrl = 'https://www.instagram.com' + href; // kept for reference/logging only
 
   try {
-    // Instagram SPA redirects long thread IDs to short ones → ERR_ABORTED or
-    // "interrupted by another navigation" are both normal (SPA redirect behaviour)
-    await page.goto(threadUrl, { waitUntil: 'domcontentloaded', timeout: 20000 })
-      .catch(e => {
-        if (!e.message.includes('ERR_ABORTED') && !e.message.includes('interrupted by another navigation')) throw e;
-      });
-    await _sleep(2500);
-
-    // Check if session expired on this pool page
-    if (page.url().includes('login')) {
-      console.log('[IG-PW] Pool page session expired â skipping thread', threadId);
-      return;
-    }
+    // No page navigation — all data fetched via Instagram API from igPage.
+    // This is the key RAM saving: no page.goto() per thread means no full page load.
+    // Pool pages only used as fallback for DOM sends (rare).
+    const page = igPage;
+    _currentProcessingThreadId = threadId; // used by sendMessageOnPage for API sends
 
     // Use Instagram thread API to get last message (DOM scan unreliable in headless mode)
     const threadData = await page.evaluate(async (tid) => {
@@ -836,6 +830,8 @@ async function processThread(poolEntry, href) {
     }
     igSeenMessages.add(msgId);
     igThreadUrls.set(senderId, threadUrl);
+    // Track when this user last sent a message — used for priority queue (active chats first)
+    igLastUserReply.set(senderId, Date.now());
     // Save lastMsgId + any newly parsed details to Firestore
     if (_stateForDedup) {
       const ctxDur = parseDuration(recentContext);
@@ -881,6 +877,8 @@ async function processThread(poolEntry, href) {
     await _sleep(1500);
   } catch (e) {
     console.error('[IG-PW] Thread error [' + threadId + ']:', e.message);
+  } finally {
+    if (_currentProcessingThreadId === threadId) _currentProcessingThreadId = null;
   }
 }
 
@@ -963,14 +961,11 @@ async function catchUpOldThreads() {
 
     console.log('[IG-PW] Catch-up: ' + allHrefs.length + ' threads to check');
 
-    // Process in batches using pool — processThread skips seen messages automatically
-    for (let i = 0; i < allHrefs.length; i += POOL_SIZE) {
-      const batch = allHrefs.slice(i, i + POOL_SIZE);
-      const entries = igPagePool.slice(0, batch.length);
-      entries.forEach(e => { e.busy = true; });
-      await Promise.allSettled(batch.map((href, idx) => processThread(entries[idx], href)));
-      entries.forEach(e => { e.busy = false; });
-      await _sleep(2000);
+    // Process serially — API-based processThread needs no parallel pool pages
+    for (const href of allHrefs) {
+      await processThread(igPagePool[0] || { page: igPage }, href)
+        .catch(e => console.error('[IG-PW] Catch-up thread error:', e.message));
+      await _sleep(500);
     }
 
     console.log('[IG-PW] Catch-up complete');
@@ -1077,26 +1072,33 @@ async function pollInstagramDMs() {
     }).catch(() => null);
 
     if (_inboxApi?.inbox?.threads?.length) {
-      threadHrefs = _inboxApi.inbox.threads.map(t => '/direct/t/' + t.thread_id + '/');
-      console.log('[IG-PW] API: got ' + threadHrefs.length + ' threads');
+      // Priority sort: active conversations (user replied < 5 min ago) first,
+      // then by Instagram's own last_activity_at, then cold threads last.
+      const now = Date.now();
+      const sorted = [..._inboxApi.inbox.threads].sort((a, b) => {
+        const aSender = 'ig_pw_' + a.thread_id;
+        const bSender = 'ig_pw_' + b.thread_id;
+        const aRecent = (igLastUserReply.get(aSender) || 0) > now - 5 * 60 * 1000 ? 1 : 0;
+        const bRecent = (igLastUserReply.get(bSender) || 0) > now - 5 * 60 * 1000 ? 1 : 0;
+        if (bRecent !== aRecent) return bRecent - aRecent; // active first
+        return (b.last_activity_at || 0) - (a.last_activity_at || 0); // then by IG timestamp
+      });
+      threadHrefs = sorted.map(t => '/direct/t/' + t.thread_id + '/');
+      console.log('[IG-PW] API: got ' + threadHrefs.length + ' threads (priority sorted)');
     } else {
       console.log('[IG-PW] API no threads. Response keys:', Object.keys(_inboxApi || {}).join(','));
     }
 
     console.log('[IG-PW] Found ' + threadHrefs.length + ' DM threads');
 
-    // Process up to 15 threads in parallel batches of POOL_SIZE
-    const toProcess = threadHrefs.slice(0, 15);
-    for (let i = 0; i < toProcess.length; i += POOL_SIZE) {
-      const batch = toProcess.slice(i, i + POOL_SIZE);
-      // Mark pool entries as busy
-      const poolEntries = igPagePool.slice(0, batch.length);
-      poolEntries.forEach(p => { p.busy = true; });
-      await Promise.allSettled(
-        batch.map((href, idx) => processThread(poolEntries[idx], href))
-      );
-      poolEntries.forEach(p => { p.busy = false; });
-      await _sleep(1000); // Brief pause between batches
+    // Process up to 20 threads SERIALLY — no parallel tabs needed since all calls are API-based.
+    // Serial is actually faster now (no page loads) and uses a fraction of the RAM.
+    // Active threads (first in list) get processed immediately.
+    const toProcess = threadHrefs.slice(0, 20);
+    for (const href of toProcess) {
+      await processThread(igPagePool[0] || { page: igPage }, href)
+        .catch(e => console.error('[IG-PW] processThread error:', e.message));
+      await _sleep(200); // tiny yield between threads
     }
 
     saveIgCookies(await igContext.cookies());
@@ -1131,24 +1133,31 @@ async function sendInstagramMessagePW(senderId, text) {
       return;
     }
 
-    // Otherwise find a free pool page, fall back to igPage
+    // API-first send: extract threadId and send directly without navigation
+    const threadId = threadUrl ? threadUrl.split('/').filter(Boolean).pop() : null;
+    if (threadId) {
+      const prevThreadId = _currentProcessingThreadId;
+      _currentProcessingThreadId = threadId;
+      try {
+        await sendMessageOnPage(igPage, text);
+        console.log('[IG-PW] Reply sent to', senderId, '(API, no navigation)');
+        return;
+      } finally {
+        _currentProcessingThreadId = prevThreadId;
+      }
+    }
+    // Fallback: navigate pool page if no threadId available
     const poolEntry = igPagePool.find(p => !p.busy);
     const page = poolEntry ? poolEntry.page : igPage;
     if (poolEntry) poolEntry.busy = true;
-
     try {
       if (threadUrl) {
-        // Fix: split('/').pop() returns '' when URL ends with '/', so filter first
-        const threadIdPart = threadUrl.split('/').filter(Boolean).pop() || '';
-        const currentUrl = page.url();
-        if (!threadIdPart || !currentUrl.includes(threadIdPart)) {
-          await page.goto(threadUrl, { waitUntil: 'domcontentloaded', timeout: 15000 })
-            .catch(e => { if (!e.message.includes('ERR_ABORTED') && !e.message.includes('interrupted by another navigation')) throw e; });
-          await _sleep(3000);
-        }
+        await page.goto(threadUrl, { waitUntil: 'domcontentloaded', timeout: 15000 })
+          .catch(e => { if (!e.message.includes('ERR_ABORTED')) throw e; });
+        await _sleep(2000);
       }
       await sendMessageOnPage(page, text);
-      console.log('[IG-PW] Reply sent to', senderId);
+      console.log('[IG-PW] Reply sent to', senderId, '(DOM fallback)');
     } finally {
       if (poolEntry) poolEntry.busy = false;
     }
