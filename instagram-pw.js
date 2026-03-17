@@ -854,14 +854,14 @@ async function processThread(poolEntry, href) {
       })
       .filter(Boolean)
       .join('\n');
-    console.log('[IG-PW] Context (' + recentItems.length + ' msgs):', recentContext.substring(0, 200));
-
     // Persist key details from context into Firestore state (duration, symptoms).
     // This survives bot restarts so we never ask users for info they already gave us.
     const msgId = lastItem.item_id || (threadId + '::' + msgText.substring(0, 60));
     const _stateForDedup = igQualStates.get(senderId);
-    if (igSeenMessages.has(msgId)) return;
+    if (igSeenMessages.has(msgId)) return; // already processed — skip silently
     igSeenMessages.add(msgId);
+    // Only log context when we're actually going to process this message (not on skip)
+    console.log('[IG-PW] Context (' + recentItems.length + ' msgs):', recentContext.substring(0, 200));
     igThreadUrls.set(senderId, threadUrl);
     // Track when this user last sent a message — used for priority queue (active chats first)
     igLastUserReply.set(senderId, Date.now());
@@ -1107,7 +1107,7 @@ async function pollInstagramDMs() {
     const _inboxApi = await igPage.evaluate(async () => {
       try {
         const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
-        const r = await fetch('/api/v1/direct_v2/inbox/?limit=20', {
+        const r = await fetch('/api/v1/direct_v2/inbox/?limit=100', {
           credentials: 'include',
           headers: { 'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459' }
         });
@@ -1136,10 +1136,8 @@ async function pollInstagramDMs() {
 
     console.log('[IG-PW] Found ' + threadHrefs.length + ' DM threads');
 
-    // Process up to 20 threads SERIALLY — no parallel tabs needed since all calls are API-based.
-    // Serial is actually faster now (no page loads) and uses a fraction of the RAM.
-    // Active threads (first in list) get processed immediately.
-    const toProcess = threadHrefs.slice(0, 20);
+    // Process up to 100 threads SERIALLY (API calls are fast, no page loads needed)
+    const toProcess = threadHrefs.slice(0, 100);
     for (const href of toProcess) {
       await processThread(igPagePool[0] || { page: igPage }, href)
         .catch(e => console.error('[IG-PW] processThread error:', e.message));
