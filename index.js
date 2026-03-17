@@ -1130,6 +1130,7 @@ app.post("/webhook", async (req, res) => {
           if (processedMessages.has(msgId)) continue;
           processedMessages.add(msgId);
           console.log("[IG] DM from", event.sender.id, ":", event.message.text);
+          if (!event.message || !event.message.text) continue; // skip reactions/stickers/attachments
           await handleMessage(event.sender.id, event.message.text || "", "instagram");
         }
       }
