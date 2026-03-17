@@ -310,7 +310,10 @@ async function sendFBMessage(recipientId, text) {
 }
 
 async function sendInstagramMessage(recipientId, text) {
-  // Must use Instagram Business Account ID as sender, not "me" (which resolves to the FB Page)
+  // Playwright bot handles Instagram DMs — skip Graph API (error #3 = no permission)
+  console.log('[IG] Skipping Graph API send — Playwright bot is active');
+  return;
+    // Must use Instagram Business Account ID as sender, not "me" (which resolves to the FB Page)
   const igAccountId = process.env.INSTAGRAM_ACCOUNT_ID || '17841445309536661';
   const url = `https://graph.facebook.com/v18.0/17841445309536661/messages?access_token=${INSTAGRAM_TOKEN}`;
   const res = await fetch(url, {
