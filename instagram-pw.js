@@ -14,7 +14,7 @@ let igReady = false;
 
 const igSeenMessages = new Set();
 const igThreadUrls = new Map();
-const igActivePages = new Map(); // senderId -> page currently open on that thread
+const igActivePages = new Map(); // senderId -> pool page currently open on that thread
 
 // Qualification state per sender
 // Stages: 'awaiting_qual', 'awaiting_symptoms', 'awaiting_duration', 'qualified'
@@ -263,19 +263,13 @@ function getSymptomInsightMsg(symptoms) {
 // Send a single message on a specific Playwright page (already on the thread)
 async function sendMessageOnPage(page, text) {
   try {
-    // Instagram's message input: contenteditable div with role=textbox
-    // Try clicking the lower half of the page first to trigger focus
     const inputEl = await page.waitForSelector(
       '[contenteditable="true"][role="textbox"]',
       { timeout: 10000 }
     ).catch(() => null);
-    if (!inputEl) {
-      console.error('[IG-PW] Message input not found on', page.url());
-      return;
-    }
+    if (!inputEl) { console.error('[IG-PW] Message input not found on', page.url()); return; }
     await inputEl.click();
     await _sleep(500);
-    // Use type() for contenteditable divs — more reliable than fill()
     await page.keyboard.type(text, { delay: 30 });
     await _sleep(500);
     await page.keyboard.press('Enter');
@@ -434,17 +428,17 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
       console.log('[IG-PW] Pool tab', i + 1, 'ready');
     }
 
-    // Auto-recover if Chromium crashes
     igBrowser.on('disconnected', () => {
       console.log('[IG-PW] Browser disconnected — reinitializing in 30s...');
       igReady = false;
       setTimeout(() => initPlaywrightIG(_igUsername, _igPassword), 30 * 1000);
     });
+
     igReady = true;
     console.log('Instagram Playwright: ready, polling every 1 min');
     console.log('[IG-PW] Module loaded. Page pool:', POOL_SIZE, 'tabs. Auto-qualification: ON');
     setInterval(pollInstagramDMs, 1 * 60 * 1000);
-    setInterval(pollNewUserRequests, 60 * 1000); // Check new user requests every 1 min
+    setInterval(pollNewUserRequests, 60 * 1000);
   } catch (e) {
     console.error('[IG-PW] Init error:', e.message);
     setTimeout(() => initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD), 5 * 60 * 1000);
@@ -564,23 +558,13 @@ async function loginInstagramPW(username = _igUsername, password = _igPassword) 
 
 // ââ Process a single DM thread on a specific pool page âââââââââââââââââââââââ
 async function processThread(poolEntry, href) {
-  let { page } = poolEntry;
+  const { page } = poolEntry;
   const threadId = href.replace(/\//g, '').replace('directt', '');
   const senderId = 'ig_pw_' + threadId;
   const threadUrl = 'https://www.instagram.com' + href;
 
-  // Health-check: reinit pool page if it was closed by a renderer crash
-  try { page.url(); } catch (_closed) {
-    console.log('[IG-PW] Pool page closed — reinitializing...');
-    try {
-      const np = await igContext.newPage();
-      await np.goto('https://www.instagram.com/', { timeout: 20000 }).catch(() => {});
-      poolEntry.page = np; page = np;
-    } catch (re) { console.error('[IG-PW] Reinit failed:', re.message); return; }
-  }
-
-  // Instagram's SPA redirects long thread IDs to short ones, causing ERR_ABORTED.
-    // This is normal — the page still lands on the thread, so we catch and continue.
+  try {
+    // Instagram SPA redirects long thread IDs to short ones → ERR_ABORTED is normal
     await page.goto(threadUrl, { waitUntil: 'domcontentloaded', timeout: 20000 })
       .catch(e => { if (!e.message.includes('ERR_ABORTED')) throw e; });
     await _sleep(2500);
@@ -611,7 +595,8 @@ async function processThread(poolEntry, href) {
     const qualHandled = await handleQualificationReply(senderId, page, msgText);
 
     if (!qualHandled) {
-      // Register this page so sendInstagramMessagePW reuses it (avoids race condition)
+      // Register the active page so sendInstagramMessagePW reuses it (avoids race condition
+      // where all pool pages are still busy when _handleMessage calls back to send a reply)
       igActivePages.set(senderId, page);
       const isNew = !igQualStates.has(senderId);
       await _handleMessage(senderId, msgText, 'instagram_playwright')
@@ -630,67 +615,6 @@ async function processThread(poolEntry, href) {
 }
 
 // ââ Poll DMs (parallel with page pool) ââââââââââââââââââââââââââââââââââââââââ
-// ── New User Requests (pending inbox) ───────────────────────────────────────
-// Polls Instagram message requests (first-time DMs from people not followed).
-// Auto-accepts and processes each request so new users get instant replies.
-async function pollNewUserRequests() {
-  if (!igReady || !igPage) return;
-  try {
-    const pendingApi = await igPage.evaluate(async () => {
-      try {
-        const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
-        const r = await fetch('/api/v1/direct_v2/pending_inbox/?limit=20', {
-          credentials: 'include',
-          headers: { 'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459' }
-        });
-        if (!r.ok) return { err: r.status };
-        return await r.json();
-      } catch(e) { return { err: e.message }; }
-    }).catch(() => null);
-
-    if (!pendingApi?.inbox?.threads?.length) return;
-
-    const pendingThreads = pendingApi.inbox.threads;
-    console.log('[IG-PW] New user requests found: ' + pendingThreads.length);
-
-    for (const thread of pendingThreads) {
-      const threadId = thread.thread_id;
-      // Auto-accept the message request so we can reply
-      await igPage.evaluate(async (tid) => {
-        try {
-          const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
-          await fetch('/api/v1/direct_v2/threads/' + tid + '/approve/', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'X-CSRFToken': tok,
-              'X-IG-App-ID': '936619743392459',
-              'Content-Type': 'application/x-www-form-urlencoded'
-            }
-          });
-        } catch(e) {}
-      }, threadId).catch(() => {});
-
-      console.log('[IG-PW] Accepted new user request, processing thread:', threadId);
-
-      // Use a free pool page to process the new user's thread
-      const href = '/direct/t/' + threadId + '/';
-      const poolEntry = igPagePool.find(p => !p.busy);
-      if (poolEntry) {
-        poolEntry.busy = true;
-        await processThread(poolEntry, href).catch(e => console.error('[IG-PW] New user thread error:', e.message));
-        poolEntry.busy = false;
-      } else {
-        // All pool pages busy — use igPage as fallback
-        await processThread({ page: igPage }, href).catch(e => console.error('[IG-PW] New user thread error (fallback):', e.message));
-      }
-      await _sleep(2000);
-    }
-  } catch(e) {
-    console.error('[IG-PW] New user poll error:', e.message);
-  }
-}
-
 // ─── PROACTIVE FOLLOW-UP ENGINE ──────────────────────────────────────────────
 // Re-engages warm leads who went silent mid-qualification
 const FOLLOWUP_DELAY_MS = 8 * 60 * 60 * 1000; // 8 hours silence before nudge
@@ -736,10 +660,71 @@ async function sendProactiveFollowups() {
 }
 // ──────────────────────────────────────────────────────────────────────────────
 
+// ── Poll pending DM requests (new users who haven't been accepted yet) ─────────
+async function pollNewUserRequests() {
+  if (!igReady || !igPage) return;
+  try {
+    const pendingApi = await igPage.evaluate(async () => {
+      try {
+        const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+        const r = await fetch('/api/v1/direct_v2/pending_inbox/?limit=20', {
+          credentials: 'include',
+          headers: { 'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459' }
+        });
+        if (!r.ok) return { err: r.status };
+        return await r.json();
+      } catch(e) { return { err: e.message }; }
+    }).catch(() => null);
+
+    if (!pendingApi?.inbox?.threads?.length) return;
+
+    console.log('[IG-PW] Pending requests:', pendingApi.inbox.threads.length);
+
+    for (const thread of pendingApi.inbox.threads) {
+      const threadId = thread.thread_id;
+
+      // Accept the message request first
+      await igPage.evaluate(async (tid) => {
+        try {
+          const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+          await fetch('/api/v1/direct_v2/threads/' + tid + '/approve/', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'X-CSRFToken': tok,
+              'X-IG-App-ID': '936619743392459',
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
+          });
+        } catch(e) {}
+      }, threadId).catch(() => {});
+
+      console.log('[IG-PW] Accepted pending request:', threadId);
+
+      // Now process the thread using a free pool page
+      const href = '/direct/t/' + threadId + '/';
+      const poolEntry = igPagePool.find(p => !p.busy);
+      if (poolEntry) {
+        poolEntry.busy = true;
+        await processThread(poolEntry, href).catch(e => console.error('[IG-PW] New user thread error:', e.message));
+        poolEntry.busy = false;
+      } else {
+        // All pool pages busy — use igPage as fallback
+        await processThread({ page: igPage }, href).catch(e => console.error('[IG-PW] New user thread error:', e.message));
+      }
+
+      await _sleep(2000);
+    }
+  } catch(e) {
+    console.error('[IG-PW] New user poll error:', e.message);
+  }
+}
+
 async function pollInstagramDMs() {
   if (!igReady || !igPage) return;
   try {
-    await igPage.goto('https://www.instagram.com/direct/inbox/', { timeout: 30000 });
+    await igPage.goto('https://www.instagram.com/direct/inbox/', { waitUntil: 'domcontentloaded', timeout: 30000 })
+      .catch(e => { if (!e.message.includes('ERR_ABORTED')) throw e; });
     await _sleep(3000);
     console.log('[IG-PW] Poll URL:', igPage.url());
 
@@ -755,7 +740,6 @@ async function pollInstagramDMs() {
 
     // Collect all thread hrefs from inbox (no clicking â just read hrefs)
     // Wait for thread list to render (Instagram SPA needs time)
-    await igPage.waitForSelector('a[href*="/direct/t/"]', { timeout: 12000 }).catch(() => null);
 
     // Use Instagram internal API to get DM thread IDs (DOM scan doesn't work in headless mode)
     let threadHrefs = [];
@@ -799,10 +783,10 @@ async function pollInstagramDMs() {
     console.error('[IG-PW] Poll error:', e.message);
     igReady = false;
     if (e.message.includes('browser has been closed') || e.message.includes('context or browser')) {
-      // Full browser crash — reinitialize everything
-      console.log('[IG-PW] Browser crash in poll — reinitializing in 30s...');
+      console.log('[IG-PW] Browser crash detected in poll — reinitializing in 30s...');
       setTimeout(() => initPlaywrightIG(_igUsername, _igPassword), 30 * 1000);
     } else {
+      // Re-engage warm leads who went silent
       await sendProactiveFollowups();
       setTimeout(pollInstagramDMs, 5 * 60 * 1000);
     }
@@ -815,8 +799,8 @@ async function sendInstagramMessagePW(senderId, text) {
   try {
     const threadUrl = igThreadUrls.get(senderId);
 
-    // Prefer the active page already open on this thread (set by processThread)
-    // This avoids the race condition where all pool pages are busy
+    // Prefer the page already open on this thread (registered by processThread).
+    // This avoids a race condition where all pool pages are still busy.
     const activePage = igActivePages.get(senderId);
     if (activePage) {
       await sendMessageOnPage(activePage, text);
@@ -831,6 +815,7 @@ async function sendInstagramMessagePW(senderId, text) {
 
     try {
       if (threadUrl) {
+        // Fix: split('/').pop() returns '' when URL ends with '/', so filter first
         const threadIdPart = threadUrl.split('/').filter(Boolean).pop() || '';
         const currentUrl = page.url();
         if (!threadIdPart || !currentUrl.includes(threadIdPart)) {
