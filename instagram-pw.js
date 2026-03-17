@@ -274,7 +274,7 @@ async function sendMessageOnPage(page, text) {
       if (tidMatch) {
         const tid = tidMatch[1];
         console.log('[IG-PW] DOM input missing, trying API send for thread', tid);
-        const res = await page.evaluate(async (threadId, msg) => {
+        const res = await page.evaluate(async ([threadId, msg]) => {
           try {
             const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
             const body = 'text=' + encodeURIComponent(msg) + '&mutation_token=' + Date.now();
@@ -289,7 +289,7 @@ async function sendMessageOnPage(page, text) {
             if (!r.ok) { const t = await r.text().catch(() => ''); return { ok: false, status: r.status, body: t.slice(0, 200) }; }
             return { ok: true };
           } catch (e) { return { ok: false, err: e.message }; }
-        }, tid, text).catch(e => ({ ok: false, err: e.message }));
+        }, [tid, text]).catch(e => ({ ok: false, err: e.message }));
 
         if (res?.ok) { console.log('[IG-PW] API send succeeded for thread', tid); }
         else { console.error('[IG-PW] API send failed for thread', tid, JSON.stringify(res)); }
