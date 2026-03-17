@@ -2122,6 +2122,8 @@ app.get('/dashboard', async (req, res) => {
 });
 // ──────────────────────────────────────────────────────────────────────────────
 
+app.get('/', (req, res) => res.send('OK'));
+
 app.listen(PORT, () => {
   console.log(`SALESOM v5.0 running on port ${PORT}`);
   console.log(`  Sinus types: Reactive Sensitivity, Chronic Congestion, Deep Inflammation, Spray Dependency, Drainage Blockage, Structural Congestion`);
