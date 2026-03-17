@@ -2027,97 +2027,97 @@ app.post('/widget-chat', async (req, res) => {
 
 // ─── FIREBASE LEAD DASHBOARD ──────────────────────────────────────────────────
 app.get('/dashboard', async (req, res) => {
-  if (!db) return res.send('<h1 style="font-family:sans-serif;color:red;padding:40px">Firebase not connected on this server instance.</h1>');
+  if (!db) return res.send('<h1 style="padding:40px;color:red">Firebase not connected.</h1>');
   try {
     const snap = await db.collection('users').get();
     const leads = [];
-    snap.forEach(doc => {
-      const d = doc.data();
-      leads.push({ id: doc.id, ...d });
-    });
-    leads.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+    snap.forEach(function(doc) { leads.push(Object.assign({ id: doc.id }, doc.data())); });
+    leads.sort(function(a, b) { return (b.lastMessageAt || 0) - (a.lastMessageAt || 0); });
 
-    const stateColor = s => ({
-      new: '#3498db', probe: '#9b59b6', pitched: '#e67e22',
-      close: '#e74c3c', enrolled: '#27ae60', closed: '#27ae60'
-    })[s] || '#95a5a6';
-
-    const fmtTime = ts => {
+    function stateColor(s) {
+      var map = { new: '#3498db', probe: '#9b59b6', pitched: '#e67e22', close: '#e74c3c', enrolled: '#27ae60', closed: '#27ae60' };
+      return map[s] || '#95a5a6';
+    }
+    function fmtTime(ts) {
       if (!ts) return '-';
-      const d = new Date(typeof ts === 'object' && ts._seconds ? ts._seconds * 1000 : ts);
-      return d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-    };
+      var ms = (ts && ts._seconds) ? ts._seconds * 1000 : ts;
+      return new Date(ms).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    }
+    function esc(v) { return String(v || '-').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-    const esc = v => String(v || '-').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    var stats = { total: leads.length, enrolled: 0, pitched: 0, probe: 0 };
+    leads.forEach(function(u) {
+      var s = u.state || u.convPhase || '';
+      if (s === 'enrolled' || s === 'closed') stats.enrolled++;
+      else if (s === 'pitched' || s === 'close') stats.pitched++;
+      else if (s === 'probe') stats.probe++;
+    });
 
-    const rows = leads.map(u => {
-      const stColor = stateColor(u.state || u.convPhase);
-      const histLen = Array.isArray(u.history) ? u.history.length : 0;
-      const lastMsgs = Array.isArray(u.history) ? u.history.slice(-3).map(h =>
-        '<div style="margin:2px 0;padding:4px 8px;border-radius:4px;background:' +
-        (h.role === 'user' ? '#eef2ff' : '#f0fdf4') + ';font-size:11px">' +
-        '<b style="color:' + (h.role === 'user' ? '#4f46e5' : '#16a34a') + '">' +
-        (h.role === 'user' ? '👤' : '🤖') + '</b> ' + esc(h.content).substring(0, 120) + '</div>'
-      ).join('') : '';
-
-      return '<tr onclick="this.querySelector('td.hist').style.display=this.querySelector('td.hist').style.display==='table-cell'?'none':'table-cell'"' +
-        ' style="cursor:pointer;border-bottom:1px solid #f0f0f0;transition:background .2s" ' +
-        'onmouseover="this.style.background='#f9f9f9'" onmouseout="this.style.background=''">' +
-        '<td style="padding:10px 12px;font-weight:600;color:#1a1a2e">' + esc(u.name) + '</td>' +
-        '<td style="padding:10px 8px;color:#666;font-size:12px">' + esc(u.id).replace('whatsapp:', '') + '</td>' +
-        '<td style="padding:10px 8px">' +
-          '<span style="padding:3px 8px;border-radius:12px;background:' + stColor + ';color:#fff;font-size:11px;font-weight:600">' + esc(u.state || '-') + '</span>' +
-        '</td>' +
-        '<td style="padding:10px 8px;font-size:12px;color:#555">' + esc(u.convPhase) + '</td>' +
+    var histData = [];
+    var rows = leads.map(function(u, i) {
+      var hist = Array.isArray(u.history) ? u.history.slice(-3) : [];
+      histData.push(JSON.stringify(hist).replace(/</g,'&lt;').replace(/>/g,'&gt;'));
+      var sc = stateColor(u.state || u.convPhase);
+      return '<tr class="lr" data-idx="' + i + '" style="cursor:pointer;border-bottom:1px solid #f0f0f0">' +
+        '<td style="padding:10px 12px;font-weight:600">' + esc(u.name) + '</td>' +
+        '<td style="padding:10px 8px;font-size:12px;color:#666">' + esc(u.id).replace('whatsapp:','') + '</td>' +
+        '<td style="padding:10px 8px"><span style="padding:3px 8px;border-radius:12px;background:' + sc + ';color:#fff;font-size:11px;font-weight:600">' + esc(u.state || '-') + '</span></td>' +
+        '<td style="padding:10px 8px;font-size:12px">' + esc(u.convPhase) + '</td>' +
         '<td style="padding:10px 8px;font-size:12px">' + esc(u.platform) + '</td>' +
         '<td style="padding:10px 8px;font-size:12px;color:#6d28d9">' + esc(u.sinusType) + '</td>' +
         '<td style="padding:10px 8px;font-size:12px">' + esc(u.duration) + '</td>' +
-        '<td style="padding:10px 8px;font-size:12px;max-width:180px">' + esc(u.symptoms) + '</td>' +
+        '<td style="padding:10px 8px;font-size:12px;max-width:160px">' + esc(u.symptoms) + '</td>' +
         '<td style="padding:10px 8px;font-size:12px;color:' + (u.usedAllopathy ? '#dc2626' : '#059669') + '">' + (u.usedAllopathy ? 'Yes' : 'No') + '</td>' +
         '<td style="padding:10px 8px;font-size:12px">' + esc(u.selectedPlan || (u.enrolledAt ? 'Enrolled' : '-')) + '</td>' +
-        '<td style="padding:10px 8px;font-size:12px;color:#666">' + fmtTime(u.lastMessageAt) + '</td>' +
-        '<td style="padding:10px 8px;font-size:12px;color:#888">' + histLen + ' msgs</td>' +
+        '<td style="padding:10px 8px;font-size:12px;color:#888">' + fmtTime(u.lastMessageAt) + '</td>' +
+        '<td style="padding:10px 8px;font-size:12px">' + (Array.isArray(u.history) ? u.history.length : 0) + '</td>' +
         '</tr>' +
-        '<tr style="display:none"><td class="hist" colspan="12" style="display:none;padding:8px 16px;background:#fafafa">' + lastMsgs + '</td></tr>';
+        '<tr class="hist-row" id="hist-' + i + '" style="display:none"><td colspan="12" style="padding:8px 16px;background:#fafafa;font-size:12px">Loading...</td></tr>';
     }).join('');
 
-    const statsCounts = { total: leads.length, enrolled: 0, pitched: 0, probe: 0, closed: 0 };
-    leads.forEach(u => {
-      const s = u.state || u.convPhase || '';
-      if (s === 'enrolled' || s === 'closed') statsCounts.enrolled++;
-      else if (s === 'pitched' || s === 'close') statsCounts.pitched++;
-      else if (s === 'probe') statsCounts.probe++;
-    });
+    var histJson = '<script>var HIST=' + JSON.stringify(histData) + ';' +
+      'document.addEventListener("click",function(e){' +
+      'var row=e.target.closest(".lr");' +
+      'if(!row)return;' +
+      'var idx=row.getAttribute("data-idx");' +
+      'var hrow=document.getElementById("hist-"+idx);' +
+      'if(hrow.style.display==="none"){' +
+      'var h=JSON.parse(HIST[idx]);' +
+      'var html=h.map(function(m){return"<div style=\"margin:2px 0;padding:4px 8px;border-radius:4px;background:"+(m.role==="user"?"#eef2ff":"#f0fdf4")+";\"><b>"+(m.role==="user"?"U":"Bot")+":</b> "+(m.content||"").substring(0,150)+"</div>";}).join("");' +
+      'hrow.querySelector("td").innerHTML=html||"No history";' +
+      'hrow.style.display="table-row";' +
+      '}else{hrow.style.display="none";}' +
+      '});' +
+      'setTimeout(function(){location.reload();},60000);' +
+      '</script>';
 
-    res.send('<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">' +
-      '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-      '<title>Ayusomam — Lead Dashboard</title>' +
-      '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f4f6fb;color:#1a1a2e}' +
-      '.header{background:linear-gradient(135deg,#2d6a4f,#40916c);color:#fff;padding:20px 32px;display:flex;justify-content:space-between;align-items:center}' +
-      '.header h1{font-size:22px;font-weight:700}.header small{opacity:.8;font-size:13px}' +
-      '.stats{display:flex;gap:16px;padding:20px 32px;flex-wrap:wrap}' +
-      '.stat{background:#fff;border-radius:12px;padding:16px 24px;flex:1;min-width:140px;box-shadow:0 1px 4px rgba(0,0,0,.08)}' +
-      '.stat .num{font-size:28px;font-weight:800;color:#2d6a4f}.stat .lbl{font-size:12px;color:#888;margin-top:2px}' +
-      '.table-wrap{padding:0 32px 32px;overflow-x:auto}' +
-      'table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}' +
-      'th{background:#2d6a4f;color:#fff;padding:10px 12px;font-size:12px;font-weight:600;text-align:left;white-space:nowrap}' +
-      '.refresh{color:#fff;opacity:.8;font-size:12px;cursor:pointer;text-decoration:underline}</style>' +
-      '<script>setTimeout(()=>location.reload(),60000)</script></head><body>' +
-      '<div class="header"><div><h1>🌿 Ayusomam Lead Dashboard</h1>' +
-      '<small>Auto-refreshes every 60s • ' + new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}) + ' IST • Click any row to see last 3 messages</small></div>' +
-      '<a class="refresh" onclick="location.reload()">Refresh Now</a></div>' +
+    res.send('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ayusomam Dashboard</title>' +
+      '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f4f6fb}' +
+      '.hdr{background:linear-gradient(135deg,#2d6a4f,#40916c);color:#fff;padding:18px 28px;display:flex;justify-content:space-between;align-items:center}' +
+      '.hdr h1{font-size:20px;font-weight:700}.hdr small{opacity:.8;font-size:12px}' +
+      '.stats{display:flex;gap:14px;padding:18px 28px;flex-wrap:wrap}' +
+      '.stat{background:#fff;border-radius:10px;padding:14px 20px;flex:1;min-width:130px;box-shadow:0 1px 4px rgba(0,0,0,.08)}' +
+      '.stat .n{font-size:26px;font-weight:800;color:#2d6a4f}.stat .l{font-size:11px;color:#888;margin-top:2px}' +
+      '.tw{padding:0 28px 28px;overflow-x:auto}' +
+      'table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}' +
+      'th{background:#2d6a4f;color:#fff;padding:9px 10px;font-size:11px;font-weight:600;text-align:left;white-space:nowrap}' +
+      'tr.lr:hover{background:#f9f9f9}</style></head><body>' +
+      '<div class="hdr"><div><h1>🌿 Ayusomam Lead Dashboard</h1>' +
+      '<small>Auto-refresh 60s • ' + new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}) + ' IST • Click row = last 3 msgs</small></div>' +
+      '<a href="/dashboard" style="color:#fff;font-size:12px">Refresh</a></div>' +
       '<div class="stats">' +
-        '<div class="stat"><div class="num">' + statsCounts.total + '</div><div class="lbl">Total Leads</div></div>' +
-        '<div class="stat"><div class="num" style="color:#27ae60">' + statsCounts.enrolled + '</div><div class="lbl">Enrolled / Closed</div></div>' +
-        '<div class="stat"><div class="num" style="color:#e67e22">' + statsCounts.pitched + '</div><div class="lbl">In Pitch / Close</div></div>' +
-        '<div class="stat"><div class="num" style="color:#9b59b6">' + statsCounts.probe + '</div><div class="lbl">In Probe</div></div>' +
+      '<div class="stat"><div class="n">' + stats.total + '</div><div class="l">Total Leads</div></div>' +
+      '<div class="stat"><div class="n" style="color:#27ae60">' + stats.enrolled + '</div><div class="l">Enrolled</div></div>' +
+      '<div class="stat"><div class="n" style="color:#e67e22">' + stats.pitched + '</div><div class="l">In Pitch</div></div>' +
+      '<div class="stat"><div class="n" style="color:#9b59b6">' + stats.probe + '</div><div class="l">In Probe</div></div>' +
       '</div>' +
-      '<div class="table-wrap"><table>' +
-      '<thead><tr><th>Name</th><th>Phone/ID</th><th>State</th><th>Phase</th><th>Platform</th>' +
-      '<th>Sinus Type</th><th>Duration</th><th>Symptoms</th><th>Allopathy?</th><th>Plan</th><th>Last Active</th><th>Conv</th></tr></thead>' +
-      '<tbody>' + rows + '</tbody></table></div></body></html>');
-  } catch (err) {
-    res.status(500).send('<pre style="padding:40px;font-family:monospace">Dashboard error: ' + err.message + '</pre>');
+      '<div class="tw"><table><thead><tr>' +
+      '<th>Name</th><th>Phone/ID</th><th>State</th><th>Phase</th><th>Platform</th>' +
+      '<th>Sinus Type</th><th>Duration</th><th>Symptoms</th><th>Allopathy</th><th>Plan</th><th>Last Active</th><th>Msgs</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      histJson + '</body></html>');
+  } catch(err) {
+    res.status(500).send('<pre style="padding:40px">Dashboard error: ' + err.message + '</pre>');
   }
 });
 // ──────────────────────────────────────────────────────────────────────────────
