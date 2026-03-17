@@ -668,35 +668,57 @@ async function pollInstagramDMs() {
     // Wait for thread list to render (Instagram SPA needs time)
     await igPage.waitForSelector('a[href*="/direct/t/"]', { timeout: 12000 }).catch(() => null);
 
-    // Collect thread hrefs via evaluate (more reliable than $$ for SPAs)
+    // Wait for conversation list to fully load (Instagram lazy-loads DM list)
+    try {
+      await igPage.waitForSelector('a[href*="/direct/t/"], [role="listitem"] a, ._acan', { timeout: 8000 });
+    } catch (_w) {
+      console.log('[IG-PW] Waited 8s but no thread links appeared - Instagram may have changed UI');
+    }
+
+    // Collect thread hrefs - try /direct/t/ links first, then click-based discovery
     const threadHrefs = await igPage.evaluate(() => {
       const seen = new Set();
       const hrefs = [];
       document.querySelectorAll('a').forEach(a => {
         try {
-          const path = a.pathname || new URL(a.href).pathname;
+          const path = new URL(a.href).pathname;
           if (path && path.includes('/direct/t/') && !seen.has(path)) {
             seen.add(path);
             hrefs.push(path);
           }
         } catch (e) {}
       });
+      // If no /direct/t/ links, try role=listitem children (Instagram's new UI)
+      if (hrefs.length === 0) {
+        document.querySelectorAll('[role="listitem"] a, [role="row"] a').forEach(a => {
+          try {
+            const path = new URL(a.href).pathname;
+            if (path && path.includes('/direct/') && path !== '/direct/inbox/' && !seen.has(path)) {
+              seen.add(path);
+              hrefs.push(path);
+            }
+          } catch (e) {}
+        });
+      }
       return hrefs;
     }).catch(() => []);
     console.log('[IG-PW] Found ' + threadHrefs.length + ' DM threads');
   // Auto re-login if inbox appears empty (expired session)
   if (threadHrefs.length === 0) {
-      // Debug: log page state to diagnose empty inbox
+            // Debug: log page state to diagnose empty inbox
       try {
         const dbg = await igPage.evaluate(() => ({
           url: location.href,
           title: document.title,
           totalLinks: document.querySelectorAll('a').length,
           directLinks: Array.from(document.querySelectorAll('a')).filter(a => a.href && a.href.includes('/direct/')).length,
-          sampleLinks: Array.from(document.querySelectorAll('a')).filter(a => a.href && a.href.includes('/direct/')).slice(0,3).map(a => new URL(a.href).pathname)
+          directTLinks: Array.from(document.querySelectorAll('a')).filter(a => a.href && a.href.includes('/direct/t/')).length,
+          listItems: document.querySelectorAll('[role="listitem"]').length,
+          rows: document.querySelectorAll('[role="row"]').length,
+          sampleListItems: Array.from(document.querySelectorAll('[role="listitem"]')).slice(0,3).map(el => el.innerText.substring(0,40)),
         }));
-        console.log('[IG-PW] Debug - URL:', dbg.url, '| title:', dbg.title, '| links:', dbg.totalLinks, '| /direct/ links:', dbg.directLinks, '| samples:', JSON.stringify(dbg.sampleLinks));
-      } catch(_dbg) {}
+        console.log('[IG-PW] Debug - title:', dbg.title, '| links:', dbg.totalLinks, '| /direct/t/ links:', dbg.directTLinks, '| listItems:', dbg.listItems, '| rows:', dbg.rows, '| listSamples:', JSON.stringify(dbg.sampleListItems));
+      } catch(_dbg) { console.log('[IG-PW] Debug eval failed:', _dbg.message); }
     try {
       const hasLoginForm = await page.evaluate(() =>
         !!document.querySelector('input[name="username"], input[autocomplete="username"]')
