@@ -305,11 +305,13 @@ async function sendMessageOnPage(page, text) {
         await _sleep(400);
         return;
       }
-      // If response body contains "not-logged-in" the session has expired — trigger re-login
-      if (res?.body && res.body.includes('not-logged-in')) {
-        console.log('[IG-PW] API returned not-logged-in page — session expired, re-logging in...');
+      // If not-logged-in body AND igPage is actually at a login URL → session truly expired
+      if (res?.body && res.body.includes('not-logged-in') && igPage && igPage.url().includes('login')) {
+        console.log('[IG-PW] Session confirmed expired (page is at login) — re-logging in...');
         try { await loginInstagramPW(); } catch (e) { console.error('[IG-PW] Re-login error:', e.message); }
       }
+      // 404 not-logged-in for a specific thread usually means that thread is restricted/blocked,
+      // not a global session issue — DOM fallback will handle it
       console.log('[IG-PW] API send failed for thread', tid, JSON.stringify({ ok: res?.ok, status: res?.status }), '— trying DOM fallback');
     }
 
@@ -1167,9 +1169,6 @@ async function pollInstagramDMs() {
     }
 
     saveIgCookies(await igContext.cookies());
-
-    // Re-engage warm leads who went silent
-    await sendProactiveFollowups();
   } catch (e) {
     console.error('[IG-PW] Poll error:', e.message);
     igReady = false;
@@ -1177,6 +1176,8 @@ async function pollInstagramDMs() {
       console.log('[IG-PW] Browser crash detected in poll — reinitializing in 30s...');
       setTimeout(() => initPlaywrightIG(_igUsername, _igPassword), 30 * 1000);
     } else {
+      // Re-engage warm leads who went silent
+      await sendProactiveFollowups();
       setTimeout(pollInstagramDMs, 30 * 1000);
     }
   } finally {
