@@ -621,8 +621,7 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
         '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote',
         '--disable-blink-features=AutomationControlled',
         '--lang=en-US,en',
-        // Memory saving flags
-        '--single-process',              // run renderer in main process — saves ~200MB
+        // Memory saving flags (stable set — no --single-process, it crashes headless Linux)
         '--disable-extensions',
         '--disable-plugins',
         '--disable-background-networking',
@@ -635,8 +634,8 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
         '--no-first-run',
         '--mute-audio',
         '--hide-scrollbars',
-        '--disable-ipc-flooding-protection',
-        '--js-flags=--max-old-space-size=256', // cap JS heap per page at 256MB
+        '--renderer-process-limit=2',    // max 2 renderer processes
+        '--js-flags=--max-old-space-size=256'
       ]
     });
     igContext = await igBrowser.newContext({
