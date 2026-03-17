@@ -403,34 +403,62 @@ function sleep(ms) {
 }
 
 // ─── GOOGLE SHEETS LOGGING ────────────────────────────────────
+// States that represent a real funnel transition — only these update the leads sheet.
+// Everything else (AI replies, objection handling) only goes to the message log.
+const LEAD_UPDATE_STATES = new Set([
+  'welcome_sent', 'asked_symptoms', 'pitched',
+  'awaiting_payment', 'payment_confirmed', 'post_payment', 'red_flag'
+]);
+
 async function logToSheet(userId, platform, sinusType, state, msg, botReply) {
   if (!SHEET_URL) return;
   const user = userData[userId] || {};
+  const cleanUserId = userId.replace(/^whatsapp:/i, '');
+  const ts = new Date().toISOString();
+  const resolvedState = state || user.state || "new";
+
   try {
-    // Single HTTP call — merged log_message + update_lead into one request.
-    // Google Sheet Apps Script handles both actions from this payload.
-    // Lead-level fields (duration, symptoms, plan etc.) are already persisted
-    // in Firestore users/ collection — Sheet only needs the conversation log
-    // plus a few key lead fields for the dashboard view.
+    // 1. Message log — every message (conversation history for review)
     await fetch(SHEET_URL, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({
         action:    "log_message",
-        timestamp: new Date().toISOString(),
-        userId:    userId.replace(/^whatsapp:/i, ''),
+        timestamp: ts,
+        userId:    cleanUserId,
         name:      user.name || '',
         platform,
-        language:  user.lang || "hin",
         sinusType: sinusType || user.sinusType || "unknown",
-        state:     state     || user.state     || "new",
+        state:     resolvedState,
         phase:     user.convPhase || "probe",
-        duration:  user.duration || "",
-        selectedPlan: user.selectedPlan || "",
         userMsg:   (msg      || "").substring(0, 300),
         botReply:  cleanText(botReply || "").substring(0, 300),
       }),
     });
+
+    // 2. Lead update — only on funnel transitions (not every message)
+    if (LEAD_UPDATE_STATES.has(resolvedState)) {
+      await fetch(SHEET_URL, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          action:       "update_lead",
+          timestamp:    ts,
+          userId:       cleanUserId,
+          name:         user.name          || "",
+          platform,
+          language:     user.lang          || "hin",
+          sinusType:    user.sinusType     || sinusType || "unknown",
+          duration:     user.duration      || "",
+          symptoms:     (user.symptomNums  || []).join(","),
+          state:        resolvedState,
+          phase:        user.convPhase     || "probe",
+          selectedPlan: user.selectedPlan  || "",
+          enrolledAt:   user.enrolledAt    ? new Date(user.enrolledAt).toISOString() : "",
+          lastMessageAt: ts,
+        }),
+      });
+    }
   } catch (e) {
     console.error("Sheet log error:", e.message);
   }
