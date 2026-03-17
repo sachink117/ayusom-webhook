@@ -1001,7 +1001,9 @@ async function handleMessage(senderId, messageText, platform) {
     }
 
     // Detect medicine usage
-    user.usedAllopathy = (user.durationIndex || 0) >= 2 ? true : null;
+    if (user.usedAllopathy === null || user.usedAllopathy === undefined) {
+      user.usedAllopathy = (user.durationIndex || 0) >= 2 ? true : null;
+    }
 
     user.insightShown      = true;
     user.sinusTypeRevealed = true;
@@ -1037,7 +1039,7 @@ async function handleMessage(senderId, messageText, platform) {
       user.state              = "awaiting_payment";
       const plan      = user.selectedPlan || "restoration";
       const planPrice = PRICES[plan].price;
-      const rzpLink   = plan === "clearing" ? RAZORPAY_LINK_499 : RAZORPAY_LINK_1299;
+      const rzpLink   = plan === "reset" ? RAZORPAY_LINK_499 : RAZORPAY_LINK_1299;
 
       let paymentMsg;
       if (rzpLink) {
@@ -1172,36 +1174,7 @@ app.post(["/twilio-webhook", "/twilio"], async (req, res) => {
   }
 });
 
-// ─── INSTAGRAM WEBHOOK ────────────────────────────────────────
-app.get("/instagram-webhook", (req, res) => {
-  if (
-    req.query["hub.mode"]          === "subscribe" &&
-    req.query["hub.verify_token"]  === VERIFY_TOKEN
-  ) {
-    res.status(200).send(req.query["hub.challenge"]);
-  } else {
-    res.sendStatus(403);
-  }
-});
-
-app.post("/instagram-webhook", async (req, res) => {
-  res.sendStatus(200);
-  try {
-    const body = req.body;
-    if (body.object !== "instagram") return;
-    for (const entry of body.entry || []) {
-      for (const event of (entry.messaging || [])) {
-        if (!event.message || event.message.is_echo) continue;
-        const msgId = event.message.mid;
-        if (processedMessages.has(msgId)) continue;
-        processedMessages.add(msgId);
-        await handleMessage(event.sender.id, event.message.text || "", "instagram");
-      }
-    }
-  } catch (e) {
-    console.error("Instagram webhook error:", e.message);
-  }
-});
+// ─── INSTAGRAM WEBHOOK (handled by /webhook with body.object==="instagram") ──
 
 // ─── BROADCAST ────────────────────────────────────────────────
 // ── WHATSAPP CLOUD API WEBHOOK ─────────────────────────────────────────
@@ -1620,7 +1593,7 @@ app.get("/admin", (req, res) => {
 </div>
 
 <script>
-const SECRET = '${secret}';
+const SECRET = '${secret.replace(/['"\\<>&]/g, '')}';
 let allLeads = [];
 let activeFilter = 'all';
 let activeUserId = null;
