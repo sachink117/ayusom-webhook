@@ -690,19 +690,6 @@ async function pollInstagramDMs() {
     }
 
     console.log('[IG-PW] Found ' + threadHrefs.length + ' DM threads');
-    try {
-      const hasLoginForm = await page.evaluate(() =>
-        !!document.querySelector('input[name="username"], input[autocomplete="username"]')
-      );
-      if (hasLoginForm) {
-        console.log('[IG-PW] Empty inbox + login form detected — session expired, re-logging in...');
-        await loginInstagramPW();
-        setTimeout(pollInstagramDMs, 2 * 60 * 1000);
-        return;
-      }
-    } catch(_e) {}
-    console.log('[IG-PW] Empty inbox — inbox may genuinely be empty, continuing.');
-  }
 
     // Process up to 15 threads in parallel batches of POOL_SIZE
     const toProcess = threadHrefs.slice(0, 15);
