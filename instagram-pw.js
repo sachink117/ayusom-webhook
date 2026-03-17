@@ -1167,6 +1167,9 @@ async function pollInstagramDMs() {
     }
 
     saveIgCookies(await igContext.cookies());
+
+    // Re-engage warm leads who went silent
+    await sendProactiveFollowups();
   } catch (e) {
     console.error('[IG-PW] Poll error:', e.message);
     igReady = false;
@@ -1174,8 +1177,6 @@ async function pollInstagramDMs() {
       console.log('[IG-PW] Browser crash detected in poll — reinitializing in 30s...');
       setTimeout(() => initPlaywrightIG(_igUsername, _igPassword), 30 * 1000);
     } else {
-      // Re-engage warm leads who went silent
-      await sendProactiveFollowups();
       setTimeout(pollInstagramDMs, 30 * 1000);
     }
   } finally {
