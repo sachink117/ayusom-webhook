@@ -1073,6 +1073,7 @@ async function pollNewUserRequests() {
 
 let _igPollRunning = false; // guard: prevent overlapping poll cycles
 let _igPollCount = 0;    // tracks cycle count for periodic maintenance
+let _igSeedDone = false; // first poll seeds igSeenMessages without sending replies
 async function pollInstagramDMs() {
   if (!igReady || !igPage || _igPollRunning) return;
   _igPollRunning = true;
@@ -1140,6 +1141,39 @@ async function pollInstagramDMs() {
     }
 
     console.log('[IG-PW] Found ' + threadHrefs.length + ' DM threads');
+
+    // ── First poll after restart: seed igSeenMessages without sending any replies ──
+    // This prevents the bot from re-processing old messages and spamming re-prompts.
+    if (!_igSeedDone) {
+      _igSeedDone = true;
+      console.log('[IG-PW] Seed pass: marking', threadHrefs.length, 'threads as seen (no replies)');
+      for (const href of threadHrefs.slice(0, 100)) {
+        const tid = href.replace(/\//g, '').replace('directt', '');
+        try {
+          const td = await igPage.evaluate(async (t) => {
+            try {
+              const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+              const r = await fetch('/api/v1/direct_v2/threads/' + t + '/?limit=1', {
+                credentials: 'include',
+                headers: { 'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459' }
+              });
+              if (!r.ok) return null;
+              return await r.json();
+            } catch(e) { return null; }
+          }, tid).catch(() => null);
+          if (td?.thread?.items?.[0]) {
+            const item = td.thread.items[0];
+            const mid = item.item_id || (tid + '::' + (item.text || '').substring(0, 60));
+            igSeenMessages.add(mid);
+          }
+        } catch(e) { /* skip */ }
+      }
+      console.log('[IG-PW] Seed done: marked', igSeenMessages.size, 'messages as seen');
+      // Save cookies and return — actual processing starts from next poll cycle
+      saveIgCookies(await igContext.cookies());
+      _igPollRunning = false;
+      return;
+    }
 
     // Process up to 100 threads SERIALLY (API calls are fast, no page loads needed)
     const toProcess = threadHrefs.slice(0, 100);
