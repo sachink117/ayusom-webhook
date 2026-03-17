@@ -668,57 +668,49 @@ async function pollInstagramDMs() {
     // Wait for thread list to render (Instagram SPA needs time)
     await igPage.waitForSelector('a[href*="/direct/t/"]', { timeout: 12000 }).catch(() => null);
 
-    // Wait for conversation list to fully load (Instagram lazy-loads DM list)
+    // Use Instagram's internal API to get thread IDs (more reliable than DOM scraping)
+    let threadHrefs = [];
     try {
-      await igPage.waitForSelector('a[href*="/direct/t/"], [role="listitem"] a, ._acan', { timeout: 8000 });
-    } catch (_w) {
-      console.log('[IG-PW] Waited 8s but no thread links appeared - Instagram may have changed UI');
-    }
-
-    // Collect thread hrefs - try /direct/t/ links first, then click-based discovery
-    const threadHrefs = await igPage.evaluate(() => {
-      const seen = new Set();
-      const hrefs = [];
-      document.querySelectorAll('a').forEach(a => {
+      const inboxData = await igPage.evaluate(async () => {
         try {
-          const path = new URL(a.href).pathname;
-          if (path && path.includes('/direct/t/') && !seen.has(path)) {
-            seen.add(path);
-            hrefs.push(path);
-          }
-        } catch (e) {}
-      });
-      // If no /direct/t/ links, try role=listitem children (Instagram's new UI)
-      if (hrefs.length === 0) {
-        document.querySelectorAll('[role="listitem"] a, [role="row"] a').forEach(a => {
-          try {
-            const path = new URL(a.href).pathname;
-            if (path && path.includes('/direct/') && path !== '/direct/inbox/' && !seen.has(path)) {
-              seen.add(path);
-              hrefs.push(path);
+          const csrfToken = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+          const resp = await fetch('/api/v1/direct_v2/inbox/?thread_message_limit=1&persistentBadging=true&limit=20', {
+            credentials: 'include',
+            headers: {
+              'X-CSRFToken': csrfToken,
+              'X-IG-App-ID': '936619743392459',
+              'X-ASBD-ID': '129477',
+              'Accept': '*/*',
             }
-          } catch (e) {}
-        });
+          });
+          if (!resp.ok) return { error: 'HTTP ' + resp.status };
+          const data = await resp.json();
+          return data;
+        } catch(e) { return { error: e.message }; }
+      });
+
+      if (inboxData?.inbox?.threads?.length > 0) {
+        threadHrefs = inboxData.inbox.threads.map(t => '/direct/t/' + t.thread_id + '/');
+        console.log('[IG-PW] API: got ' + threadHrefs.length + ' threads');
+      } else if (inboxData?.error) {
+        console.log('[IG-PW] API error:', inboxData.error, '- falling back to DOM scan');
+        // Fallback: DOM scan
+        threadHrefs = await igPage.evaluate(() => {
+          const seen = new Set(); const hrefs = [];
+          document.querySelectorAll('a').forEach(a => {
+            try { const p = new URL(a.href).pathname;
+              if (p.includes('/direct/t/') && !seen.has(p)) { seen.add(p); hrefs.push(p); }
+            } catch(e) {}
+          });
+          return hrefs;
+        }).catch(() => []);
+        console.log('[IG-PW] DOM scan fallback found ' + threadHrefs.length + ' threads');
+      } else {
+        console.log('[IG-PW] API returned no threads - inbox empty or response format changed. Keys:', Object.keys(inboxData || {}).join(','));
       }
-      return hrefs;
-    }).catch(() => []);
-    console.log('[IG-PW] Found ' + threadHrefs.length + ' DM threads');
-  // Auto re-login if inbox appears empty (expired session)
-  if (threadHrefs.length === 0) {
-            // Debug: log page state to diagnose empty inbox
-      try {
-        const dbg = await igPage.evaluate(() => ({
-          url: location.href,
-          title: document.title,
-          totalLinks: document.querySelectorAll('a').length,
-          directLinks: Array.from(document.querySelectorAll('a')).filter(a => a.href && a.href.includes('/direct/')).length,
-          directTLinks: Array.from(document.querySelectorAll('a')).filter(a => a.href && a.href.includes('/direct/t/')).length,
-          listItems: document.querySelectorAll('[role="listitem"]').length,
-          rows: document.querySelectorAll('[role="row"]').length,
-          sampleListItems: Array.from(document.querySelectorAll('[role="listitem"]')).slice(0,3).map(el => el.innerText.substring(0,40)),
-        }));
-        console.log('[IG-PW] Debug - title:', dbg.title, '| links:', dbg.totalLinks, '| /direct/t/ links:', dbg.directTLinks, '| listItems:', dbg.listItems, '| rows:', dbg.rows, '| listSamples:', JSON.stringify(dbg.sampleListItems));
-      } catch(_dbg) { console.log('[IG-PW] Debug eval failed:', _dbg.message); }
+    } catch(apiErr) {
+      console.log('[IG-PW] API fetch exception:', apiErr.message);
+    }
     try {
       const hasLoginForm = await page.evaluate(() =>
         !!document.querySelector('input[name="username"], input[autocomplete="username"]')
