@@ -278,96 +278,75 @@ async function sendMessageOnPage(page, text) {
   await prevLock;
 
   try {
-    // ── Attempt 1: Instagram internal fetch API (PRIMARY — no typing, no interleaving) ──
-    // Uses the same authenticated browser session, just calls the IG API directly.
-    const tid = _currentProcessingThreadId || page.url().match(/\/direct\/t\/(\d+)/)?.[1];
-    if (tid) {
-      const res = await page.evaluate(async ([threadId, msg]) => {
-        try {
-          const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
-          const body = 'text=' + encodeURIComponent(msg) + '&mutation_token=' + Date.now();
-          const r = await fetch('/api/v1/direct_v2/threads/' + threadId + '/broadcast/text/', {
-            method: 'POST', credentials: 'include',
-            headers: {
-              'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459',
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body
-          });
-          if (!r.ok) { const t = await r.text().catch(() => ''); return { ok: false, status: r.status, body: t.slice(0, 200) }; }
-          return { ok: true };
-        } catch (e) { return { ok: false, err: e.message }; }
-      }, [tid, text]).catch(e => ({ ok: false, err: e.message }));
-
-      if (res?.ok) {
-        console.log('[IG-PW] API send OK for thread', tid);
-        igSendFailCounts.delete(tid); // reset on success
-        await _sleep(400);
-        return;
-      }
-      // If not-logged-in body AND igPage is actually at a login URL → session truly expired
-      if (res?.body && res.body.includes('not-logged-in') && igPage && igPage.url().includes('login')) {
-        console.log('[IG-PW] Session confirmed expired (page is at login) — re-logging in...');
-        try { await loginInstagramPW(); } catch (e) { console.error('[IG-PW] Re-login error:', e.message); }
-      }
-      // 404 not-logged-in for a specific thread usually means that thread is restricted/blocked,
-      // not a global session issue — DOM fallback will handle it
-      console.log('[IG-PW] API send failed for thread', tid, JSON.stringify({ ok: res?.ok, status: res?.status }), '— trying DOM fallback');
-    }
-
-    // ── Attempt 2 & 3: DOM fallback — must be on the thread page (not inbox) ──
-    // If the current page is NOT on the thread URL (e.g. igPage stuck at inbox),
-    // grab the pool page and navigate IT to the thread URL first.
+    // ── DOM send — navigate a fresh temp page to the thread, type and send ──
+    // API (/api/v1/direct_v2/) was returning 404 for all threads; DOM is the reliable path.
     const domTid = _currentProcessingThreadId || page.url().match(/\/direct\/t\/(\d+)/)?.[1];
-    const onThreadPage = domTid && page.url().includes('/direct/t/' + domTid);
+
+    if (!domTid) {
+      console.error('[IG-PW] No thread ID available for send — skipping');
+      return;
+    }
 
     let domPage = page;
     let domPoolEntry = null;
+    const onThreadPage = page.url().includes('/direct/t/' + domTid);
 
-    if (!onThreadPage && domTid) {
-      // igPage is at inbox — can't do DOM send here. Use pool page instead.
-      // Create a fresh page for DOM send — closed immediately after, no heap accumulation
+    if (!onThreadPage) {
       try {
         domPage = await igContext.newPage();
-        domPoolEntry = { page: domPage, _isTemp: true }; // flag for cleanup in finally
-        console.log('[IG-PW] Created temp page for DOM send to thread', domTid);
+        domPoolEntry = { page: domPage, _isTemp: true };
         await domPage.goto('https://www.instagram.com/direct/t/' + domTid + '/', {
-          waitUntil: 'domcontentloaded', timeout: 15000
+          waitUntil: 'domcontentloaded', timeout: 20000
         }).catch(e => { if (!e.message.includes('ERR_ABORTED')) console.warn('[IG-PW] DOM nav warn:', e.message); });
-        // Wait for textbox to appear (Instagram React app can take 4-6s to render DM UI)
-        await domPage.waitForSelector('[contenteditable="true"], [role="textbox"]', { timeout: 8000 })
-          .catch(() => null); // ok if not found — execCommand will handle that case
-        await _sleep(800);
+        // Give React time to render the DM UI — wait up to 10s for textbox
+        await domPage.waitForSelector(
+          'div[contenteditable="true"], p[contenteditable="true"], [role="textbox"]',
+          { timeout: 10000 }
+        ).catch(() => null);
+        await _sleep(600);
       } catch (pageErr) {
-        console.error('[IG-PW] Could not create temp page for DOM fallback:', pageErr.message);
+        console.error('[IG-PW] Could not open thread page for send:', pageErr.message);
         return;
       }
     }
 
     try {
-      // ── Attempt 2: execCommand insertText (atomic paste) ──
+      const pageUrl = domPage.url();
+
+      // ── Attempt 1: execCommand insertText (fast, atomic, no interleaving) ──
       const jsResult = await domPage.evaluate(async (msg) => {
-        const inputs = Array.from(document.querySelectorAll('[contenteditable="true"], [role="textbox"]'));
-        for (const el of inputs) {
-          if (el.offsetHeight < 10) continue;
-          el.focus();
-          document.execCommand('insertText', false, msg);
-          el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true }));
-          el.dispatchEvent(new KeyboardEvent('keyup',  { key: 'Enter', keyCode: 13, bubbles: true }));
-          return { ok: true, tag: el.tagName, role: el.getAttribute('role') };
+        // Try to find the DM message input — look for visible contenteditable
+        const inputs = Array.from(document.querySelectorAll(
+          'div[contenteditable="true"], p[contenteditable="true"], [role="textbox"]'
+        ));
+        const visible = inputs.filter(el => el.offsetHeight > 10 && el.offsetWidth > 10);
+        if (visible.length === 0) {
+          return { ok: false, count: inputs.length, url: location.href };
         }
-        return { ok: false, count: inputs.length };
+        // Use the LAST visible one (message box is usually at the bottom)
+        const el = visible[visible.length - 1];
+        el.focus();
+        // Try React-compatible input event dispatch
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, 'innerText');
+        document.execCommand('insertText', false, msg);
+        el.dispatchEvent(new InputEvent('input', { bubbles: true, data: msg, inputType: 'insertText' }));
+        el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true, cancelable: true }));
+        el.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', keyCode: 13, bubbles: true, cancelable: true }));
+        el.dispatchEvent(new KeyboardEvent('keyup',    { key: 'Enter', keyCode: 13, bubbles: true }));
+        return { ok: true, tag: el.tagName, role: el.getAttribute('role'), visCount: visible.length };
       }, text).catch(e => ({ ok: false, err: e.message }));
 
       if (jsResult?.ok) {
         console.log('[IG-PW] execCommand send OK:', JSON.stringify(jsResult));
-        igSendFailCounts.delete(_currentProcessingThreadId || '');
+        igSendFailCounts.delete(domTid);
         await _sleep(800);
         return;
       }
-      console.log('[IG-PW] execCommand found', jsResult?.count ?? 0, 'inputs — trying keyboard');
 
-      // ── Attempt 3: keyboard.type (last resort) ──
+      // Log why execCommand missed — helps diagnose restricted/unavailable threads
+      console.log('[IG-PW] execCommand miss (url:', pageUrl.substring(30), 'inputs:', jsResult?.count, jsResult?.url ? '→ ' + jsResult.url.substring(30) : '', ') — trying keyboard.type');
+
+      // ── Attempt 2: Playwright keyboard.type — directly types into the element ──
       const SELECTORS = [
         'div[role="textbox"][contenteditable="true"]',
         'div[contenteditable="true"][aria-label]',
@@ -375,26 +354,25 @@ async function sendMessageOnPage(page, text) {
         'p[contenteditable="true"]',
       ];
       for (const sel of SELECTORS) {
-        const el = await domPage.waitForSelector(sel, { timeout: 5000 }).catch(() => null);
+        const el = await domPage.waitForSelector(sel, { timeout: 4000 }).catch(() => null);
         if (!el) continue;
         try {
           await el.scrollIntoViewIfNeeded();
           await el.click({ timeout: 3000 });
-          await _sleep(300);
-          await domPage.keyboard.type(text, { delay: 15 });
-          await _sleep(300);
+          await _sleep(200);
+          await domPage.keyboard.type(text, { delay: 20 });
+          await _sleep(200);
           await domPage.keyboard.press('Enter');
-          await _sleep(800);
+          await _sleep(600);
           console.log('[IG-PW] keyboard.type send OK (selector:', sel, ')');
+          igSendFailCounts.delete(domTid);
           return;
-        } catch (clickErr) { /* try next */ }
+        } catch (clickErr) { /* try next selector */ }
       }
-      const failTid = _currentProcessingThreadId;
-      if (failTid) {
-        const n = (igSendFailCounts.get(failTid) || 0) + 1;
-        igSendFailCounts.set(failTid, n);
-        if (n >= 5) console.warn('[IG-PW] Thread', failTid, 'has failed', n, 'times — user may have blocked/restricted. Will keep retrying.');
-      }
+
+      const n = (igSendFailCounts.get(domTid) || 0) + 1;
+      igSendFailCounts.set(domTid, n);
+      if (n >= 3) console.warn('[IG-PW] Thread', domTid, 'failed', n, 'sends — likely blocked/restricted/request-pending');
       console.error('[IG-PW] All send attempts failed for text:', text.substring(0, 40));
     } finally {
       if (domPoolEntry?._isTemp) {
