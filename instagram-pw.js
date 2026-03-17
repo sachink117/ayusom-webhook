@@ -431,6 +431,7 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
     console.log('Instagram Playwright: ready, polling every 1 min');
     console.log('[IG-PW] Module loaded. Page pool:', POOL_SIZE, 'tabs. Auto-qualification: ON');
     setInterval(pollInstagramDMs, 1 * 60 * 1000);
+    setInterval(pollNewUserRequests, 60 * 1000); // Check new user requests every 1 min
   } catch (e) {
     console.error('[IG-PW] Init error:', e.message);
     setTimeout(() => initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD), 5 * 60 * 1000);
@@ -602,6 +603,67 @@ async function processThread(poolEntry, href) {
 }
 
 // ââ Poll DMs (parallel with page pool) ââââââââââââââââââââââââââââââââââââââââ
+// ── New User Requests (pending inbox) ───────────────────────────────────────
+// Polls Instagram message requests (first-time DMs from people not followed).
+// Auto-accepts and processes each request so new users get instant replies.
+async function pollNewUserRequests() {
+  if (!igReady || !igPage) return;
+  try {
+    const pendingApi = await igPage.evaluate(async () => {
+      try {
+        const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+        const r = await fetch('/api/v1/direct_v2/pending_inbox/?limit=20', {
+          credentials: 'include',
+          headers: { 'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459' }
+        });
+        if (!r.ok) return { err: r.status };
+        return await r.json();
+      } catch(e) { return { err: e.message }; }
+    }).catch(() => null);
+
+    if (!pendingApi?.inbox?.threads?.length) return;
+
+    const pendingThreads = pendingApi.inbox.threads;
+    console.log('[IG-PW] New user requests found: ' + pendingThreads.length);
+
+    for (const thread of pendingThreads) {
+      const threadId = thread.thread_id;
+      // Auto-accept the message request so we can reply
+      await igPage.evaluate(async (tid) => {
+        try {
+          const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+          await fetch('/api/v1/direct_v2/threads/' + tid + '/approve/', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'X-CSRFToken': tok,
+              'X-IG-App-ID': '936619743392459',
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
+          });
+        } catch(e) {}
+      }, threadId).catch(() => {});
+
+      console.log('[IG-PW] Accepted new user request, processing thread:', threadId);
+
+      // Use a free pool page to process the new user's thread
+      const href = '/direct/t/' + threadId + '/';
+      const poolEntry = igPagePool.find(p => !p.busy);
+      if (poolEntry) {
+        poolEntry.busy = true;
+        await processThread(poolEntry, href).catch(e => console.error('[IG-PW] New user thread error:', e.message));
+        poolEntry.busy = false;
+      } else {
+        // All pool pages busy — use igPage as fallback
+        await processThread({ page: igPage }, href).catch(e => console.error('[IG-PW] New user thread error (fallback):', e.message));
+      }
+      await _sleep(2000);
+    }
+  } catch(e) {
+    console.error('[IG-PW] New user poll error:', e.message);
+  }
+}
+
 // ─── PROACTIVE FOLLOW-UP ENGINE ──────────────────────────────────────────────
 // Re-engages warm leads who went silent mid-qualification
 const FOLLOWUP_DELAY_MS = 8 * 60 * 60 * 1000; // 8 hours silence before nudge
