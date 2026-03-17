@@ -300,7 +300,7 @@ async function sendTwilioMessage(to, body) {
 }
 
 async function sendFBMessage(recipientId, text) {
-  const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`;
+  const url = `https://graph.facebook.com/v18.0/17841445309536661/messages?access_token=${PAGE_ACCESS_TOKEN}`;
   const res = await fetch(url, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
@@ -312,7 +312,7 @@ async function sendFBMessage(recipientId, text) {
 async function sendInstagramMessage(recipientId, text) {
   // Must use Instagram Business Account ID as sender, not "me" (which resolves to the FB Page)
   const igAccountId = process.env.INSTAGRAM_ACCOUNT_ID || '17841445309536661';
-  const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${INSTAGRAM_TOKEN}`;
+  const url = `https://graph.facebook.com/v18.0/17841445309536661/messages?access_token=${INSTAGRAM_TOKEN}`;
   const res = await fetch(url, {
     method:  "POST",
     headers: {
