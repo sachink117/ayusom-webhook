@@ -14,6 +14,7 @@ let igReady = false;
 
 const igSeenMessages = new Set();
 const igThreadUrls = new Map();
+const igActivePages = new Map(); // senderId -> page currently open on that thread
 
 // Qualification state per sender
 // Stages: 'awaiting_qual', 'awaiting_symptoms', 'awaiting_duration', 'qualified'
@@ -592,10 +593,12 @@ async function processThread(poolEntry, href) {
     const qualHandled = await handleQualificationReply(senderId, page, msgText);
 
     if (!qualHandled) {
-      // Mark as awaiting qualification after _handleMessage sends initial message
+      // Register this page so sendInstagramMessagePW reuses it (avoids race condition)
+      igActivePages.set(senderId, page);
       const isNew = !igQualStates.has(senderId);
       await _handleMessage(senderId, msgText, 'instagram_playwright')
         .catch(e => console.error('[IG-PW] handleMessage error:', e.message));
+      igActivePages.delete(senderId);
       if (isNew) {
         igQualStates.set(senderId, { stage: 'awaiting_qual' });
         saveQualStates();
@@ -789,15 +792,22 @@ async function sendInstagramMessagePW(senderId, text) {
   try {
     const threadUrl = igThreadUrls.get(senderId);
 
-    // Find a free pool page
+    // Prefer the active page already open on this thread (set by processThread)
+    // This avoids the race condition where all pool pages are busy
+    const activePage = igActivePages.get(senderId);
+    if (activePage) {
+      await sendMessageOnPage(activePage, text);
+      console.log('[IG-PW] Reply sent to', senderId, '(active page)');
+      return;
+    }
+
+    // Otherwise find a free pool page, fall back to igPage
     const poolEntry = igPagePool.find(p => !p.busy);
     const page = poolEntry ? poolEntry.page : igPage;
     if (poolEntry) poolEntry.busy = true;
 
     try {
       if (threadUrl) {
-        // Always navigate to ensure we're on the right thread page
-        // (the split/pop check was broken – URL ends in '/' so pop() returns '')
         const threadIdPart = threadUrl.split('/').filter(Boolean).pop() || '';
         const currentUrl = page.url();
         if (!threadIdPart || !currentUrl.includes(threadIdPart)) {
