@@ -291,7 +291,7 @@ async function sendMessageOnPage(page, text) {
           } catch (e) { return { ok: false, err: e.message }; }
         }, tid, text).catch(e => ({ ok: false, err: e.message }));
 
-        if (res && res.ok) { console.log('[IG-PW] API send succeeded for thread', tid); }
+        if (res?.ok) { console.log('[IG-PW] API send succeeded for thread', tid); }
         else { console.error('[IG-PW] API send failed for thread', tid, JSON.stringify(res)); }
       } else {
         console.error('[IG-PW] Message input not found and no thread ID in URL:', pageUrl);
@@ -349,7 +349,7 @@ async function handleQualificationReply(senderId, page, msgText) {
   const state = igQualStates.get(senderId);
 
   // Already qualified â do not re-run the sequence
-  if (state && state.stage === 'qualified') return false;
+  if (state && (state.stage === 'qualified' || state.stage === 'pitched')) return false;
 
   const duration = parseDuration(msgText);
   const symptoms = parseSymptoms(msgText);
@@ -403,6 +403,97 @@ async function handleQualificationReply(senderId, page, msgText) {
 }
 
 // ââ Init âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+// Post-qualification conversation: handles replies after the sinus type + question was sent
+async function handlePostQualReply(senderId, page, msgText, state) {
+  const { sinusType, duration } = state;
+  const lower = (msgText || '').toLowerCase();
+  const isLong = duration === 'D' || duration === 'C';
+  const messages = [];
+
+  if (state.stage === 'pitched') {
+    // User replied after we already sent the program pitch
+    if (/nahi|nahin|costly|mahanga|soch|baad mein|kal|pehle|zaroorat nahi|budget|paisa/.test(lower)) {
+      messages.push('Bilkul samajh sakta hoon.');
+      messages.push('Sirf ek baat — sinus jitna purana hota hai utna mushkil treat karna. Time ke saath condition aur kharab hoti hai.');
+      messages.push('Rs. 499 ka 7-din Starter Program ek baar try karke dekh sakte hain. Koi long commitment nahi.');
+    } else if (/haan|ha|yes|theek|okay|ok|chalega|shuru|karo|bhejo|link|payment/.test(lower)) {
+      messages.push('Bahut accha! Payment link abhhi bhej raha hoon.');
+      messages.push('Ek kaam karein — apna naam aur WhatsApp number yahan bhej dein taki program details aur link directly bhej sakein.');
+    } else {
+      messages.push('Koi sawaal ho toh zaroor poochein. Main yahan hoon.');
+    }
+    state.lastUpdated = Date.now();
+    igQualStates.set(senderId, state);
+    saveQualStates();
+  } else {
+    // state.stage === 'qualified' - user replied to the type-specific question
+    if (sinusType === 'chronic_congestion') {
+      // Question was: "Kya kabhi doctor ne surgery suggest ki hai aapko?"
+      const usedSpray = /otrivin|spray|nasal|decongestant/.test(lower);
+      const yesSurgery = /haan|ha|yes|surgery|operation|suggest ki/.test(lower);
+
+      if (usedSpray) {
+        messages.push('Otrivin jaisi spray se temporarily naak khulti hai lekin andar ki inflammation bilkul theek nahi hoti.');
+        messages.push('Regular use se nasal lining aur zyada sensitive ho jaati hai — dhire dhire dependency ban jaati hai.');
+      } else if (yesSurgery) {
+        messages.push('Surgery ek option hai — lekin pehle Ayurvedic route try karna chahiye.');
+        messages.push('Bahut log hamare program se surgery avoid kar chuke hain.');
+      } else {
+        messages.push('Accha hua doctor ke paas surgery ke liye nahi gaye. Abhi bhi natural route possible hai.');
+      }
+      const prog = isLong ? '14-din Core Program (Rs. 1299)' : '7-din Starter Program (Rs. 499)';
+      messages.push('Hamare ' + prog + ' mein herbs, nasal exercises aur complete Ayurvedic protocol milta hai. Kya shuru karein?');
+
+    } else if (sinusType === 'reactive_sensitivity') {
+      // Question was: "Kaunsi cheez sabse zyada trigger karti hai aapko - dust, smoke ya cold?"
+      messages.push('Yeh trigger pata lagana treatment ka pehla step hai. Sahi pakda aapne.');
+      messages.push('Hamare program mein trigger management bhi sikhate hain. Herbs ke saath lifestyle changes bhi hoti hain.');
+      const prog = isLong ? '14-din Core Program (Rs. 1299)' : '7-din Starter Program (Rs. 499)';
+      messages.push(prog + ' mein yeh sab milta hai. Kya try karna chahenge?');
+
+    } else if (sinusType === 'reactive_congestion') {
+      // Question was: "Subah uthte hi naak band hoti hai ya sneezing hoti hai?"
+      messages.push('Subah ke symptoms zyada hona is type ki classic sign hai. Raat mein mucus accumulate hota hai.');
+      messages.push('Hamare program mein subah ki specially designed Ayurvedic routine hai iske liye.');
+      const prog = isLong ? '14-din Core Program (Rs. 1299)' : '7-din Starter Program (Rs. 499)';
+      messages.push(prog + '. Kya shuru karein?');
+
+    } else if (sinusType === 'mixed_overload') {
+      // Question was: "Kya pehle koi Ayurvedic ya herbal treatment try kiya tha?"
+      if (/nahi|nahin|nai|no|pehle nahi|try nahi/.test(lower)) {
+        messages.push('Pehli baar mein sahi system se try karna zyada effective hota hai.');
+      } else {
+        messages.push('Pehle jo try kiya wo shayad incomplete protocol tha. Mixed type ke liye complete approach chahiye.');
+      }
+      messages.push('Hamare 14-din Core Program mein sabh symptoms ko ek saath address kiya jaata hai. Rs. 1299.');
+      messages.push('Kya try karna chahenge?');
+
+    } else if (sinusType === 'advanced_chronic') {
+      // Question was about when smell left
+      messages.push('Smell ka return possible hai. Sahi herbs se nasal nerve layer recover hoti hai.');
+      messages.push('Is type ke liye dedicated protocol hai hamare program mein.');
+      messages.push('14-din Core Program (Rs. 1299). Kya shuru karein?');
+
+    } else {
+      messages.push('Aapke case ke liye personalized guidance zaroor help karegi.');
+      const prog = isLong ? '14-din Core Program (Rs. 1299)' : '7-din Starter Program (Rs. 499)';
+      messages.push(prog + '. Herbs, exercises, complete Ayurvedic protocol.');
+      messages.push('Kya shuru karna chahenge?');
+    }
+
+    // Move to pitched stage
+    igQualStates.set(senderId, { ...state, stage: 'pitched', lastUpdated: Date.now() });
+    saveQualStates();
+  }
+
+  for (const msg of messages) {
+    await sendMessageOnPage(page, msg);
+    await _sleep(2500);
+  }
+  return true;
+}
+
 async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
   _igUsername = INSTAGRAM_USERNAME;
   _igPassword = INSTAGRAM_PASSWORD;
@@ -467,12 +558,6 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
       setTimeout(() => initPlaywrightIG(_igUsername, _igPassword), 30 * 1000);
     });
 
-    igBrowser.on('disconnected', () => {
-      console.log('[IG-PW] Browser disconnected — reinitializing in 30s...');
-      igReady = false;
-      setTimeout(() => initPlaywrightIG(_igUsername, _igPassword), 30 * 1000);
-    });
-
     igReady = true;
     console.log('Instagram Playwright: ready, polling every 1 min');
     console.log('[IG-PW] Module loaded. Page pool:', POOL_SIZE, 'tabs. Auto-qualification: ON');
@@ -483,7 +568,7 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
     setTimeout(sendProactiveFollowups, 5 * 60 * 1000); // first nudge check 5 min after start
   } catch (e) {
     console.error('[IG-PW] Init error:', e.message);
-    setTimeout(() => initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD), 30 * 1000);
+    setTimeout(() => initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD), 5 * 60 * 1000);
   }
 }
 
@@ -642,7 +727,7 @@ async function processThread(poolEntry, href) {
     const msgText = (lastItem.text || lastItem.item_type || '').trim();
     if (!msgText || msgText.length < 2) return;
 
-    const msgId = threadId + '::' + msgText.substring(0, 60);
+    const msgId = lastItem.item_id || (threadId + '::' + msgText.substring(0, 60));
     if (igSeenMessages.has(msgId)) return;
     igSeenMessages.add(msgId);
     igThreadUrls.set(senderId, threadUrl);
@@ -653,15 +738,27 @@ async function processThread(poolEntry, href) {
     const qualHandled = await handleQualificationReply(senderId, page, msgText);
 
     if (!qualHandled) {
-      // Register the active page so sendInstagramMessagePW reuses it (avoids race condition
-      // where all pool pages are still busy when _handleMessage calls back to send a reply)
-      igActivePages.set(senderId, page);
-      const isNew = !igQualStates.has(senderId);
-      await _handleMessage(senderId, msgText, 'instagram_playwright')
-        .catch(e => console.error('[IG-PW] handleMessage error:', e.message));
-      igActivePages.delete(senderId);
-      if (isNew) {
-        igQualStates.set(senderId, { stage: 'awaiting_qual' });
+      const existingState = igQualStates.get(senderId);
+
+      if (!existingState || existingState.stage === 'new') {
+        // Truly new user — send initial greeting via main bot handler
+        igActivePages.set(senderId, page);
+        await _handleMessage(senderId, msgText, 'instagram_playwright')
+          .catch(e => console.error('[IG-PW] handleMessage error:', e.message));
+        igActivePages.delete(senderId);
+        // Mark as awaiting_qual so future messages are handled by qual engine
+        igQualStates.set(senderId, { stage: 'awaiting_qual', lastUpdated: Date.now() });
+        saveQualStates();
+      } else if (existingState.stage === 'qualified' || existingState.stage === 'pitched') {
+        // Existing user in post-qualification stage — continue the sales conversation
+        await handlePostQualReply(senderId, page, msgText, existingState)
+          .catch(e => console.error('[IG-PW] postQualReply error:', e.message));
+      } else {
+        // awaiting_qual/symptoms/duration but couldn't parse this message — gentle re-prompt
+        console.log('[IG-PW] Could not parse reply for stage', existingState.stage, '— re-prompting');
+        await sendMessageOnPage(page, 'Kya aap thoda aur detail mein bata sakte hain? Main samajhna chahta hoon.');
+        existingState.lastUpdated = Date.now();
+        igQualStates.set(senderId, existingState);
         saveQualStates();
       }
     }
@@ -675,7 +772,7 @@ async function processThread(poolEntry, href) {
 // ââ Poll DMs (parallel with page pool) ââââââââââââââââââââââââââââââââââââââââ
 // ─── PROACTIVE FOLLOW-UP ENGINE ──────────────────────────────────────────────
 // Re-engages warm leads who went silent mid-qualification
-const FOLLOWUP_DELAY_MS = 8 * 60 * 30 * 1000; // 8 hours silence before nudge
+const FOLLOWUP_DELAY_MS = 8 * 60 * 60 * 1000; // 8 hours silence before nudge
 const FOLLOWUP_MSGS = {
   awaiting_qual:     'Namaste 🙏 Kya aapke sinus ki problem abhi bhi pareshaan kar rahi hai? Main aapki help ke liye yahan hoon — bas batayein kya feel ho raha hai?',
   awaiting_symptoms: 'Namaste 🙏 Aapne sinus problem ke baare mein bataya tha. Kya aap apne main symptoms share kar sakte hain? (naak band, sir dard, etc.) 🌿',
@@ -726,7 +823,7 @@ async function catchUpOldThreads() {
     let allHrefs = [];
     let cursor = null;
 
-    // Paginate inbox API (3 pages x 20 threads = up to 60 threads)
+    // Paginate inbox API (3 pages × 20 threads = up to 60 threads)
     for (let p = 0; p < 3; p++) {
       const data = await igPage.evaluate(async (cur) => {
         try {
@@ -751,7 +848,7 @@ async function catchUpOldThreads() {
 
     console.log('[IG-PW] Catch-up: ' + allHrefs.length + ' threads to check');
 
-    // Process in batches using pool -- processThread skips seen messages automatically
+    // Process in batches using pool — processThread skips seen messages automatically
     for (let i = 0; i < allHrefs.length; i += POOL_SIZE) {
       const batch = allHrefs.slice(i, i + POOL_SIZE);
       const entries = igPagePool.slice(0, batch.length);
@@ -831,7 +928,7 @@ async function pollInstagramDMs() {
   if (!igReady || !igPage) return;
   try {
     await igPage.goto('https://www.instagram.com/direct/inbox/', { waitUntil: 'domcontentloaded', timeout: 30000 })
-      .catch(e => { if (!e.message.includes('ERR_ABORTED') && !e.message.includes('interrupted by another navigation')) throw e; });
+      .catch(e => { if (!e.message.includes('ERR_ABORTED')) throw e; });
     await _sleep(3000);
     console.log('[IG-PW] Poll URL:', igPage.url());
 
