@@ -263,13 +263,11 @@ function getSymptomInsightMsg(symptoms) {
 // Send a single message on a specific Playwright page (already on the thread)
 async function sendMessageOnPage(page, text) {
   try {
-    // Wait up to 20s — after an Instagram SPA redirect the input can take a moment to render
-    const inputEl = await page.waitForSelector(
-      '[contenteditable="true"][role="textbox"], div[aria-label*="message" i][contenteditable="true"]',
-      { timeout: 20000 }
-    ).catch(() => null);
+    const INPUT_SEL = '[contenteditable="true"][role="textbox"], div[aria-label*="message" i][contenteditable="true"]';
+    // Wait up to 20s for the input to appear
+    const appeared = await page.waitForSelector(INPUT_SEL, { timeout: 20000 }).catch(() => null);
 
-    if (!inputEl) {
+    if (!appeared) {
       // DOM input not found — fall back to Instagram internal send API
       const pageUrl = page.url();
       const tidMatch = pageUrl.match(/\/direct\/t\/(\d+)/);
@@ -301,7 +299,9 @@ async function sendMessageOnPage(page, text) {
       return;
     }
 
-    await inputEl.click();
+    // Use locator (not stale element handle) so React re-renders don't break the click
+    const locator = page.locator(INPUT_SEL).first();
+    await locator.click({ timeout: 5000 });
     await _sleep(500);
     await page.keyboard.type(text, { delay: 30 });
     await _sleep(500);
