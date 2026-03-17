@@ -261,52 +261,88 @@ function getSymptomInsightMsg(symptoms) {
 }
 
 // Send a single message on a specific Playwright page (already on the thread)
+// Strategy: DOM click → JS execCommand → API fallback (all use real browser session)
 async function sendMessageOnPage(page, text) {
   try {
-    const INPUT_SEL = '[contenteditable="true"][role="textbox"], div[aria-label*="message" i][contenteditable="true"]';
-    // Wait up to 20s for the input to appear
-    const appeared = await page.waitForSelector(INPUT_SEL, { timeout: 20000 }).catch(() => null);
+    // Instagram uses Meta's Lexical editor — try multiple selectors in priority order
+    const SELECTORS = [
+      'div[role="textbox"][contenteditable="true"]',
+      'div[contenteditable="true"][aria-label]',
+      'div[contenteditable="true"][class*="message"]',
+      'div[contenteditable="true"][class*="Message"]',
+      'div[contenteditable="true"]',
+      'p[contenteditable="true"]',
+    ];
 
-    if (!appeared) {
-      // DOM input not found — fall back to Instagram internal send API
-      const pageUrl = page.url();
-      const tidMatch = pageUrl.match(/\/direct\/t\/(\d+)/);
-      if (tidMatch) {
-        const tid = tidMatch[1];
-        console.log('[IG-PW] DOM input missing, trying API send for thread', tid);
-        const res = await page.evaluate(async ([threadId, msg]) => {
-          try {
-            const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
-            const body = 'text=' + encodeURIComponent(msg) + '&mutation_token=' + Date.now();
-            const r = await fetch('/api/v1/direct_v2/threads/' + threadId + '/broadcast/text/', {
-              method: 'POST', credentials: 'include',
-              headers: {
-                'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459',
-                'Content-Type': 'application/x-www-form-urlencoded'
-              },
-              body
-            });
-            if (!r.ok) { const t = await r.text().catch(() => ''); return { ok: false, status: r.status, body: t.slice(0, 200) }; }
-            return { ok: true };
-          } catch (e) { return { ok: false, err: e.message }; }
-        }, [tid, text]).catch(e => ({ ok: false, err: e.message }));
-
-        if (res?.ok) { console.log('[IG-PW] API send succeeded for thread', tid); }
-        else { console.error('[IG-PW] API send failed for thread', tid, JSON.stringify(res)); }
-      } else {
-        console.error('[IG-PW] Message input not found and no thread ID in URL:', pageUrl);
+    // ── Attempt 1: standard Playwright click + keyboard ──────────────────────
+    let domSent = false;
+    for (const sel of SELECTORS) {
+      const el = await page.waitForSelector(sel, { timeout: 5000 }).catch(() => null);
+      if (!el) continue;
+      try {
+        await el.scrollIntoViewIfNeeded();
+        await el.click({ timeout: 3000 });
+        await _sleep(300);
+        await page.keyboard.type(text, { delay: 15 });
+        await _sleep(300);
+        await page.keyboard.press('Enter');
+        await _sleep(800);
+        console.log('[IG-PW] DOM send OK (selector:', sel, ')');
+        domSent = true;
+        break;
+      } catch (clickErr) {
+        // try next selector
       }
+    }
+    if (domSent) return;
+
+    // ── Attempt 2: JS execCommand inside the page (still DOM, no API) ────────
+    const jsResult = await page.evaluate(async (msg) => {
+      const inputs = Array.from(document.querySelectorAll('[contenteditable="true"], [role="textbox"]'));
+      for (const el of inputs) {
+        if (el.offsetHeight < 10) continue; // skip hidden
+        el.focus();
+        document.execCommand('insertText', false, msg);
+        el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true }));
+        el.dispatchEvent(new KeyboardEvent('keyup',  { key: 'Enter', keyCode: 13, bubbles: true }));
+        return { ok: true, tag: el.tagName, role: el.getAttribute('role') };
+      }
+      return { ok: false, count: inputs.length };
+    }, text).catch(e => ({ ok: false, err: e.message }));
+
+    if (jsResult?.ok) {
+      console.log('[IG-PW] JS DOM send OK:', JSON.stringify(jsResult));
+      await _sleep(800);
       return;
     }
+    console.log('[IG-PW] JS DOM found', jsResult?.count ?? 0, 'inputs but none worked');
 
-    // Use locator (not stale element handle) so React re-renders don't break the click
-    const locator = page.locator(INPUT_SEL).first();
-    await locator.click({ timeout: 5000 });
-    await _sleep(500);
-    await page.keyboard.type(text, { delay: 30 });
-    await _sleep(500);
-    await page.keyboard.press('Enter');
-    await _sleep(800);
+    // ── Attempt 3: Instagram internal fetch API (still authenticated browser session) ──
+    const tid = page.url().match(/\/direct\/t\/(\d+)/)?.[1];
+    if (tid) {
+      console.log('[IG-PW] Falling back to API send for thread', tid);
+      const res = await page.evaluate(async ([threadId, msg]) => {
+        try {
+          const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+          const body = 'text=' + encodeURIComponent(msg) + '&mutation_token=' + Date.now();
+          const r = await fetch('/api/v1/direct_v2/threads/' + threadId + '/broadcast/text/', {
+            method: 'POST', credentials: 'include',
+            headers: {
+              'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459',
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body
+          });
+          if (!r.ok) { const t = await r.text().catch(() => ''); return { ok: false, status: r.status, body: t.slice(0, 200) }; }
+          return { ok: true };
+        } catch (e) { return { ok: false, err: e.message }; }
+      }, [tid, text]).catch(e => ({ ok: false, err: e.message }));
+
+      if (res?.ok) console.log('[IG-PW] API send succeeded for thread', tid);
+      else console.error('[IG-PW] API send failed for thread', tid, JSON.stringify(res));
+    } else {
+      console.error('[IG-PW] Cannot send — no thread ID in URL:', page.url());
+    }
   } catch (e) {
     console.error('[IG-PW] sendMessageOnPage error:', e.message);
   }
@@ -924,8 +960,10 @@ async function pollNewUserRequests() {
   }
 }
 
+let _igPollRunning = false; // guard: prevent overlapping poll cycles
 async function pollInstagramDMs() {
-  if (!igReady || !igPage) return;
+  if (!igReady || !igPage || _igPollRunning) return;
+  _igPollRunning = true;
   try {
     await igPage.goto('https://www.instagram.com/direct/inbox/', { waitUntil: 'domcontentloaded', timeout: 30000 })
       .catch(e => { if (!e.message.includes('ERR_ABORTED')) throw e; });
@@ -994,6 +1032,8 @@ async function pollInstagramDMs() {
       await sendProactiveFollowups();
       setTimeout(pollInstagramDMs, 30 * 1000);
     }
+  } finally {
+    _igPollRunning = false; // always release the lock so next interval can run
   }
 }
 
