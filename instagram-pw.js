@@ -303,53 +303,83 @@ async function sendMessageOnPage(page, text) {
         await _sleep(400);
         return;
       }
-      console.log('[IG-PW] API send failed for thread', tid, JSON.stringify(res), '— trying DOM fallbacks');
+      console.log('[IG-PW] API send failed for thread', tid, JSON.stringify(res), '— trying DOM fallback');
     }
 
-    // ── Attempt 2: execCommand insertText (atomic DOM paste — no char-by-char typing) ──
-    const jsResult = await page.evaluate(async (msg) => {
-      const inputs = Array.from(document.querySelectorAll('[contenteditable="true"], [role="textbox"]'));
-      for (const el of inputs) {
-        if (el.offsetHeight < 10) continue; // skip hidden
-        el.focus();
-        document.execCommand('insertText', false, msg);
-        el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true }));
-        el.dispatchEvent(new KeyboardEvent('keyup',  { key: 'Enter', keyCode: 13, bubbles: true }));
-        return { ok: true, tag: el.tagName, role: el.getAttribute('role') };
-      }
-      return { ok: false, count: inputs.length };
-    }, text).catch(e => ({ ok: false, err: e.message }));
+    // ── Attempt 2 & 3: DOM fallback — must be on the thread page (not inbox) ──
+    // If the current page is NOT on the thread URL (e.g. igPage stuck at inbox),
+    // grab the pool page and navigate IT to the thread URL first.
+    const domTid = _currentProcessingThreadId || page.url().match(/\/direct\/t\/(\d+)/)?.[1];
+    const onThreadPage = domTid && page.url().includes('/direct/t/' + domTid);
 
-    if (jsResult?.ok) {
-      console.log('[IG-PW] execCommand send OK:', JSON.stringify(jsResult));
-      await _sleep(800);
-      return;
-    }
-    console.log('[IG-PW] execCommand found', jsResult?.count ?? 0, 'inputs, none worked');
+    let domPage = page;
+    let domPoolEntry = null;
 
-    // ── Attempt 3: Playwright keyboard.type (last resort — avoid concurrent use on same page) ──
-    const SELECTORS = [
-      'div[role="textbox"][contenteditable="true"]',
-      'div[contenteditable="true"][aria-label]',
-      'div[contenteditable="true"]',
-      'p[contenteditable="true"]',
-    ];
-    for (const sel of SELECTORS) {
-      const el = await page.waitForSelector(sel, { timeout: 5000 }).catch(() => null);
-      if (!el) continue;
-      try {
-        await el.scrollIntoViewIfNeeded();
-        await el.click({ timeout: 3000 });
-        await _sleep(300);
-        await page.keyboard.type(text, { delay: 15 });
-        await _sleep(300);
-        await page.keyboard.press('Enter');
-        await _sleep(800);
-        console.log('[IG-PW] keyboard.type send OK (selector:', sel, ')');
+    if (!onThreadPage && domTid) {
+      // igPage is at inbox — can't do DOM send here. Use pool page instead.
+      domPoolEntry = igPagePool.find(p => !p.busy);
+      if (domPoolEntry) {
+        domPoolEntry.busy = true;
+        domPage = domPoolEntry.page;
+        console.log('[IG-PW] Navigating pool page to thread', domTid, 'for DOM send');
+        await domPage.goto('https://www.instagram.com/direct/t/' + domTid + '/', {
+          waitUntil: 'domcontentloaded', timeout: 15000
+        }).catch(e => { if (!e.message.includes('ERR_ABORTED')) console.warn('[IG-PW] DOM nav warn:', e.message); });
+        await _sleep(2500);
+      } else {
+        console.error('[IG-PW] No pool page available for DOM fallback — all attempts failed');
         return;
-      } catch (clickErr) { /* try next */ }
+      }
     }
-    console.error('[IG-PW] All send attempts failed for text:', text.substring(0, 40));
+
+    try {
+      // ── Attempt 2: execCommand insertText (atomic paste) ──
+      const jsResult = await domPage.evaluate(async (msg) => {
+        const inputs = Array.from(document.querySelectorAll('[contenteditable="true"], [role="textbox"]'));
+        for (const el of inputs) {
+          if (el.offsetHeight < 10) continue;
+          el.focus();
+          document.execCommand('insertText', false, msg);
+          el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true }));
+          el.dispatchEvent(new KeyboardEvent('keyup',  { key: 'Enter', keyCode: 13, bubbles: true }));
+          return { ok: true, tag: el.tagName, role: el.getAttribute('role') };
+        }
+        return { ok: false, count: inputs.length };
+      }, text).catch(e => ({ ok: false, err: e.message }));
+
+      if (jsResult?.ok) {
+        console.log('[IG-PW] execCommand send OK:', JSON.stringify(jsResult));
+        await _sleep(800);
+        return;
+      }
+      console.log('[IG-PW] execCommand found', jsResult?.count ?? 0, 'inputs — trying keyboard');
+
+      // ── Attempt 3: keyboard.type (last resort) ──
+      const SELECTORS = [
+        'div[role="textbox"][contenteditable="true"]',
+        'div[contenteditable="true"][aria-label]',
+        'div[contenteditable="true"]',
+        'p[contenteditable="true"]',
+      ];
+      for (const sel of SELECTORS) {
+        const el = await domPage.waitForSelector(sel, { timeout: 5000 }).catch(() => null);
+        if (!el) continue;
+        try {
+          await el.scrollIntoViewIfNeeded();
+          await el.click({ timeout: 3000 });
+          await _sleep(300);
+          await domPage.keyboard.type(text, { delay: 15 });
+          await _sleep(300);
+          await domPage.keyboard.press('Enter');
+          await _sleep(800);
+          console.log('[IG-PW] keyboard.type send OK (selector:', sel, ')');
+          return;
+        } catch (clickErr) { /* try next */ }
+      }
+      console.error('[IG-PW] All send attempts failed for text:', text.substring(0, 40));
+    } finally {
+      if (domPoolEntry) domPoolEntry.busy = false;
+    }
   } catch (e) {
     console.error('[IG-PW] sendMessageOnPage error:', e.message);
   } finally {
