@@ -342,6 +342,7 @@ async function handleQualificationReply(senderId, page, msgText) {
     if (finalDuration && finalSymptoms.length === 0) {
       // Have duration, need symptoms
       igQualStates.set(senderId, { stage: 'awaiting_symptoms', duration: finalDuration });
+      state.lastUpdated = Date.now();
       saveQualStates();
       await sendMessageOnPage(page,
         `Theek hai.\nAapko kaun kaun si problem hoti hai? Inme se jo bhi ho woh number type karein:\n1. Naak band rehti hai\n2. Sneezing ya naak behna\n3. Sir mein bhaariapan\n4. Smell nahi aati\n5. Gale mein mucus`
@@ -352,6 +353,7 @@ async function handleQualificationReply(senderId, page, msgText) {
     if (!finalDuration && finalSymptoms.length > 0) {
       // Have symptoms, need duration
       igQualStates.set(senderId, { stage: 'awaiting_duration', symptoms: finalSymptoms });
+      state.lastUpdated = Date.now();
       saveQualStates();
       await sendMessageOnPage(page,
         `Acha. Yeh problem kitne time se hai aapko?\nA. 7 din se kam\nB. 1 se 4 hafte\nC. 1 se 3 mahine\nD. 3 mahine se zyada ya saalon se`
@@ -600,6 +602,51 @@ async function processThread(poolEntry, href) {
 }
 
 // ââ Poll DMs (parallel with page pool) ââââââââââââââââââââââââââââââââââââââââ
+// ─── PROACTIVE FOLLOW-UP ENGINE ──────────────────────────────────────────────
+// Re-engages warm leads who went silent mid-qualification
+const FOLLOWUP_DELAY_MS = 8 * 60 * 60 * 1000; // 8 hours silence before nudge
+const FOLLOWUP_MSGS = {
+  awaiting_qual:     'Namaste 🙏 Kya aapke sinus ki problem abhi bhi pareshaan kar rahi hai? Main aapki help ke liye yahan hoon — bas batayein kya feel ho raha hai?',
+  awaiting_symptoms: 'Namaste 🙏 Aapne sinus problem ke baare mein bataya tha. Kya aap apne main symptoms share kar sakte hain? (naak band, sir dard, etc.) 🌿',
+  awaiting_duration: 'Namaste 🙏 Bas ek chhota sawaal — yeh sinus ki takleef aapko kitne time se hai? Isse hum sahi program suggest kar sakte hain 🌿',
+  qualified:         'Namaste 🙏 Aap hamare Ayurvedic sinus program ke liye perfect candidate hain! 14 din intensive + 7 din free support. Sirf Rs.499. Kya shuru karein? 🌿'
+};
+
+async function sendProactiveFollowups() {
+  try {
+    const now = Date.now();
+    const senders = Object.keys(igQualStates);
+    if (!senders.length) return;
+    console.log('[IG-PW] Checking proactive follow-ups for ' + senders.length + ' leads...');
+    let nudgeCount = 0;
+    for (const senderId of senders) {
+      const st = igQualStates[senderId];
+      if (!st || !st.stage) continue;
+      if (st.stage === 'converted' || st.stage === 'opted_out') continue;
+      if (!FOLLOWUP_MSGS[st.stage]) continue;
+      if (st.nudgeSentAt && (now - st.nudgeSentAt) < FOLLOWUP_DELAY_MS) continue;
+      const lastAct = st.lastUpdated || st.nudgeSentAt || 0;
+      if (lastAct && (now - lastAct) < FOLLOWUP_DELAY_MS) continue;
+      console.log('[IG-PW] Nudging ' + senderId + ' | stage: ' + st.stage);
+      try {
+        await sendInstagramMessagePW(senderId, FOLLOWUP_MSGS[st.stage]);
+        st.nudgeSentAt = now;
+        nudgeCount++;
+        await _sleep(4000);
+      } catch (e) {
+        console.error('[IG-PW] Nudge failed for ' + senderId + ':', e.message);
+      }
+    }
+    if (nudgeCount > 0) {
+      await saveQualStates();
+      console.log('[IG-PW] Proactive nudges sent: ' + nudgeCount);
+    }
+  } catch (err) {
+    console.error('[IG-PW] Proactive follow-up error:', err.message);
+  }
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
 async function pollInstagramDMs() {
   if (!igReady || !igPage) return;
   try {
@@ -656,6 +703,8 @@ async function pollInstagramDMs() {
   } catch (e) {
     console.error('[IG-PW] Poll error:', e.message);
     igReady = false;
+        // Re-engage warm leads who went silent
+    await sendProactiveFollowups();
     setTimeout(pollInstagramDMs, 5 * 60 * 1000);
   }
 }
