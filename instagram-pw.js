@@ -434,6 +434,12 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
       setTimeout(() => initPlaywrightIG(_igUsername, _igPassword), 30 * 1000);
     });
 
+    igBrowser.on('disconnected', () => {
+      console.log('[IG-PW] Browser disconnected — reinitializing in 30s...');
+      igReady = false;
+      setTimeout(() => initPlaywrightIG(_igUsername, _igPassword), 30 * 1000);
+    });
+
     igReady = true;
     console.log('Instagram Playwright: ready, polling every 1 min');
     console.log('[IG-PW] Module loaded. Page pool:', POOL_SIZE, 'tabs. Auto-qualification: ON');
@@ -575,13 +581,26 @@ async function processThread(poolEntry, href) {
       return;
     }
 
-    const msgEls = await page.$$(
-      'div[class*="_aa6j"], div[dir="auto"]:not(header *), [class*="messageText"]'
-    );
-    if (msgEls.length === 0) return;
+    // Use Instagram thread API to get last message (DOM scan unreliable in headless mode)
+    const threadData = await page.evaluate(async (tid) => {
+      try {
+        const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+        const r = await fetch('/api/v1/direct_v2/threads/' + tid + '/?limit=1', {
+          credentials: 'include',
+          headers: { 'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459' }
+        });
+        if (!r.ok) return null;
+        return await r.json();
+      } catch(e) { return null; }
+    }, threadId).catch(() => null);
 
-    const lastEl = msgEls[msgEls.length - 1];
-    const msgText = (await lastEl.textContent().catch(() => '')).trim();
+    if (!threadData?.thread?.items?.length) return;
+
+    const lastItem = threadData.thread.items[0]; // items are newest-first
+    // Skip if the last message is our own reply (avoid infinite reply loop)
+    if (String(lastItem.user_id) === String(threadData.thread.viewer_id)) return;
+
+    const msgText = (lastItem.text || lastItem.item_type || '').trim();
     if (!msgText || msgText.length < 2) return;
 
     const msgId = threadId + '::' + msgText.substring(0, 60);
