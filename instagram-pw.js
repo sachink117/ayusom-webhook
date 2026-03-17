@@ -846,70 +846,23 @@ async function processThread(poolEntry, href) {
     const msgText = (lastItem.text || '').trim();
     if (!msgText || msgText.length < 2) return;
 
-    // Build conversation context: last 20 messages, oldest first, with Bot/User labels.
-    // Used by both qual and post-qual handlers to reply smartly based on full history.
-    const viewerId = String(threadData.thread.viewer_id);
-    const recentItems = [...threadData.thread.items].reverse(); // newest-first → oldest-first
-    const recentContext = recentItems
-      .map(item => {
-        const isBot = String(item.user_id) === viewerId;
-        const txt = (item.text || '').trim();
-        if (!txt) return null;
-        return (isBot ? 'Bot: ' : 'User: ') + txt;
-      })
-      .filter(Boolean)
-      .join('\n');
-    // Persist key details from context into Firestore state (duration, symptoms).
-    // This survives bot restarts so we never ask users for info they already gave us.
+    // Context is now built by SALESOM AI in index.js (user.history) — no need for IG-side context.
     const msgId = lastItem.item_id || (threadId + '::' + msgText.substring(0, 60));
-    const _stateForDedup = igQualStates.get(senderId);
     if (igSeenMessages.has(msgId)) return; // already processed — skip silently
     igSeenMessages.add(msgId);
-    // Only log context when we're actually going to process this message (not on skip)
-    console.log('[IG-PW] Context (' + recentItems.length + ' msgs):', recentContext.substring(0, 200));
     igThreadUrls.set(senderId, threadUrl);
     // Track when this user last sent a message — used for priority queue (active chats first)
     igLastUserReply.set(senderId, Date.now());
-    // Persist any newly parsed context details (duration, symptoms) to Firestore
-    if (_stateForDedup) {
-      const ctxDur = parseDuration(recentContext);
-      const ctxSym = parseSymptoms(recentContext);
-      if (ctxDur && !_stateForDedup.duration) _stateForDedup.duration = ctxDur;
-      if (ctxSym.length > 0 && !(_stateForDedup.symptoms?.length > 0)) _stateForDedup.symptoms = ctxSym;
-      igQualStates.set(senderId, _stateForDedup);
-      saveQualStates();
-    }
-
     console.log('[IG-PW] DM (' + threadId + '): "' + msgText.substring(0, 80) + '"');
 
-    // Try qualification handler first
-    const qualHandled = await handleQualificationReply(senderId, page, msgText, recentContext);
-
-    if (!qualHandled) {
-      const existingState = igQualStates.get(senderId);
-
-      if (!existingState || existingState.stage === 'new') {
-        // Truly new user — send initial greeting via main bot handler
-        igActivePages.set(senderId, page);
-        await _handleMessage(senderId, msgText, 'instagram_playwright')
-          .catch(e => console.error('[IG-PW] handleMessage error:', e.message));
-        igActivePages.delete(senderId);
-        // Mark as awaiting_qual so future messages are handled by qual engine
-        igQualStates.set(senderId, { stage: 'awaiting_qual', lastUpdated: Date.now() });
-        saveQualStates();
-      } else if (existingState.stage === 'qualified' || existingState.stage === 'pitched') {
-        // Existing user in post-qualification stage — continue the sales conversation
-        await handlePostQualReply(senderId, page, msgText, existingState, recentContext)
-          .catch(e => console.error('[IG-PW] postQualReply error:', e.message));
-      } else {
-        // awaiting_qual/symptoms/duration but couldn't parse this message — gentle re-prompt
-        console.log('[IG-PW] Could not parse reply for stage', existingState.stage, '— re-prompting');
-        await sendMessageOnPage(page, 'Kya aap thoda aur detail mein bata sakte hain? Main samajhna chahta hoon.');
-        existingState.lastUpdated = Date.now();
-        igQualStates.set(senderId, existingState);
-        saveQualStates();
-      }
-    }
+    // ── Route ALL messages through SALESOM AI (same as WhatsApp) ──
+    // This gives Instagram users the exact same experience: welcome menu,
+    // duration/symptom capture, SALESOM AI objection handling, phase
+    // advancement, ghosting recovery, payment links, and milestone messages.
+    igActivePages.set(senderId, page);
+    await _handleMessage(senderId, msgText, 'instagram_playwright')
+      .catch(e => console.error('[IG-PW] handleMessage error:', e.message));
+    igActivePages.delete(senderId);
 
     await _sleep(1500);
   } catch (e) {
@@ -930,38 +883,10 @@ const FOLLOWUP_MSGS = {
   qualified:         'Namaste 🙏 Aap hamare Ayurvedic sinus program ke liye perfect candidate hain! 14 din intensive + 7 din free support. Sirf Rs.499. Kya shuru karein? 🌿'
 };
 
+// Proactive follow-ups now handled by SALESOM AI ghosting recovery in index.js handleMessage.
+// The WhatsApp handler already sends type-specific nudges at 24h and 72h intervals.
 async function sendProactiveFollowups() {
-  try {
-    const now = Date.now();
-    const senders = [...igQualStates.keys()];
-    if (!senders.length) return;
-    console.log('[IG-PW] Checking proactive follow-ups for ' + senders.length + ' leads...');
-    let nudgeCount = 0;
-    for (const senderId of senders) {
-      const st = igQualStates.get(senderId);
-      if (!st || !st.stage) continue;
-      if (st.stage === 'converted' || st.stage === 'opted_out') continue;
-      if (!FOLLOWUP_MSGS[st.stage]) continue;
-      if (st.nudgeSentAt && (now - st.nudgeSentAt) < FOLLOWUP_DELAY_MS) continue;
-      const lastAct = st.lastUpdated || st.nudgeSentAt || 0;
-      if (lastAct && (now - lastAct) < FOLLOWUP_DELAY_MS) continue;
-      console.log('[IG-PW] Nudging ' + senderId + ' | stage: ' + st.stage);
-      try {
-        await sendInstagramMessagePW(senderId, FOLLOWUP_MSGS[st.stage]);
-        st.nudgeSentAt = now;
-        nudgeCount++;
-        await _sleep(4000);
-      } catch (e) {
-        console.error('[IG-PW] Nudge failed for ' + senderId + ':', e.message);
-      }
-    }
-    if (nudgeCount > 0) {
-      await saveQualStates();
-      console.log('[IG-PW] Proactive nudges sent: ' + nudgeCount);
-    }
-  } catch (err) {
-    console.error('[IG-PW] Proactive follow-up error:', err.message);
-  }
+  // No-op — SALESOM AI handles ghosting recovery for all platforms including instagram_playwright
 }
 // ──────────────────────────────────────────────────────────────────────────────
 
