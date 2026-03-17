@@ -690,7 +690,6 @@ async function pollInstagramDMs() {
     }
 
     console.log('[IG-PW] Found ' + threadHrefs.length + ' DM threads');
-    }
     try {
       const hasLoginForm = await page.evaluate(() =>
         !!document.querySelector('input[name="username"], input[autocomplete="username"]')
