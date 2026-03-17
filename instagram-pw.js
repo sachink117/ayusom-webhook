@@ -1,23 +1,33 @@
 // instagram-pw.js
 // Playwright-based Instagram DM handler for Ayusomam Herbals bot.
-// Polls Instagram DMs every 1 minute via headless Chromium browser.h
-// No Meta API token needed — uses real browser session.
+// Polls Instagram DMs every 1 minute via headless Chromium browser.
+// Processes up to 3 threads in parallel using a page pool.
+// No Meta API token needed â uses real browser session.
 //
 // Requires env vars: INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD, TOTP_SECRET
 // TOTP_SECRET: base32 key from Instagram's authenticator app setup (e.g. "JBSWY3DPEHPK3PXP")
 
 let igBrowser = null;
-let igContext  = null;
-let igPage     = null;
-let igReady    = false;
+let igContext = null;
+let igPage = null;
+let igReady = false;
 
 const igSeenMessages = new Set();
-const igThreadUrls   = new Map();
+const igThreadUrls = new Map();
+const igActivePages = new Map(); // senderId -> pool page currently open on that thread
+
+// Qualification state per sender
+// Stages: 'awaiting_qual', 'awaiting_symptoms', 'awaiting_duration', 'qualified'
+const igQualStates = new Map();
+
+// Page pool for parallel thread processing
+const igPagePool = [];
+const POOL_SIZE = 3;
 
 let _db, _handleMessage, _sleep;
 let _igUsername, _igPassword;
 
-// ── TOTP generator (no external deps — uses Node built-in crypto) ─────────────
+// ââ TOTP generator (no external deps â uses Node built-in crypto) âââââââââââââ
 function generateTOTP(secret, timeOffset = 0) {
   const base32Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   let bits = '';
@@ -40,15 +50,15 @@ function generateTOTP(secret, timeOffset = 0) {
   const digest = hmac.digest();
   const offset = digest[digest.length - 1] & 0x0f;
   const code = (
-    ((digest[offset]     & 0x7f) << 24) |
+    ((digest[offset] & 0x7f) << 24) |
     ((digest[offset + 1] & 0xff) << 16) |
-    ((digest[offset + 2] & 0xff) <<  8) |
-     (digest[offset + 3] & 0xff)
+    ((digest[offset + 2] & 0xff) << 8) |
+    (digest[offset + 3] & 0xff)
   ) % 1000000;
   return code.toString().padStart(6, '0');
 }
 
-// ── Cookie persistence (Firestore) ──────────────────────────────────────────
+// ââ Cookie persistence (Firestore) ââââââââââââââââââââââââââââââââââââââââââ
 async function loadIgCookies() {
   if (!_db) return null;
   try {
@@ -64,29 +74,530 @@ function saveIgCookies(cookies) {
     .catch(e => console.error('[IG-PW] Cookie save error:', e.message));
 }
 
-// ── Init ─────────────────────────────────────────────────────────────────────
+// ââ Qualification State (Firestore persistence) ââââââââââââââââââââââââââââââ
+async function loadQualStates() {
+  if (!_db) return;
+  try {
+    const doc = await _db.collection('config').doc('ig_qual_states').get();
+    if (doc.exists && doc.data().states) {
+      for (const [k, v] of Object.entries(doc.data().states)) {
+        igQualStates.set(k, v);
+      }
+      console.log('[IG-PW] Loaded', igQualStates.size, 'qualification states');
+    }
+  } catch (e) {}
+}
+function saveQualStates() {
+  if (!_db) return;
+  const obj = {};
+  igQualStates.forEach((v, k) => { obj[k] = v; });
+  _db.collection('config').doc('ig_qual_states')
+    .set({ states: obj, savedAt: Date.now() })
+    .catch(e => console.error('[IG-PW] QualState save error:', e.message));
+}
+
+// ââ Qualification Engine âââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+function parseDuration(text) {
+  const t = text.toLowerCase();
+  // Explicit single-letter codes (A/B/C/D)
+  if (/(?:^|[\s+,])d(?:[\s+,]|$)/.test(t)) return 'D';
+  if (/(?:^|[\s+,])c(?:[\s+,]|$)/.test(t)) return 'C';
+  if (/(?:^|[\s+,])b(?:[\s+,]|$)/.test(t)) return 'B';
+  if (/(?:^|[\s+,])a(?:[\s+,]|$)/.test(t)) return 'A';
+  // Natural language: years
+  const yearMatch = t.match(/(\d+)\s*(?:saal|sal|year|yr)/);
+  if (yearMatch) {
+    const n = parseInt(yearMatch[1]);
+    return n >= 3 ? 'D' : (n >= 1 ? 'C' : 'B');
+  }
+  if (/saalon\s*se|kaafi\s*time|bahut\s*pehle|bahut\s*purana|years?\s*se/.test(t)) return 'D';
+  // Natural language: months
+  const monthMatch = t.match(/(\d+)\s*(?:mahine|maheene|month)/);
+  if (monthMatch) {
+    const n = parseInt(monthMatch[1]);
+    return n >= 3 ? 'C' : 'B';
+  }
+  if (/kuch\s*(?:mahine|month)/.test(t)) return 'C';
+  // Natural language: weeks
+  if (/(?:\d+\s*)?(?:hafte|hafta|hapta|week)/.test(t)) return 'B';
+  // Natural language: days
+  const dayMatch = t.match(/(\d+)\s*(?:din|day)/);
+  if (dayMatch) {
+    return parseInt(dayMatch[1]) <= 7 ? 'A' : 'B';
+  }
+  return null;
+}
+
+function parseSymptoms(text) {
+  const t = text.toLowerCase();
+  const syms = new Set();
+  // Explicit single digit numbers 1-5
+  const nums = t.match(/\b[1-5]\b/g);
+  if (nums) nums.forEach(n => syms.add(parseInt(n)));
+  // "all" or "sab"
+  if (/\ball\b|\bsab\b|\bsaari\b|\bsabhi\b|\bsab kuch\b/.test(t)) {
+    [1, 2, 3, 4, 5].forEach(n => syms.add(n));
+  }
+  // Symptom 1: naak band / nose block
+  if (/naak\s*(?:band|block|jam|bund)|band\s*naak|nose\s*(?:block|band|bund)|nak\s*(?:band|block)|blocked?\s*nose|congestion/.test(t)) syms.add(1);
+  // Symptom 2: sneezing / runny nose
+  if (/sneez|chhink|runny|naak\s*(?:beh|bah)|bahnti|behna|watery\s*nose|pani\s*aat|paani\s*aat/.test(t)) syms.add(2);
+  // Symptom 3: head heaviness / sinus pressure
+  if (/sir\s*(?:bhaari|bhari|dard|heavy|dukh)|sar\s*(?:bhaari|dard)|head\s*(?:heavy|ache|pain|pressure)|bhaariapan|pressure\s*(?:sar|sir|head)|heaviness/.test(t)) syms.add(3);
+  // Symptom 4: smell loss
+  if (/smell\s*(?:nahi|nahin|na|loss|gone)|khushbu\s*(?:nahi|nahin)|mehak\s*(?:nahi|nahin)|sunghna|soongh|anosmia/.test(t)) syms.add(4);
+  // Symptom 5: post nasal drip / gale mein mucus
+  if (/gal[ae]\s*(?:me[ih]n|mein|me|par|mey)|mucus|kapha|balgam|khara[hs]|throat\s*(?:mucus|drip)|phlegm|post.?nasal|drip/.test(t)) syms.add(5);
+  return [...syms].sort((a, b) => a - b);
+}
+
+function detectSinusType(duration, symptoms) {
+  const s = new Set(symptoms);
+  const isChron = duration === 'D' || duration === 'C';
+  // All 5 symptoms
+  if (s.has(1) && s.has(2) && s.has(3) && s.has(4) && s.has(5)) return 'mixed_overload';
+  if (s.size >= 5) return 'mixed_overload';
+  // Smell loss + block (advanced)
+  if (isChron && s.has(1) && s.has(4)) return 'advanced_chronic';
+  // Block only (chronic)
+  if (isChron && s.has(1) && !s.has(2) && !s.has(3)) return 'chronic_congestion';
+  // Sneezing + head heaviness (reactive congestion)
+  if (s.has(2) && s.has(3)) return 'reactive_congestion';
+  // Sneezing only, long duration
+  if (isChron && s.has(2) && !s.has(1) && !s.has(3)) return 'reactive_sensitivity';
+  // Short duration with reactivity
+  if ((duration === 'A' || duration === 'B') && s.has(2)) return 'reactive_congestion';
+  // Fallbacks
+  if (s.has(1)) return 'chronic_congestion';
+  if (s.has(3)) return 'reactive_congestion';
+  if (s.has(2)) return 'reactive_sensitivity';
+  if (s.has(5)) return 'reactive_sensitivity';
+  return 'chronic_congestion';
+}
+
+// Message templates â NO dashes of any kind
+const MSG_MEDICINE_CYCLE =
+`Itne lambe time se sinus hai toh ek cheez zaroor hua hoga.
+Koi na koi medicine li hogi, thoda theek laga, band ki, wapas aa gayi problem.
+Aisa isliye hota hai kyunki medicines sirf symptoms dabati hain.
+Andar ki wajah theek nahi hoti.
+Sahi hai na aapke saath bhi yahi hua?`;
+
+const MSG_SYMPTOM = {
+  1: `Naak ka band rehna nasal lining ki permanent swelling ka sign hai.
+Jitna purana hoga, utna tissue level par asar badh jaata hai.`,
+  2: `Frequent sneezing aur naak behna matlab nasal lining bahut sensitive ho gayi hai.
+Chhoti si cheez se bhi reaction hoti hai jaise dust, smell ya cold air.`,
+  3: `Sir mein bhaariapan matlab sinus cavity mein mucus jam gaya hai jo drain nahi ho raha.
+Pressure build hota hai aur sar dard bhi aata rehta hai.`,
+  4: `Smell ka chale jaana matlab naak ke andar ki nerve layer affect ho rahi hai.
+Ye treatable hai lekin isme time lagta hai.`,
+  5: `Gale mein mucus rehna post nasal drip hai.
+Raat mein zyada pareshaan karta hai aur neend kharaab hoti hai.`,
+};
+
+const MSG_COMBO = {
+  '1,4': `Naak block aur smell loss dono saath matlab inflammation nasal passage ke upar tak pahunch gayi hai.
+Ye ek advanced sign hai.`,
+  '2,3': `Sneezing aur sir ka bhaariapan dono saath matlab body ek hi time par reactive bhi hai aur congested bhi.
+Dono ko alag alag treat karna padta hai.`,
+  '1,2,3': `Naak band, sneezing aur sir bhaariapan teeno saath matlab sinus ka complete inflammation hai.
+Sirf ek symptom theek karna kaafi nahi hoga.`,
+  '1,2,3,4,5': `Itne saare symptoms ek saath matlab body mein multiple layers par problem hai.
+Ek cheez treat karo to doosri baaki rehti hai.`,
+};
+
+const SINUS_TYPE_DATA = {
+  chronic_congestion: {
+    name: 'Chronic Congestion Type',
+    insight: `Is type mein nasal lining lamba time se swell rehti hai aur passage narrow ho jaata hai.
+Regular breathing bhi mushkil hoti hai dhire dhire.`,
+    question: `Kya kabhi doctor ne surgery suggest ki hai aapko?`,
+  },
+  reactive_sensitivity: {
+    name: 'Reactive Sensitivity Type',
+    insight: `Is type mein nasal lining bahut zyada sensitive ho jaati hai.
+Dust, smoke, cold air - kuch bhi trigger kar sakta hai.`,
+    question: `Kaunsi cheez sabse zyada trigger karti hai aapko - dust, smoke ya cold?`,
+  },
+  reactive_congestion: {
+    name: 'Reactive Congestion Type',
+    insight: `Is type mein dono problems hain. Sensitivity bhi aur blockage bhi.
+Subah uthne par symptoms zyada hote hain usually.`,
+    question: `Subah uthte hi naak band hoti hai ya sneezing hoti hai?`,
+  },
+  mixed_overload: {
+    name: 'Mixed Overload Type',
+    insight: `Is type mein ek saath kaafi layers par problem hai.
+Isliye sirf ek cheez se relief nahi milti aur sab ko saath treat karna padta hai.`,
+    question: `Kya pehle koi Ayurvedic ya herbal treatment try kiya tha?`,
+  },
+  advanced_chronic: {
+    name: 'Advanced Chronic Congestion Type',
+    insight: `Naak block ke saath smell ka jaana matlab nerve level par bhi asar hua hai.
+Ye serious hai lekin Ayurvedic treatment se reverse ho sakta hai.`,
+    question: `Smell kab se gayi hai approximately - 1 saal se pehle ya baad mein?`,
+  },
+  deep_inflammation: {
+    name: 'Deep Inflammation Type',
+    insight: `Is type mein andar ki lining thick ho jaati hai aur passage narrow ho jaata hai.
+Ye chronic inflammation ka advanced stage hai.`,
+    question: `Kya doctor ne kabhi scope ya X-ray se check kiya tha?`,
+  },
+};
+
+function getSymptomInsightMsg(symptoms) {
+  const key = symptoms.join(',');
+  if (MSG_COMBO[key]) return MSG_COMBO[key];
+  // Try partial combos
+  if (symptoms.includes(1) && symptoms.includes(4)) return MSG_COMBO['1,4'];
+  if (symptoms.includes(2) && symptoms.includes(3)) return MSG_COMBO['2,3'];
+  // Single priority: smell > block > head > sneezing > throat
+  for (const p of [4, 1, 3, 2, 5]) {
+    if (symptoms.includes(p)) return MSG_SYMPTOM[p];
+  }
+  return MSG_SYMPTOM[1];
+}
+
+// Per-page send lock — prevents concurrent keyboard events from interleaving characters
+// (e.g. two messages sent at the same time would garble like "KySai rafa pe kt hboadaat")
+const _pageSendLocks = new WeakMap();
+
+// Send a single message on a specific Playwright page (already on the thread)
+// Strategy: API first (no typing, no interleaving), then execCommand, then keyboard fallback
+async function sendMessageOnPage(page, text) {
+  // Serialize all sends on this page — only one at a time
+  const prevLock = _pageSendLocks.get(page) || Promise.resolve();
+  let releaseLock;
+  const thisLock = new Promise(r => { releaseLock = r; });
+  _pageSendLocks.set(page, thisLock);
+  await prevLock;
+
+  try {
+    // ── Attempt 1: Instagram internal fetch API (PRIMARY — no typing, no interleaving) ──
+    // Uses the same authenticated browser session, just calls the IG API directly.
+    const tid = page.url().match(/\/direct\/t\/(\d+)/)?.[1];
+    if (tid) {
+      const res = await page.evaluate(async ([threadId, msg]) => {
+        try {
+          const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+          const body = 'text=' + encodeURIComponent(msg) + '&mutation_token=' + Date.now();
+          const r = await fetch('/api/v1/direct_v2/threads/' + threadId + '/broadcast/text/', {
+            method: 'POST', credentials: 'include',
+            headers: {
+              'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459',
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body
+          });
+          if (!r.ok) { const t = await r.text().catch(() => ''); return { ok: false, status: r.status, body: t.slice(0, 200) }; }
+          return { ok: true };
+        } catch (e) { return { ok: false, err: e.message }; }
+      }, [tid, text]).catch(e => ({ ok: false, err: e.message }));
+
+      if (res?.ok) {
+        console.log('[IG-PW] API send OK for thread', tid);
+        await _sleep(400);
+        return;
+      }
+      console.log('[IG-PW] API send failed for thread', tid, JSON.stringify(res), '— trying DOM fallbacks');
+    }
+
+    // ── Attempt 2: execCommand insertText (atomic DOM paste — no char-by-char typing) ──
+    const jsResult = await page.evaluate(async (msg) => {
+      const inputs = Array.from(document.querySelectorAll('[contenteditable="true"], [role="textbox"]'));
+      for (const el of inputs) {
+        if (el.offsetHeight < 10) continue; // skip hidden
+        el.focus();
+        document.execCommand('insertText', false, msg);
+        el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true }));
+        el.dispatchEvent(new KeyboardEvent('keyup',  { key: 'Enter', keyCode: 13, bubbles: true }));
+        return { ok: true, tag: el.tagName, role: el.getAttribute('role') };
+      }
+      return { ok: false, count: inputs.length };
+    }, text).catch(e => ({ ok: false, err: e.message }));
+
+    if (jsResult?.ok) {
+      console.log('[IG-PW] execCommand send OK:', JSON.stringify(jsResult));
+      await _sleep(800);
+      return;
+    }
+    console.log('[IG-PW] execCommand found', jsResult?.count ?? 0, 'inputs, none worked');
+
+    // ── Attempt 3: Playwright keyboard.type (last resort — avoid concurrent use on same page) ──
+    const SELECTORS = [
+      'div[role="textbox"][contenteditable="true"]',
+      'div[contenteditable="true"][aria-label]',
+      'div[contenteditable="true"]',
+      'p[contenteditable="true"]',
+    ];
+    for (const sel of SELECTORS) {
+      const el = await page.waitForSelector(sel, { timeout: 5000 }).catch(() => null);
+      if (!el) continue;
+      try {
+        await el.scrollIntoViewIfNeeded();
+        await el.click({ timeout: 3000 });
+        await _sleep(300);
+        await page.keyboard.type(text, { delay: 15 });
+        await _sleep(300);
+        await page.keyboard.press('Enter');
+        await _sleep(800);
+        console.log('[IG-PW] keyboard.type send OK (selector:', sel, ')');
+        return;
+      } catch (clickErr) { /* try next */ }
+    }
+    console.error('[IG-PW] All send attempts failed for text:', text.substring(0, 40));
+  } catch (e) {
+    console.error('[IG-PW] sendMessageOnPage error:', e.message);
+  } finally {
+    releaseLock();
+  }
+}
+
+// Send the full qualification sequence (3-4 messages with delays)
+async function sendQualificationSequence(senderId, page, duration, symptoms) {
+  const sinusType = detectSinusType(duration, symptoms);
+  const typeData = SINUS_TYPE_DATA[sinusType] || SINUS_TYPE_DATA.chronic_congestion;
+
+  console.log('[IG-PW] Qual sequence for', senderId, '| duration:', duration, '| symptoms:', symptoms, '| type:', sinusType);
+
+  const messages = [];
+
+  // Step 1: Medicine cycle insight (only for C/D = chronic)
+  if (duration === 'D' || duration === 'C') {
+    messages.push(MSG_MEDICINE_CYCLE);
+  }
+
+  // Step 2: Symptom insight
+  messages.push(getSymptomInsightMsg(symptoms));
+
+  // Step 3: Sinus type reveal + insight
+  messages.push(`Aapka sinus type hai: ${typeData.name}.\n${typeData.insight}`);
+
+  // Step 4: Engaging question
+  messages.push(typeData.question);
+
+  // Save state as 'qualified' BEFORE sending messages.
+  // If we save AFTER (old behaviour), a crash mid-sequence leaves state as 'awaiting_qual'
+  // and the bot re-runs the whole sequence on the next message — asking details again.
+  igQualStates.set(senderId, { stage: 'qualified', duration, symptoms, sinusType, lastUpdated: Date.now() });
+  saveQualStates();
+
+  for (const msg of messages) {
+    await sendMessageOnPage(page, msg);
+    await _sleep(2800); // Pause between messages to feel natural
+  }
+}
+
+// Returns true if this message was handled as a qualification reply
+async function handleQualificationReply(senderId, page, msgText, recentContext) {
+  const state = igQualStates.get(senderId);
+
+  // Already qualified â do not re-run the sequence
+  if (state && (state.stage === 'qualified' || state.stage === 'pitched')) return false;
+
+  const duration = parseDuration(msgText);
+  const symptoms = parseSymptoms(msgText);
+
+  // Scan full conversation context (last 20 msgs) for duration/symptoms shared in earlier messages.
+  // e.g. user said "3 mahine se" 2 turns ago — we should still remember it.
+  const ctxDuration = duration || (recentContext ? parseDuration(recentContext) : null);
+  const ctxSymptoms = symptoms.length > 0 ? symptoms : (recentContext ? parseSymptoms(recentContext) : []);
+
+  // New user with BOTH found anywhere in full context â handle directly
+  if ((!state || state.stage === 'new') && ctxDuration && ctxSymptoms.length > 0) {
+    await sendQualificationSequence(senderId, page, ctxDuration, ctxSymptoms);
+    return true;
+  }
+
+  // Not awaiting qual yet â let _handleMessage handle it
+  if (!state || state.stage === 'new') return false;
+
+  if (state.stage === 'awaiting_qual' || state.stage === 'awaiting_symptoms' || state.stage === 'awaiting_duration') {
+    // Use context-enriched values — avoids re-asking for details the user already shared
+    const finalDuration = ctxDuration || state.duration || null;
+    const finalSymptoms = ctxSymptoms.length > 0 ? ctxSymptoms : (state.symptoms || []);
+
+    if (finalDuration && finalSymptoms.length > 0) {
+      // Have everything â send full sequence
+      await sendQualificationSequence(senderId, page, finalDuration, finalSymptoms);
+      return true;
+    }
+
+    if (finalDuration && finalSymptoms.length === 0) {
+      // Have duration, need symptoms
+      igQualStates.set(senderId, { stage: 'awaiting_symptoms', duration: finalDuration });
+      state.lastUpdated = Date.now();
+      saveQualStates();
+      await sendMessageOnPage(page,
+        `Theek hai.\nAapko kaun kaun si problem hoti hai? Inme se jo bhi ho woh number type karein:\n1. Naak band rehti hai\n2. Sneezing ya naak behna\n3. Sir mein bhaariapan\n4. Smell nahi aati\n5. Gale mein mucus`
+      );
+      return true;
+    }
+
+    if (!finalDuration && finalSymptoms.length > 0) {
+      // Have symptoms, need duration
+      igQualStates.set(senderId, { stage: 'awaiting_duration', symptoms: finalSymptoms });
+      state.lastUpdated = Date.now();
+      saveQualStates();
+      await sendMessageOnPage(page,
+        `Acha. Yeh problem kitne time se hai aapko?\nA. 7 din se kam\nB. 1 se 4 hafte\nC. 1 se 3 mahine\nD. 3 mahine se zyada ya saalon se`
+      );
+      return true;
+    }
+
+    // Cannot parse duration or symptoms from this message
+    return false;
+  }
+
+  return false;
+}
+
+// ââ Init âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+// Post-qualification conversation: handles replies after the sinus type + question was sent
+async function handlePostQualReply(senderId, page, msgText, state, recentContext) {
+  const { sinusType, duration } = state;
+  const lower = (msgText || '').toLowerCase();
+  const isLong = duration === 'D' || duration === 'C';
+  const messages = [];
+
+  if (state.stage === 'pitched') {
+    // User replied after we already sent the program pitch
+
+    // Handle "ilaz batao / treatment kya hai / jukham ka ilaz" — user asking for treatment details
+    if (/ilaz|ilaaj|treatment|upay|remedy|kaise theek|kaise kare|kaise karein|kya karun|kya karna|herb|dawai|dawa|nuskha|gharelu|jukham|sardi|cold|batao kaise|bataiye kaise/.test(lower)) {
+      messages.push('Sinus ka sabse effective ilaz hai root cause target karna — sirf symptoms dabana nahi.\n\nHamare program mein 3 cheezon ka combination hai:\n1. Customized Ayurvedic herb kit (aapke sinus type ke liye)\n2. Daily nasal routine — steam, Nasya, exercises\n3. Diet + lifestyle changes jo mucus production rokein');
+      messages.push('Yeh combination 7-14 din mein clear difference deta hai.\n\nStarter pack Rs. 499 (7 din) ya Core Program Rs. 1299 (14 din + full support).\n\nKya shuru karein?');
+      state.lastUpdated = Date.now();
+      igQualStates.set(senderId, state);
+      saveQualStates();
+      for (const msg of messages) { await sendMessageOnPage(page, msg); await _sleep(2500); }
+      return true;
+    }
+
+    // Objection patterns — must be buying-related, not generic "nahi" complaints
+    const isBuyingObjection = (
+      /nahi chahiye|nahi lena|nahi khareedna|nahi karna|zaroorat nahi|mat bhejo|nahin chahiye|nahin lena/.test(lower) ||
+      /costly|mahanga|mehenga|budget nahi|paisa nahi|afford nahi|paisa kam/.test(lower) ||
+      /sochna hai|soch ke|baad mein|kal baat|pehle sochta|zaroorat nahi|ek baar soch/.test(lower) ||
+      (/nahi/.test(lower) && /program|starter|core|499|1299|khareed|le loon|shuru/.test(lower))
+    );
+    if (isBuyingObjection) {
+      messages.push('Bilkul samajh sakta hoon, aap sochna chahte hain.\n\nSirf ek baat — sinus jitna purana hota hai, utna mushkil treat karna hota hai. Time ke saath condition aur kharab hoti rehti hai.\n\nRs. 499 ka 7-din Starter Program ek baar try karke dekh sakte hain. Koi long commitment nahi — sirf ek hafte ka chhota experiment.');
+    } else if (/\bhaan\b|\bha\b|\byes\b|\btheek\b|\bokay\b|\bok\b|chalega|shuru|\bkaro\b|bhejo|payment|\blink\b|karunga|karenge|ready|le lenge|le leta|shuru kar/.test(lower)) {
+      messages.push('Bahut accha! Main abhi payment link bhej raha hoon.\n\nEk kaam karein — apna naam aur WhatsApp number yahan share karein. Taki program details aur payment link directly aapke paas pahunche aur setup mein koi delay na ho.');
+    } else if (/batao|samjhao|explain|kya hai|kya hoga|kaise|kaisa|puchna|poochna|sawaal|question/.test(lower)) {
+      messages.push('Zaroor — koi bhi sawaal poochein. Main program, herbs, ya treatment process ke baare mein sab kuch bataunga.');
+      messages.push('Ya seedha shuru karte hain? 7-din Starter Program Rs. 499 mein available hai — koi long commitment nahi.');
+    } else {
+      // Smart fallback: look at last 3 user messages in context for relevant keywords
+      const lastUserMsgs = (recentContext || '')
+        .split('\n')
+        .filter(l => l.startsWith('User: '))
+        .slice(-3)
+        .map(l => l.replace('User: ', '').trim())
+        .join(' | ');
+      const ctxLower = lastUserMsgs.toLowerCase();
+      if (/kitna|price|cost|rupees|rs |paisa|kitne|mehanga|sasta/.test(ctxLower)) {
+        messages.push('7-din Starter Program sirf Rs. 499 ka hai.');
+        messages.push('14-din Core Program Rs. 1299 mein milta hai — jo purani problem ke liye zyada effective hai.');
+      } else if (/kya milega|kya hota|program mein|product|herbs|kya hai/.test(ctxLower)) {
+        messages.push('Program mein milta hai: customized herbal kit, nasal Ayurvedic routine, diet tips, aur WhatsApp support.');
+        messages.push('Aapke sinus type ke hisaab se personalized hoga.');
+      } else if (/kitne din|kitne time|kab tak|result|kitna time/.test(ctxLower)) {
+        messages.push('Most people 3-4 din mein breathing improvement feel karte hain.');
+        messages.push('7-din program mein 70-80% log noticeable relief report karte hain.');
+      } else if (/side effect|safe|nuksan|koi problem|nuksaan/.test(ctxLower)) {
+        messages.push('Bilkul safe hai — 100% natural Ayurvedic herbs, koi chemicals nahi.');
+        messages.push('Already 200+ log try kar chuke hain, koi side effects report nahi hue.');
+      } else {
+        messages.push('Koi bhi sawaal ho — price, program, ya treatment ke baare mein — seedha poochein.');
+        messages.push('Main yahan hoon aapki help ke liye.');
+      }
+    }
+    state.lastUpdated = Date.now();
+    igQualStates.set(senderId, state);
+    saveQualStates();
+  } else {
+    // state.stage === 'qualified' - user replied to the type-specific question
+    if (sinusType === 'chronic_congestion') {
+      // Question was: "Kya kabhi doctor ne surgery suggest ki hai aapko?"
+      const usedSpray = /otrivin|spray|nasal|decongestant/.test(lower);
+      const yesSurgery = /haan|ha|yes|surgery|operation|suggest ki/.test(lower);
+
+      if (usedSpray) {
+        messages.push('Otrivin jaisi spray se temporarily naak khulti hai — lekin andar ki inflammation bilkul theek nahi hoti.\n\nRegular use se nasal lining aur zyada sensitive ho jaati hai. Dhire dhire dependency ban jaati hai aur asli problem wahi ki wahi rehti hai.');
+      } else if (yesSurgery) {
+        messages.push('Surgery ek option zaroor hai, lekin pehle Ayurvedic route try karna chahiye.\n\nHamare program se bahut log surgery avoid kar chuke hain — kyunki root cause herbs + lifestyle se treat hota hai, knife se nahi.');
+      } else {
+        messages.push('Accha hua doctor ke paas surgery ke liye nahi gaye. Abhi bhi natural route bilkul possible hai.');
+      }
+      const prog = isLong ? '14-din Core Program (Rs. 1299)' : '7-din Starter Program (Rs. 499)';
+      messages.push('Hamare ' + prog + ' mein customized herbal kit, nasal exercises aur complete Ayurvedic protocol milta hai.\n\nKya shuru karein?');
+
+    } else if (sinusType === 'reactive_sensitivity') {
+      // Question was: "Kaunsi cheez sabse zyada trigger karti hai aapko - dust, smoke ya cold?"
+      const prog = isLong ? '14-din Core Program (Rs. 1299)' : '7-din Starter Program (Rs. 499)';
+      messages.push('Yeh trigger pata lagana treatment ka pehla step hota hai — sahi pakda aapne.\n\nHamare program mein trigger management bhi sikhate hain. Herbs ke saath lifestyle changes bhi hoti hain jo sensitivity ko root se khatam karne mein help karti hain.\n\n' + prog + ' mein yeh sab milta hai. Kya try karna chahenge?');
+
+    } else if (sinusType === 'reactive_congestion') {
+      // Question was: "Subah uthte hi naak band hoti hai ya sneezing hoti hai?"
+      const prog = isLong ? '14-din Core Program (Rs. 1299)' : '7-din Starter Program (Rs. 499)';
+      messages.push('Subah ke symptoms zyada hona is type ki classic sign hai — raat bhar mucus accumulate hota hai aur subah uthte hi attack karta hai.\n\nHamare program mein subah ki specially designed Ayurvedic routine hai iske liye. Plus herbs jo raat mein bhi mucus build-up rokein.\n\n' + prog + '. Kya shuru karein?');
+
+    } else if (sinusType === 'mixed_overload') {
+      // Question was: "Kya pehle koi Ayurvedic ya herbal treatment try kiya tha?"
+      if (/nahi|nahin|nai|no|pehle nahi|try nahi/.test(lower)) {
+        messages.push('Pehli baar mein sahi system se try karna zyada effective hota hai.\n\nHamare 14-din Core Program mein sabh symptoms ko ek saath address kiya jaata hai — herbs, nasal routine, diet, aur lifestyle. Rs. 1299.\n\nKya try karna chahenge?');
+      } else {
+        messages.push('Pehle jo try kiya wo shayad incomplete protocol tha — mixed type ke liye ek complete approach chahiye jo sab symptoms ek saath target kare.\n\nHamare 14-din Core Program mein yahi milta hai. Rs. 1299.\n\nKya try karein?');
+      }
+
+    } else if (sinusType === 'advanced_chronic') {
+      // Question was about when smell left
+      messages.push('Smell ka return possible hai — sahi herbs se nasal nerve layer recover hoti hai.\n\nIs type ke liye hamare program mein ek dedicated protocol hai jo specifically nerve recovery aur deep-seated inflammation target karta hai.\n\n14-din Core Program (Rs. 1299). Kya shuru karein?');
+
+    } else {
+      const prog = isLong ? '14-din Core Program (Rs. 1299)' : '7-din Starter Program (Rs. 499)';
+      messages.push('Aapke case ke liye personalized guidance zaroor help karegi.\n\n' + prog + ' — customized herbal kit, exercises, aur complete Ayurvedic protocol.\n\nKya shuru karna chahenge?');
+    }
+
+    // Move to pitched stage
+    igQualStates.set(senderId, { ...state, stage: 'pitched', lastUpdated: Date.now() });
+    saveQualStates();
+  }
+
+  for (const msg of messages) {
+    await sendMessageOnPage(page, msg);
+    await _sleep(2500);
+  }
+  return true;
+}
+
 async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
   _igUsername = INSTAGRAM_USERNAME;
-  _igPassword  = INSTAGRAM_PASSWORD;
+  _igPassword = INSTAGRAM_PASSWORD;
   try {
     const { chromium } = require('playwright');
     igBrowser = await chromium.launch({
       headless: true,
       args: [
-        '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process',
+        '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote',
         '--disable-blink-features=AutomationControlled',
         '--lang=en-US,en',
       ]
     });
     igContext = await igBrowser.newContext({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-      viewport:  { width: 1280, height: 800 },
+      viewport: { width: 1280, height: 800 },
       locale: 'en-US',
       extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' },
     });
     await igContext.addInitScript(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-      Object.defineProperty(navigator, 'plugins',   { get: () => [1, 2, 3, 4, 5] });
+      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
       Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
       window.chrome = { runtime: {}, loadTimes: function(){}, csi: function(){}, app: {} };
     });
@@ -103,23 +614,47 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
     console.log('[IG-PW] Init inbox URL:', igPage.url());
 
     if (igPage.url().includes('login')) {
-      console.log('[IG-PW] Session expired — logging in...');
+      console.log('[IG-PW] Session expired â logging in...');
       await loginInstagramPW(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD);
     } else {
       console.log('[IG-PW] Session restored from cookies');
     }
 
+    // Load saved qualification states
+    await loadQualStates();
+
+    // Initialize page pool for parallel DM processing
+    console.log('[IG-PW] Initializing page pool (' + POOL_SIZE + ' tabs)...');
+    igPagePool.length = 0;
+    for (let i = 0; i < POOL_SIZE; i++) {
+      const poolPage = await igContext.newPage();
+      // Pre-warm each pool page by navigating to a blank Instagram page
+      await poolPage.goto('https://www.instagram.com/', { timeout: 20000 }).catch(() => {});
+      igPagePool.push({ page: poolPage, busy: false });
+      console.log('[IG-PW] Pool tab', i + 1, 'ready');
+    }
+
+    igBrowser.on('disconnected', () => {
+      console.log('[IG-PW] Browser disconnected — reinitializing in 30s...');
+      igReady = false;
+      setTimeout(() => initPlaywrightIG(_igUsername, _igPassword), 30 * 1000);
+    });
+
     igReady = true;
     console.log('Instagram Playwright: ready, polling every 1 min');
-    console.log('[IG-PW] Module loaded and ready');
-    setInterval(pollInstagramDMs, 1 * 60 * 1000);
+    console.log('[IG-PW] Module loaded. Page pool:', POOL_SIZE, 'tabs. Auto-qualification: ON');
+    setInterval(pollInstagramDMs, 20 * 1000);
+    setInterval(pollNewUserRequests, 20 * 1000);
+    setInterval(sendProactiveFollowups, 2 * 60 * 60 * 1000); // nudge silent leads every 2 hrs
+    setTimeout(catchUpOldThreads, 60 * 1000);        // catch up on old threads 60s after start
+    setTimeout(sendProactiveFollowups, 5 * 60 * 1000); // first nudge check 5 min after start
   } catch (e) {
     console.error('[IG-PW] Init error:', e.message);
     setTimeout(() => initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD), 5 * 60 * 1000);
   }
 }
 
-// ── Login ────────────────────────────────────────────────────────────────────
+// ââ Login ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 async function loginInstagramPW(username = _igUsername, password = _igPassword) {
   try {
     await igPage.goto('https://www.instagram.com/accounts/login/', { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -140,7 +675,7 @@ async function loginInstagramPW(username = _igUsername, password = _igPassword) 
       return false;
     };
     const unameSelectors = ['input[name="username"]','input[aria-label*="username" i]','input[autocomplete="username"]','input[type="text"]'];
-    const pwSelectors    = ['input[name="password"]','input[aria-label*="password" i]','input[autocomplete="current-password"]','input[type="password"]'];
+    const pwSelectors = ['input[name="password"]','input[aria-label*="password" i]','input[autocomplete="current-password"]','input[type="password"]'];
 
     const gotUname = await tryFill(unameSelectors, username);
     if (!gotUname) throw new Error('Username input not found');
@@ -153,18 +688,16 @@ async function loginInstagramPW(username = _igUsername, password = _igPassword) 
     await _sleep(6000);
     console.log('[IG-PW] Post-submit URL:', igPage.url());
 
-    // ── Handle Two-Factor Authentication ──────────────────────────────────────
+    // ââ Handle Two-Factor Authentication ââââââââââââââââââââââââââââââââââââââ
     if (igPage.url().includes('two_factor') || igPage.url().includes('codeentry') || igPage.url().includes('challenge')) {
       console.log('[IG-PW] 2FA page detected:', igPage.url());
       const totpSecret = process.env.TOTP_SECRET;
       if (!totpSecret) {
         throw new Error('2FA required but TOTP_SECRET env var is not set');
       }
-      // Log 2FA page to diagnose which method Instagram is showing
       const pageText2fa = await igPage.evaluate(() => document.body.innerText).catch(() => '');
       console.log('[IG-PW] 2FA page text:', pageText2fa.slice(0, 400).replace(/\n/g, ' | '));
 
-      // Instagram defaults to SMS 2FA — try to switch to authenticator app first
       try {
         const allEls = await igPage.$$('a, button, span[role="button"]');
         for (const el of allEls) {
@@ -178,7 +711,7 @@ async function loginInstagramPW(username = _igUsername, password = _igPassword) 
         }
       } catch(e) { console.log('[IG-PW] Auth-app switch error (non-fatal):', e.message); }
 
-            const serverTs = Math.floor(Date.now() / 1000);
+      const serverTs = Math.floor(Date.now() / 1000);
       console.log('[IG-PW] Server Unix timestamp:', serverTs, '| window:', Math.floor(serverTs / 30));
       const codeInput = await igPage.$(
         'input[name="verificationCode"], input[aria-label*="code" i], input[inputmode="numeric"], input[type="number"], input[autocomplete="one-time-code"]'
@@ -207,7 +740,7 @@ async function loginInstagramPW(username = _igUsername, password = _igPassword) 
           break;
         }
       }
-      if (!twoFaDone) console.log('[IG-PW] All TOTP windows failed — wrong secret or Instagram challenge');
+      if (!twoFaDone) console.log('[IG-PW] All TOTP windows failed â wrong secret or Instagram challenge');
     }
 
     // Dismiss "Save your login info?" and "Turn on notifications?" prompts
@@ -232,112 +765,407 @@ async function loginInstagramPW(username = _igUsername, password = _igPassword) 
   }
 }
 
-// ── Poll DMs ─────────────────────────────────────────────────────────────────
-async function pollInstagramDMs() {
+// ââ Process a single DM thread on a specific pool page âââââââââââââââââââââââ
+async function processThread(poolEntry, href) {
+  const { page } = poolEntry;
+  const threadId = href.replace(/\//g, '').replace('directt', '');
+  const senderId = 'ig_pw_' + threadId;
+  const threadUrl = 'https://www.instagram.com' + href;
+
+  try {
+    // Instagram SPA redirects long thread IDs to short ones → ERR_ABORTED or
+    // "interrupted by another navigation" are both normal (SPA redirect behaviour)
+    await page.goto(threadUrl, { waitUntil: 'domcontentloaded', timeout: 20000 })
+      .catch(e => {
+        if (!e.message.includes('ERR_ABORTED') && !e.message.includes('interrupted by another navigation')) throw e;
+      });
+    await _sleep(2500);
+
+    // Check if session expired on this pool page
+    if (page.url().includes('login')) {
+      console.log('[IG-PW] Pool page session expired â skipping thread', threadId);
+      return;
+    }
+
+    // Use Instagram thread API to get last message (DOM scan unreliable in headless mode)
+    const threadData = await page.evaluate(async (tid) => {
+      try {
+        const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+        const r = await fetch('/api/v1/direct_v2/threads/' + tid + '/?limit=20', {
+          credentials: 'include',
+          headers: { 'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459' }
+        });
+        if (!r.ok) return null;
+        return await r.json();
+      } catch(e) { return null; }
+    }, threadId).catch(() => null);
+
+    if (!threadData?.thread?.items?.length) return;
+
+    const lastItem = threadData.thread.items[0]; // items are newest-first
+    // Skip if the last message is our own reply (avoid infinite reply loop)
+    if (String(lastItem.user_id) === String(threadData.thread.viewer_id)) return;
+
+    const msgText = (lastItem.text || lastItem.item_type || '').trim();
+    if (!msgText || msgText.length < 2) return;
+
+    // Build conversation context: last 20 messages, oldest first, with Bot/User labels.
+    // Used by both qual and post-qual handlers to reply smartly based on full history.
+    const viewerId = String(threadData.thread.viewer_id);
+    const recentItems = [...threadData.thread.items].reverse(); // newest-first → oldest-first
+    const recentContext = recentItems
+      .map(item => {
+        const isBot = String(item.user_id) === viewerId;
+        const txt = (item.text || '').trim();
+        if (!txt) return null;
+        return (isBot ? 'Bot: ' : 'User: ') + txt;
+      })
+      .filter(Boolean)
+      .join('\n');
+    console.log('[IG-PW] Context (' + recentItems.length + ' msgs):', recentContext.substring(0, 200));
+
+    // Persist key details from context into Firestore state (duration, symptoms, lastMsgId).
+    // This survives bot restarts so we never ask users for info they already gave us.
+    const msgId = lastItem.item_id || (threadId + '::' + msgText.substring(0, 60));
+    const _stateForDedup = igQualStates.get(senderId);
+    if (igSeenMessages.has(msgId)) return;
+    // Also check persisted lastMsgId — igSeenMessages resets on every restart
+    if (_stateForDedup?.lastMsgId === msgId) {
+      igSeenMessages.add(msgId);
+      return;
+    }
+    igSeenMessages.add(msgId);
+    igThreadUrls.set(senderId, threadUrl);
+    // Save lastMsgId + any newly parsed details to Firestore
+    if (_stateForDedup) {
+      const ctxDur = parseDuration(recentContext);
+      const ctxSym = parseSymptoms(recentContext);
+      if (ctxDur && !_stateForDedup.duration) _stateForDedup.duration = ctxDur;
+      if (ctxSym.length > 0 && !(_stateForDedup.symptoms?.length > 0)) _stateForDedup.symptoms = ctxSym;
+      _stateForDedup.lastMsgId = msgId;
+      igQualStates.set(senderId, _stateForDedup);
+      saveQualStates();
+    }
+
+    console.log('[IG-PW] DM (' + threadId + '): "' + msgText.substring(0, 80) + '"');
+
+    // Try qualification handler first
+    const qualHandled = await handleQualificationReply(senderId, page, msgText, recentContext);
+
+    if (!qualHandled) {
+      const existingState = igQualStates.get(senderId);
+
+      if (!existingState || existingState.stage === 'new') {
+        // Truly new user — send initial greeting via main bot handler
+        igActivePages.set(senderId, page);
+        await _handleMessage(senderId, msgText, 'instagram_playwright')
+          .catch(e => console.error('[IG-PW] handleMessage error:', e.message));
+        igActivePages.delete(senderId);
+        // Mark as awaiting_qual so future messages are handled by qual engine
+        igQualStates.set(senderId, { stage: 'awaiting_qual', lastMsgId: msgId, lastUpdated: Date.now() });
+        saveQualStates();
+      } else if (existingState.stage === 'qualified' || existingState.stage === 'pitched') {
+        // Existing user in post-qualification stage — continue the sales conversation
+        await handlePostQualReply(senderId, page, msgText, existingState, recentContext)
+          .catch(e => console.error('[IG-PW] postQualReply error:', e.message));
+      } else {
+        // awaiting_qual/symptoms/duration but couldn't parse this message — gentle re-prompt
+        console.log('[IG-PW] Could not parse reply for stage', existingState.stage, '— re-prompting');
+        await sendMessageOnPage(page, 'Kya aap thoda aur detail mein bata sakte hain? Main samajhna chahta hoon.');
+        existingState.lastUpdated = Date.now();
+        igQualStates.set(senderId, existingState);
+        saveQualStates();
+      }
+    }
+
+    await _sleep(1500);
+  } catch (e) {
+    console.error('[IG-PW] Thread error [' + threadId + ']:', e.message);
+  }
+}
+
+// ââ Poll DMs (parallel with page pool) ââââââââââââââââââââââââââââââââââââââââ
+// ─── PROACTIVE FOLLOW-UP ENGINE ──────────────────────────────────────────────
+// Re-engages warm leads who went silent mid-qualification
+const FOLLOWUP_DELAY_MS = 8 * 60 * 60 * 1000; // 8 hours silence before nudge
+const FOLLOWUP_MSGS = {
+  awaiting_qual:     'Namaste 🙏 Kya aapke sinus ki problem abhi bhi pareshaan kar rahi hai? Main aapki help ke liye yahan hoon — bas batayein kya feel ho raha hai?',
+  awaiting_symptoms: 'Namaste 🙏 Aapne sinus problem ke baare mein bataya tha. Kya aap apne main symptoms share kar sakte hain? (naak band, sir dard, etc.) 🌿',
+  awaiting_duration: 'Namaste 🙏 Bas ek chhota sawaal — yeh sinus ki takleef aapko kitne time se hai? Isse hum sahi program suggest kar sakte hain 🌿',
+  qualified:         'Namaste 🙏 Aap hamare Ayurvedic sinus program ke liye perfect candidate hain! 14 din intensive + 7 din free support. Sirf Rs.499. Kya shuru karein? 🌿'
+};
+
+async function sendProactiveFollowups() {
+  try {
+    const now = Date.now();
+    const senders = [...igQualStates.keys()];
+    if (!senders.length) return;
+    console.log('[IG-PW] Checking proactive follow-ups for ' + senders.length + ' leads...');
+    let nudgeCount = 0;
+    for (const senderId of senders) {
+      const st = igQualStates.get(senderId);
+      if (!st || !st.stage) continue;
+      if (st.stage === 'converted' || st.stage === 'opted_out') continue;
+      if (!FOLLOWUP_MSGS[st.stage]) continue;
+      if (st.nudgeSentAt && (now - st.nudgeSentAt) < FOLLOWUP_DELAY_MS) continue;
+      const lastAct = st.lastUpdated || st.nudgeSentAt || 0;
+      if (lastAct && (now - lastAct) < FOLLOWUP_DELAY_MS) continue;
+      console.log('[IG-PW] Nudging ' + senderId + ' | stage: ' + st.stage);
+      try {
+        await sendInstagramMessagePW(senderId, FOLLOWUP_MSGS[st.stage]);
+        st.nudgeSentAt = now;
+        nudgeCount++;
+        await _sleep(4000);
+      } catch (e) {
+        console.error('[IG-PW] Nudge failed for ' + senderId + ':', e.message);
+      }
+    }
+    if (nudgeCount > 0) {
+      await saveQualStates();
+      console.log('[IG-PW] Proactive nudges sent: ' + nudgeCount);
+    }
+  } catch (err) {
+    console.error('[IG-PW] Proactive follow-up error:', err.message);
+  }
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
+// ── Catch up on old / unanswered threads (runs once ~60s after startup) ────────
+async function catchUpOldThreads() {
+  if (!igReady || !igPage) return;
+  console.log('[IG-PW] Catch-up: scanning older threads for unanswered messages...');
+  try {
+    let allHrefs = [];
+    let cursor = null;
+
+    // Paginate inbox API (3 pages × 20 threads = up to 60 threads)
+    for (let p = 0; p < 3; p++) {
+      const data = await igPage.evaluate(async (cur) => {
+        try {
+          const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+          let url = '/api/v1/direct_v2/inbox/?limit=20';
+          if (cur) url += '&cursor=' + encodeURIComponent(cur);
+          const r = await fetch(url, {
+            credentials: 'include',
+            headers: { 'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459' }
+          });
+          if (!r.ok) return null;
+          return await r.json();
+        } catch(e) { return null; }
+      }, cursor).catch(() => null);
+
+      if (!data?.inbox?.threads?.length) break;
+      allHrefs.push(...data.inbox.threads.map(t => '/direct/t/' + t.thread_id + '/'));
+      cursor = data.inbox.oldest_cursor || null;
+      if (!cursor) break;
+      await _sleep(1000);
+    }
+
+    console.log('[IG-PW] Catch-up: ' + allHrefs.length + ' threads to check');
+
+    // Process in batches using pool — processThread skips seen messages automatically
+    for (let i = 0; i < allHrefs.length; i += POOL_SIZE) {
+      const batch = allHrefs.slice(i, i + POOL_SIZE);
+      const entries = igPagePool.slice(0, batch.length);
+      entries.forEach(e => { e.busy = true; });
+      await Promise.allSettled(batch.map((href, idx) => processThread(entries[idx], href)));
+      entries.forEach(e => { e.busy = false; });
+      await _sleep(2000);
+    }
+
+    console.log('[IG-PW] Catch-up complete');
+  } catch(e) {
+    console.error('[IG-PW] Catch-up error:', e.message);
+  }
+}
+
+// ── Poll pending DM requests (new users who haven't been accepted yet) ─────────
+async function pollNewUserRequests() {
   if (!igReady || !igPage) return;
   try {
-    await igPage.goto('https://www.instagram.com/direct/inbox/', { timeout: 30000 });
+    const pendingApi = await igPage.evaluate(async () => {
+      try {
+        const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+        const r = await fetch('/api/v1/direct_v2/pending_inbox/?limit=20', {
+          credentials: 'include',
+          headers: { 'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459' }
+        });
+        if (!r.ok) return { err: r.status };
+        return await r.json();
+      } catch(e) { return { err: e.message }; }
+    }).catch(() => null);
+
+    if (!pendingApi?.inbox?.threads?.length) return;
+
+    console.log('[IG-PW] Pending requests:', pendingApi.inbox.threads.length);
+
+    for (const thread of pendingApi.inbox.threads) {
+      const threadId = thread.thread_id;
+
+      // Accept the message request first
+      await igPage.evaluate(async (tid) => {
+        try {
+          const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+          await fetch('/api/v1/direct_v2/threads/' + tid + '/approve/', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'X-CSRFToken': tok,
+              'X-IG-App-ID': '936619743392459',
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
+          });
+        } catch(e) {}
+      }, threadId).catch(() => {});
+
+      console.log('[IG-PW] Accepted pending request:', threadId);
+
+      // Now process the thread using a free pool page
+      const href = '/direct/t/' + threadId + '/';
+      const poolEntry = igPagePool.find(p => !p.busy);
+      if (poolEntry) {
+        poolEntry.busy = true;
+        await processThread(poolEntry, href).catch(e => console.error('[IG-PW] New user thread error:', e.message));
+        poolEntry.busy = false;
+      } else {
+        // All pool pages busy — use igPage as fallback
+        await processThread({ page: igPage }, href).catch(e => console.error('[IG-PW] New user thread error:', e.message));
+      }
+
+      await _sleep(2000);
+    }
+  } catch(e) {
+    console.error('[IG-PW] New user poll error:', e.message);
+  }
+}
+
+let _igPollRunning = false; // guard: prevent overlapping poll cycles
+async function pollInstagramDMs() {
+  if (!igReady || !igPage || _igPollRunning) return;
+  _igPollRunning = true;
+  try {
+    await igPage.goto('https://www.instagram.com/direct/inbox/', { waitUntil: 'domcontentloaded', timeout: 30000 })
+      .catch(e => { if (!e.message.includes('ERR_ABORTED')) throw e; });
     await _sleep(3000);
     console.log('[IG-PW] Poll URL:', igPage.url());
 
     if (igPage.url().includes('login')) {
-      console.log('[IG-PW] Session expired — re-logging in...');
+      console.log('[IG-PW] Session expired â re-logging in...');
       await loginInstagramPW();
       console.log('[IG-PW] Post-relogin URL:', igPage.url());
       if (igPage.url().includes('login')) {
-        console.log('[IG-PW] Still on login after re-login — aborting poll');
+        console.log('[IG-PW] Still on login after re-login â aborting poll');
         return;
       }
     }
 
-    const allLinks = await igPage.$$('a[href*="/direct/t/"]');
-    const seenHrefs = new Set();
-    const threads = [];
-    for (const link of allLinks) {
-      const href = await link.getAttribute('href').catch(() => null);
-      if (href && !seenHrefs.has(href)) { seenHrefs.add(href); threads.push({ link, href }); }
-    }
-    console.log('[IG-PW] Found ' + threads.length + ' DM threads');
+    // Collect all thread hrefs from inbox (no clicking â just read hrefs)
+    // Wait for thread list to render (Instagram SPA needs time)
 
-    for (const { link, href } of threads.slice(0, 8)) {
+    // Use Instagram internal API to get DM thread IDs (DOM scan doesn't work in headless mode)
+    let threadHrefs = [];
+    const _inboxApi = await igPage.evaluate(async () => {
       try {
-        await link.click();
-        await _sleep(2500);
+        const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+        const r = await fetch('/api/v1/direct_v2/inbox/?limit=20', {
+          credentials: 'include',
+          headers: { 'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459' }
+        });
+        if (!r.ok) return { err: r.status };
+        return await r.json();
+      } catch(e) { return { err: e.message }; }
+    }).catch(() => null);
 
-        const threadUrl = igPage.url();
-        const threadId  = href.replace(/\//g, '').replace('directt', '');
-        const senderId  = 'ig_pw_' + threadId;
+    if (_inboxApi?.inbox?.threads?.length) {
+      threadHrefs = _inboxApi.inbox.threads.map(t => '/direct/t/' + t.thread_id + '/');
+      console.log('[IG-PW] API: got ' + threadHrefs.length + ' threads');
+    } else {
+      console.log('[IG-PW] API no threads. Response keys:', Object.keys(_inboxApi || {}).join(','));
+    }
 
-        const msgEls = await igPage.$$(
-          'div[class*="_aa6j"], div[dir="auto"]:not(header *), [class*="messageText"]'
-        );
-        if (msgEls.length === 0) continue;
+    console.log('[IG-PW] Found ' + threadHrefs.length + ' DM threads');
 
-        const lastEl  = msgEls[msgEls.length - 1];
-        const msgText = (await lastEl.textContent().catch(() => '')).trim();
-        if (!msgText || msgText.length < 2) continue;
-
-        const msgId = threadId + '::' + msgText.substring(0, 60);
-        if (igSeenMessages.has(msgId)) continue;
-        igSeenMessages.add(msgId);
-        igThreadUrls.set(senderId, threadUrl);
-
-        console.log('[IG-PW] DM (' + threadId + '): "' + msgText.substring(0, 80) + '"');
-
-        _handleMessage(senderId, msgText, 'instagram_playwright')
-          .catch(e => console.error('[IG-PW] handleMessage error:', e.message));
-
-        await _sleep(2000);
-      } catch (e) {
-        console.error('[IG-PW] Thread error:', e.message);
-      }
+    // Process up to 15 threads in parallel batches of POOL_SIZE
+    const toProcess = threadHrefs.slice(0, 15);
+    for (let i = 0; i < toProcess.length; i += POOL_SIZE) {
+      const batch = toProcess.slice(i, i + POOL_SIZE);
+      // Mark pool entries as busy
+      const poolEntries = igPagePool.slice(0, batch.length);
+      poolEntries.forEach(p => { p.busy = true; });
+      await Promise.allSettled(
+        batch.map((href, idx) => processThread(poolEntries[idx], href))
+      );
+      poolEntries.forEach(p => { p.busy = false; });
+      await _sleep(1000); // Brief pause between batches
     }
 
     saveIgCookies(await igContext.cookies());
   } catch (e) {
     console.error('[IG-PW] Poll error:', e.message);
     igReady = false;
-    setTimeout(pollInstagramDMs, 5 * 60 * 1000);
+    if (e.message.includes('browser has been closed') || e.message.includes('context or browser')) {
+      console.log('[IG-PW] Browser crash detected in poll — reinitializing in 30s...');
+      setTimeout(() => initPlaywrightIG(_igUsername, _igPassword), 30 * 1000);
+    } else {
+      // Re-engage warm leads who went silent
+      await sendProactiveFollowups();
+      setTimeout(pollInstagramDMs, 30 * 1000);
+    }
+  } finally {
+    _igPollRunning = false; // always release the lock so next interval can run
   }
 }
 
-// ── Send reply ────────────────────────────────────────────────────────────────
+// ââ Send reply (used by index.js _handleMessage for initial messages) âââââââââ
 async function sendInstagramMessagePW(senderId, text) {
   if (!igPage) { console.error('[IG-PW] No browser page'); return; }
   try {
     const threadUrl = igThreadUrls.get(senderId);
-    if (threadUrl && !igPage.url().includes(threadUrl.split('/').pop())) {
-      await igPage.goto(threadUrl, { timeout: 15000 });
-      await _sleep(2000);
+
+    // Prefer the page already open on this thread (registered by processThread).
+    // This avoids a race condition where all pool pages are still busy.
+    const activePage = igActivePages.get(senderId);
+    if (activePage) {
+      await sendMessageOnPage(activePage, text);
+      console.log('[IG-PW] Reply sent to', senderId, '(active page)');
+      return;
     }
 
-    const inputEl = await igPage.waitForSelector(
-      '[contenteditable="true"][role="textbox"], div[contenteditable="true"][data-testid], textarea[placeholder*="essage"]',
-      { timeout: 8000 }
-    ).catch(() => null);
+    // Otherwise find a free pool page, fall back to igPage
+    const poolEntry = igPagePool.find(p => !p.busy);
+    const page = poolEntry ? poolEntry.page : igPage;
+    if (poolEntry) poolEntry.busy = true;
 
-    if (!inputEl) { console.error('[IG-PW] Message input not found'); return; }
-
-    await inputEl.click();
-    await _sleep(300);
-    await inputEl.fill(text);
-    await _sleep(300);
-    await igPage.keyboard.press('Enter');
-    await _sleep(500);
-
-    console.log('[IG-PW] Reply sent to', senderId);
+    try {
+      if (threadUrl) {
+        // Fix: split('/').pop() returns '' when URL ends with '/', so filter first
+        const threadIdPart = threadUrl.split('/').filter(Boolean).pop() || '';
+        const currentUrl = page.url();
+        if (!threadIdPart || !currentUrl.includes(threadIdPart)) {
+          await page.goto(threadUrl, { waitUntil: 'domcontentloaded', timeout: 15000 })
+            .catch(e => { if (!e.message.includes('ERR_ABORTED') && !e.message.includes('interrupted by another navigation')) throw e; });
+          await _sleep(3000);
+        }
+      }
+      await sendMessageOnPage(page, text);
+      console.log('[IG-PW] Reply sent to', senderId);
+    } finally {
+      if (poolEntry) poolEntry.busy = false;
+    }
   } catch (e) {
     console.error('[IG-PW] Send error:', e.message);
   }
 }
 
-// ── Module export ─────────────────────────────────────────────────────────────
+// ââ Module export âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 module.exports = {
-  async init({ db, handleMessage, sleep, INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD }) {
-    _db            = db;
+  async init({ db, handleMessage, sleep, INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD}) {
+    _db = db;
     _handleMessage = handleMessage;
-    _sleep         = sleep;
+    _sleep = sleep;
     await initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD);
     return sendInstagramMessagePW;
   }
 };
+
+module.exports.loginInstagramPW = loginInstagramPW;
