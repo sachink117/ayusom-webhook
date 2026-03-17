@@ -445,6 +445,9 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
     console.log('[IG-PW] Module loaded. Page pool:', POOL_SIZE, 'tabs. Auto-qualification: ON');
     setInterval(pollInstagramDMs, 20 * 1000);
     setInterval(pollNewUserRequests, 20 * 1000);
+    setInterval(sendProactiveFollowups, 2 * 60 * 60 * 1000); // nudge silent leads every 2 hrs
+    setTimeout(catchUpOldThreads, 60 * 1000);        // catch up on old threads 60s after start
+    setTimeout(sendProactiveFollowups, 5 * 60 * 1000); // first nudge check 5 min after start
   } catch (e) {
     console.error('[IG-PW] Init error:', e.message);
     setTimeout(() => initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD), 30 * 1000);
@@ -647,12 +650,12 @@ const FOLLOWUP_MSGS = {
 async function sendProactiveFollowups() {
   try {
     const now = Date.now();
-    const senders = Object.keys(igQualStates);
+    const senders = [...igQualStates.keys()];
     if (!senders.length) return;
     console.log('[IG-PW] Checking proactive follow-ups for ' + senders.length + ' leads...');
     let nudgeCount = 0;
     for (const senderId of senders) {
-      const st = igQualStates[senderId];
+      const st = igQualStates.get(senderId);
       if (!st || !st.stage) continue;
       if (st.stage === 'converted' || st.stage === 'opted_out') continue;
       if (!FOLLOWUP_MSGS[st.stage]) continue;
@@ -678,6 +681,55 @@ async function sendProactiveFollowups() {
   }
 }
 // ──────────────────────────────────────────────────────────────────────────────
+
+// ── Catch up on old / unanswered threads (runs once ~60s after startup) ────────
+async function catchUpOldThreads() {
+  if (!igReady || !igPage) return;
+  console.log('[IG-PW] Catch-up: scanning older threads for unanswered messages...');
+  try {
+    let allHrefs = [];
+    let cursor = null;
+
+    // Paginate inbox API (3 pages x 20 threads = up to 60 threads)
+    for (let p = 0; p < 3; p++) {
+      const data = await igPage.evaluate(async (cur) => {
+        try {
+          const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+          let url = '/api/v1/direct_v2/inbox/?limit=20';
+          if (cur) url += '&cursor=' + encodeURIComponent(cur);
+          const r = await fetch(url, {
+            credentials: 'include',
+            headers: { 'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459' }
+          });
+          if (!r.ok) return null;
+          return await r.json();
+        } catch(e) { return null; }
+      }, cursor).catch(() => null);
+
+      if (!data?.inbox?.threads?.length) break;
+      allHrefs.push(...data.inbox.threads.map(t => '/direct/t/' + t.thread_id + '/'));
+      cursor = data.inbox.oldest_cursor || null;
+      if (!cursor) break;
+      await _sleep(1000);
+    }
+
+    console.log('[IG-PW] Catch-up: ' + allHrefs.length + ' threads to check');
+
+    // Process in batches using pool -- processThread skips seen messages automatically
+    for (let i = 0; i < allHrefs.length; i += POOL_SIZE) {
+      const batch = allHrefs.slice(i, i + POOL_SIZE);
+      const entries = igPagePool.slice(0, batch.length);
+      entries.forEach(e => { e.busy = true; });
+      await Promise.allSettled(batch.map((href, idx) => processThread(entries[idx], href)));
+      entries.forEach(e => { e.busy = false; });
+      await _sleep(2000);
+    }
+
+    console.log('[IG-PW] Catch-up complete');
+  } catch(e) {
+    console.error('[IG-PW] Catch-up error:', e.message);
+  }
+}
 
 // ── Poll pending DM requests (new users who haven't been accepted yet) ─────────
 async function pollNewUserRequests() {
