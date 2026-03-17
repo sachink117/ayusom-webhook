@@ -313,9 +313,11 @@ async function sendMessageOnPage(page, text) {
     try {
       const pageUrl = domPage.url();
 
-      // ── Attempt 1: execCommand insertText (fast, atomic, no interleaving) ──
+      // ── Attempt 1: execCommand insertText + Playwright Enter (reliable combo) ──
+      // execCommand inserts text into React's contenteditable correctly,
+      // but synthetic KeyboardEvent dispatches do NOT trigger Instagram's send.
+      // So we use execCommand for text insertion, then Playwright keyboard.press for Enter.
       const jsResult = await domPage.evaluate(async (msg) => {
-        // Try to find the DM message input — look for visible contenteditable
         const inputs = Array.from(document.querySelectorAll(
           'div[contenteditable="true"], p[contenteditable="true"], [role="textbox"]'
         ));
@@ -323,23 +325,21 @@ async function sendMessageOnPage(page, text) {
         if (visible.length === 0) {
           return { ok: false, count: inputs.length, url: location.href };
         }
-        // Use the LAST visible one (message box is usually at the bottom)
         const el = visible[visible.length - 1];
         el.focus();
-        // Try React-compatible input event dispatch
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, 'innerText');
         document.execCommand('insertText', false, msg);
         el.dispatchEvent(new InputEvent('input', { bubbles: true, data: msg, inputType: 'insertText' }));
-        el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true, cancelable: true }));
-        el.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', keyCode: 13, bubbles: true, cancelable: true }));
-        el.dispatchEvent(new KeyboardEvent('keyup',    { key: 'Enter', keyCode: 13, bubbles: true }));
+        // Do NOT dispatch synthetic Enter here — Playwright will press Enter natively below
         return { ok: true, tag: el.tagName, role: el.getAttribute('role'), visCount: visible.length };
       }, text).catch(e => ({ ok: false, err: e.message }));
 
       if (jsResult?.ok) {
-        console.log('[IG-PW] execCommand send OK:', JSON.stringify(jsResult));
+        // Use Playwright's native keyboard.press to actually send — synthetic events don't work
+        await _sleep(300);
+        await domPage.keyboard.press('Enter');
+        await _sleep(600);
+        console.log('[IG-PW] execCommand+Enter send OK:', JSON.stringify(jsResult));
         igSendFailCounts.delete(domTid);
-        await _sleep(800);
         return;
       }
 
@@ -838,7 +838,12 @@ async function processThread(poolEntry, href) {
     // Skip if the last message is our own reply (avoid infinite reply loop)
     if (String(lastItem.user_id) === String(threadData.thread.viewer_id)) return;
 
-    const msgText = (lastItem.text || lastItem.item_type || '').trim();
+    // Only process actual text messages — skip media shares, reels, clips, action logs etc.
+    const SKIP_ITEM_TYPES = new Set(['media_share', 'clip', 'placeholder', 'action_log', 'reel_share',
+      'animated_media', 'voice_media', 'video_call_event', 'link', 'like', 'raven_media',
+      'story_share', 'felix_share', 'profile', 'location']);
+    if (SKIP_ITEM_TYPES.has(lastItem.item_type) && !lastItem.text) return;
+    const msgText = (lastItem.text || '').trim();
     if (!msgText || msgText.length < 2) return;
 
     // Build conversation context: last 20 messages, oldest first, with Bot/User labels.
