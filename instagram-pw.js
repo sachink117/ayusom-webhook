@@ -263,9 +263,10 @@ function getSymptomInsightMsg(symptoms) {
 // Send a single message on a specific Playwright page (already on the thread)
 async function sendMessageOnPage(page, text) {
   try {
+    // Wait up to 20s — after an Instagram SPA redirect the input can take a moment to render
     const inputEl = await page.waitForSelector(
-      '[contenteditable="true"][role="textbox"]',
-      { timeout: 10000 }
+      '[contenteditable="true"][role="textbox"], div[aria-label*="message" i][contenteditable="true"]',
+      { timeout: 20000 }
     ).catch(() => null);
     if (!inputEl) { console.error('[IG-PW] Message input not found on', page.url()); return; }
     await inputEl.click();
@@ -573,9 +574,12 @@ async function processThread(poolEntry, href) {
   const threadUrl = 'https://www.instagram.com' + href;
 
   try {
-    // Instagram SPA redirects long thread IDs to short ones → ERR_ABORTED is normal
+    // Instagram SPA redirects long thread IDs to short ones → ERR_ABORTED or
+    // "interrupted by another navigation" are both normal (SPA redirect behaviour)
     await page.goto(threadUrl, { waitUntil: 'domcontentloaded', timeout: 20000 })
-      .catch(e => { if (!e.message.includes('ERR_ABORTED')) throw e; });
+      .catch(e => {
+        if (!e.message.includes('ERR_ABORTED') && !e.message.includes('interrupted by another navigation')) throw e;
+      });
     await _sleep(2500);
 
     // Check if session expired on this pool page
@@ -795,7 +799,7 @@ async function pollInstagramDMs() {
   if (!igReady || !igPage) return;
   try {
     await igPage.goto('https://www.instagram.com/direct/inbox/', { waitUntil: 'domcontentloaded', timeout: 30000 })
-      .catch(e => { if (!e.message.includes('ERR_ABORTED')) throw e; });
+      .catch(e => { if (!e.message.includes('ERR_ABORTED') && !e.message.includes('interrupted by another navigation')) throw e; });
     await _sleep(3000);
     console.log('[IG-PW] Poll URL:', igPage.url());
 
@@ -891,7 +895,7 @@ async function sendInstagramMessagePW(senderId, text) {
         const currentUrl = page.url();
         if (!threadIdPart || !currentUrl.includes(threadIdPart)) {
           await page.goto(threadUrl, { waitUntil: 'domcontentloaded', timeout: 15000 })
-            .catch(e => { if (!e.message.includes('ERR_ABORTED')) throw e; });
+            .catch(e => { if (!e.message.includes('ERR_ABORTED') && !e.message.includes('interrupted by another navigation')) throw e; });
           await _sleep(3000);
         }
       }
