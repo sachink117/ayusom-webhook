@@ -437,25 +437,40 @@ async function logToSheet(userId, platform, sinusType, state, msg, botReply) {
     });
 
     // 2. Lead update — only on funnel transitions (not every message)
+    //    Field names match Leads sheet columns exactly:
+    //    Timestamp | Platform | Sender ID | Name | Message | Status | Last Stage | Last Active | Symptom | Notes | SinusType | ProfileJSON
     if (LEAD_UPDATE_STATES.has(resolvedState)) {
+      const notes = [
+        user.lang       ? "lang:" + user.lang              : "",
+        user.duration   ? "duration:" + user.duration       : "",
+        user.selectedPlan ? "plan:" + user.selectedPlan     : "",
+        user.enrolledAt ? "enrolled:" + new Date(user.enrolledAt).toISOString() : "",
+      ].filter(Boolean).join(" | ");
+
       await fetch(SHEET_URL, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
-          action:       "update_lead",
-          timestamp:    ts,
-          userId:       cleanUserId,
-          name:         user.name          || "",
+          action:      "update_lead",
+          timestamp:   ts,
           platform,
-          language:     user.lang          || "hin",
-          sinusType:    user.sinusType     || sinusType || "unknown",
-          duration:     user.duration      || "",
-          symptoms:     (user.symptomNums  || []).join(","),
-          state:        resolvedState,
-          phase:        user.convPhase     || "probe",
-          selectedPlan: user.selectedPlan  || "",
-          enrolledAt:   user.enrolledAt    ? new Date(user.enrolledAt).toISOString() : "",
-          lastMessageAt: ts,
+          senderId:    cleanUserId,
+          name:        user.name          || "",
+          message:     (msg || "").substring(0, 200),
+          status:      resolvedState,
+          lastStage:   user.convPhase     || "probe",
+          lastActive:  ts,
+          symptom:     (user.symptomNums  || []).join(","),
+          notes,
+          sinusType:   user.sinusType     || sinusType || "unknown",
+          profileJson: JSON.stringify({
+            lang:         user.lang          || "hin",
+            duration:     user.duration      || "",
+            selectedPlan: user.selectedPlan  || "",
+            enrolledAt:   user.enrolledAt    || "",
+            convPhase:    user.convPhase     || "",
+            msgCount:     user.conversationHistory?.length || 0,
+          }),
         }),
       });
     }
