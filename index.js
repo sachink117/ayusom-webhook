@@ -2126,7 +2126,7 @@ app.get('/dashboard', async (req, res) => {
 app.get('/ig-relogin', async (req, res) => {
   try {
     console.log('[IG-PW] Manual relogin triggered via /ig-relogin');
-    await igMod.loginInstagramPW();
+    await require('./instagram-pw').loginInstagramPW();
     res.send('OK: Instagram re-login complete. Bot will resume polling in ~1 min.');
   } catch (err) {
     console.error('[IG-PW] Relogin error:', err.message);
