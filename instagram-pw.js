@@ -686,6 +686,17 @@ async function pollInstagramDMs() {
     console.log('[IG-PW] Found ' + threadHrefs.length + ' DM threads');
   // Auto re-login if inbox appears empty (expired session)
   if (threadHrefs.length === 0) {
+      // Debug: log page state to diagnose empty inbox
+      try {
+        const dbg = await igPage.evaluate(() => ({
+          url: location.href,
+          title: document.title,
+          totalLinks: document.querySelectorAll('a').length,
+          directLinks: Array.from(document.querySelectorAll('a')).filter(a => a.href && a.href.includes('/direct/')).length,
+          sampleLinks: Array.from(document.querySelectorAll('a')).filter(a => a.href && a.href.includes('/direct/')).slice(0,3).map(a => new URL(a.href).pathname)
+        }));
+        console.log('[IG-PW] Debug - URL:', dbg.url, '| title:', dbg.title, '| links:', dbg.totalLinks, '| /direct/ links:', dbg.directLinks, '| samples:', JSON.stringify(dbg.sampleLinks));
+      } catch(_dbg) {}
     try {
       const hasLoginForm = await page.evaluate(() =>
         !!document.querySelector('input[name="username"], input[autocomplete="username"]')
