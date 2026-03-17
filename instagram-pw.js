@@ -384,7 +384,7 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
     igBrowser = await chromium.launch({
       headless: true,
       args: [
-        '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process',
+        '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote',
         '--disable-blink-features=AutomationControlled',
         '--lang=en-US,en',
       ]
@@ -558,13 +558,22 @@ async function loginInstagramPW(username = _igUsername, password = _igPassword) 
 
 // ââ Process a single DM thread on a specific pool page âââââââââââââââââââââââ
 async function processThread(poolEntry, href) {
-  const { page } = poolEntry;
+  let { page } = poolEntry;
   const threadId = href.replace(/\//g, '').replace('directt', '');
   const senderId = 'ig_pw_' + threadId;
   const threadUrl = 'https://www.instagram.com' + href;
 
-  try {
-    // Instagram's SPA redirects long thread IDs to short ones, causing ERR_ABORTED.
+  // Health-check: reinit pool page if it was closed by a renderer crash
+  try { page.url(); } catch (_closed) {
+    console.log('[IG-PW] Pool page closed — reinitializing...');
+    try {
+      const np = await igContext.newPage();
+      await np.goto('https://www.instagram.com/', { timeout: 20000 }).catch(() => {});
+      poolEntry.page = np; page = np;
+    } catch (re) { console.error('[IG-PW] Reinit failed:', re.message); return; }
+  }
+
+  // Instagram's SPA redirects long thread IDs to short ones, causing ERR_ABORTED.
     // This is normal — the page still lands on the thread, so we catch and continue.
     await page.goto(threadUrl, { waitUntil: 'domcontentloaded', timeout: 20000 })
       .catch(e => { if (!e.message.includes('ERR_ABORTED')) throw e; });
