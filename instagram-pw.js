@@ -443,11 +443,11 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
     igReady = true;
     console.log('Instagram Playwright: ready, polling every 1 min');
     console.log('[IG-PW] Module loaded. Page pool:', POOL_SIZE, 'tabs. Auto-qualification: ON');
-    setInterval(pollInstagramDMs, 1 * 60 * 1000);
-    setInterval(pollNewUserRequests, 60 * 1000);
+    setInterval(pollInstagramDMs, 20 * 1000);
+    setInterval(pollNewUserRequests, 20 * 1000);
   } catch (e) {
     console.error('[IG-PW] Init error:', e.message);
-    setTimeout(() => initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD), 5 * 60 * 1000);
+    setTimeout(() => initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD), 30 * 1000);
   }
 }
 
@@ -636,7 +636,7 @@ async function processThread(poolEntry, href) {
 // ââ Poll DMs (parallel with page pool) ââââââââââââââââââââââââââââââââââââââââ
 // ─── PROACTIVE FOLLOW-UP ENGINE ──────────────────────────────────────────────
 // Re-engages warm leads who went silent mid-qualification
-const FOLLOWUP_DELAY_MS = 8 * 60 * 60 * 1000; // 8 hours silence before nudge
+const FOLLOWUP_DELAY_MS = 8 * 60 * 30 * 1000; // 8 hours silence before nudge
 const FOLLOWUP_MSGS = {
   awaiting_qual:     'Namaste 🙏 Kya aapke sinus ki problem abhi bhi pareshaan kar rahi hai? Main aapki help ke liye yahan hoon — bas batayein kya feel ho raha hai?',
   awaiting_symptoms: 'Namaste 🙏 Aapne sinus problem ke baare mein bataya tha. Kya aap apne main symptoms share kar sakte hain? (naak band, sir dard, etc.) 🌿',
@@ -807,7 +807,7 @@ async function pollInstagramDMs() {
     } else {
       // Re-engage warm leads who went silent
       await sendProactiveFollowups();
-      setTimeout(pollInstagramDMs, 5 * 60 * 1000);
+      setTimeout(pollInstagramDMs, 30 * 1000);
     }
   }
 }
