@@ -845,12 +845,13 @@ async function processThread(poolEntry, href) {
     // ── Relevance filter: only respond to sinus/health-related DMs ──
     // Existing users (already in conversation) always get a reply.
     // New users only get a reply if their message is health/sinus related or a common trigger.
-    const _isExistingUser = _db ? await (async () => {
+    const _isExistingUser = igQualStates.has(senderId) || igLastUserReply.has(senderId) ||
+    (_db ? await (async () => {
       try {
         const doc = await _db.collection('users').doc(senderId).get();
         return doc.exists;
       } catch(e) { return false; }
-    })() : false;
+    })() : false);
 
     if (!_isExistingUser) {
       const lower = msgText.toLowerCase();
