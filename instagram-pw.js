@@ -15,6 +15,7 @@ let igReady = false;
 const igSeenMessages = new Set();
 const igThreadUrls = new Map();
 const igActivePages = new Map(); // senderId -> pool page currently open on that thread
+const igSendFailCounts = new Map(); // threadId -> consecutive send failure count (skip unreachable threads)
 
 // Qualification state per sender
 // Stages: 'awaiting_qual', 'awaiting_symptoms', 'awaiting_duration', 'qualified'
@@ -300,10 +301,16 @@ async function sendMessageOnPage(page, text) {
 
       if (res?.ok) {
         console.log('[IG-PW] API send OK for thread', tid);
+        igSendFailCounts.delete(tid); // reset on success
         await _sleep(400);
         return;
       }
-      console.log('[IG-PW] API send failed for thread', tid, JSON.stringify(res), '— trying DOM fallback');
+      // If response body contains "not-logged-in" the session has expired — trigger re-login
+      if (res?.body && res.body.includes('not-logged-in')) {
+        console.log('[IG-PW] API returned not-logged-in page — session expired, re-logging in...');
+        try { await loginInstagramPW(); } catch (e) { console.error('[IG-PW] Re-login error:', e.message); }
+      }
+      console.log('[IG-PW] API send failed for thread', tid, JSON.stringify({ ok: res?.ok, status: res?.status }), '— trying DOM fallback');
     }
 
     // ── Attempt 2 & 3: DOM fallback — must be on the thread page (not inbox) ──
@@ -325,7 +332,10 @@ async function sendMessageOnPage(page, text) {
         await domPage.goto('https://www.instagram.com/direct/t/' + domTid + '/', {
           waitUntil: 'domcontentloaded', timeout: 15000
         }).catch(e => { if (!e.message.includes('ERR_ABORTED')) console.warn('[IG-PW] DOM nav warn:', e.message); });
-        await _sleep(2500);
+        // Wait for textbox to appear (Instagram React app can take 4-6s to render DM UI)
+        await domPage.waitForSelector('[contenteditable="true"], [role="textbox"]', { timeout: 8000 })
+          .catch(() => null); // ok if not found — execCommand will handle that case
+        await _sleep(800);
       } catch (pageErr) {
         console.error('[IG-PW] Could not create temp page for DOM fallback:', pageErr.message);
         return;
@@ -349,6 +359,7 @@ async function sendMessageOnPage(page, text) {
 
       if (jsResult?.ok) {
         console.log('[IG-PW] execCommand send OK:', JSON.stringify(jsResult));
+        igSendFailCounts.delete(_currentProcessingThreadId || '');
         await _sleep(800);
         return;
       }
@@ -375,6 +386,12 @@ async function sendMessageOnPage(page, text) {
           console.log('[IG-PW] keyboard.type send OK (selector:', sel, ')');
           return;
         } catch (clickErr) { /* try next */ }
+      }
+      const failTid = _currentProcessingThreadId;
+      if (failTid) {
+        const n = (igSendFailCounts.get(failTid) || 0) + 1;
+        igSendFailCounts.set(failTid, n);
+        if (n >= 5) console.warn('[IG-PW] Thread', failTid, 'has failed', n, 'times — user may have blocked/restricted. Will keep retrying.');
       }
       console.error('[IG-PW] All send attempts failed for text:', text.substring(0, 40));
     } finally {
