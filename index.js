@@ -300,7 +300,7 @@ async function sendTwilioMessage(to, body) {
 }
 
 async function sendFBMessage(recipientId, text) {
-  const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`;
+  const url = `https://graph.facebook.com/v18.0/17841445309536661/messages?access_token=${PAGE_ACCESS_TOKEN}`;
   const res = await fetch(url, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
@@ -310,9 +310,12 @@ async function sendFBMessage(recipientId, text) {
 }
 
 async function sendInstagramMessage(recipientId, text) {
-  // Must use Instagram Business Account ID as sender, not "me" (which resolves to the FB Page)
+  // Playwright bot handles Instagram DMs — skip Graph API (error #3 = no permission)
+  console.log('[IG] Skipping Graph API send — Playwright bot is active');
+  return;
+    // Must use Instagram Business Account ID as sender, not "me" (which resolves to the FB Page)
   const igAccountId = process.env.INSTAGRAM_ACCOUNT_ID || '17841445309536661';
-  const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${INSTAGRAM_TOKEN}`;
+  const url = `https://graph.facebook.com/v18.0/17841445309536661/messages?access_token=${INSTAGRAM_TOKEN}`;
   const res = await fetch(url, {
     method:  "POST",
     headers: {
@@ -1130,6 +1133,7 @@ app.post("/webhook", async (req, res) => {
           if (processedMessages.has(msgId)) continue;
           processedMessages.add(msgId);
           console.log("[IG] DM from", event.sender.id, ":", event.message.text);
+          if (!event.message || !event.message.text) continue; // skip reactions/stickers/attachments
           await handleMessage(event.sender.id, event.message.text || "", "instagram");
         }
       }
@@ -1818,6 +1822,137 @@ setInterval(loadData, 30000);
 </html>`);
 });
 
+// ─── VIDEO LANDING PAGE — SINUS LEAD CAPTURE ─────────────────
+app.get("/sinus", (req, res) => {
+  const src = req.query.src || 'direct';
+  res.setHeader('Content-Type', 'text/html');
+  res.send(`<!DOCTYPE html><html lang="hi"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Apna Sinus Type Jaano — FREE | Ayusomam Herbals</title>
+<meta name="description" content="6 type ke sinus hote hain. Apna sinus type identify karo aur sahi Ayurvedic treatment pao. Free assessment by Ayusomam Herbals.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0a0a0a;color:#fff;min-height:100vh}
+.hero{background:linear-gradient(135deg,#1a3a1a 0%,#0d1f0d 50%,#0a0a0a 100%);padding:40px 20px 30px;text-align:center}
+.logo{font-size:14px;color:#4caf50;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px}
+h1{font-size:28px;line-height:1.3;margin-bottom:12px}
+h1 span{color:#4caf50}
+.sub{color:#aaa;font-size:15px;line-height:1.5;max-width:340px;margin:0 auto 24px}
+.badge{display:inline-block;background:#1b5e20;color:#a5d6a7;padding:6px 16px;border-radius:20px;font-size:13px;margin-bottom:24px}
+.types{padding:20px;max-width:400px;margin:0 auto}
+.types h2{font-size:18px;margin-bottom:16px;text-align:center;color:#81c784}
+.type-card{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px}
+.type-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.t1 .type-icon{background:#1a237e20;color:#7986cb}
+.t2 .type-icon{background:#01579b20;color:#4fc3f7}
+.t3 .type-icon{background:#bf360c20;color:#ff8a65}
+.t4 .type-icon{background:#4a148c20;color:#ce93d8}
+.t5 .type-icon{background:#33691e20;color:#aed581}
+.t6 .type-icon{background:#e6511520;color:#ffab91}
+.type-name{font-size:14px;font-weight:600}
+.type-hint{font-size:12px;color:#888;margin-top:2px}
+.cta-section{padding:30px 20px;text-align:center;max-width:400px;margin:0 auto}
+.cta-section h2{font-size:20px;margin-bottom:8px}
+.cta-section p{color:#aaa;font-size:14px;margin-bottom:20px}
+.cta-btn{display:block;width:100%;padding:16px;border-radius:12px;font-size:16px;font-weight:700;text-decoration:none;text-align:center;margin-bottom:12px;border:none;cursor:pointer}
+.wa-btn{background:#25D366;color:#fff}
+.wa-btn:hover{background:#1da851}
+.chat-btn{background:#1b5e20;color:#fff;border:1px solid #2e7d32}
+.chat-btn:hover{background:#2e7d32}
+.trust{display:flex;justify-content:center;gap:20px;margin-top:20px;flex-wrap:wrap}
+.trust-item{font-size:12px;color:#888;display:flex;align-items:center;gap:4px}
+.free-tag{color:#4caf50;font-weight:700}
+.footer{text-align:center;padding:20px;color:#555;font-size:12px;border-top:1px solid #1a1a1a;margin-top:20px}
+</style></head><body>
+<div class="hero">
+<div class="logo">Ayusomam Herbals</div>
+<h1>Sinus Ka <span>Asli Solution</span><br>Type Se Shuru Hota Hai</h1>
+<p class="sub">6 type ke sinus hote hain. Har ek ka treatment alag hai. Pehle apna type jaano — phir sahi protocol lo.</p>
+<span class="badge">500+ logon ne apna type jaana</span>
+</div>
+<div class="types">
+<h2>6 Sinus Types</h2>
+<div class="type-card t1"><div class="type-icon">🌬</div><div><div class="type-name">Reactive Sensitivity</div><div class="type-hint">Sneezing, watery nose, allergy triggers</div></div></div>
+<div class="type-card t2"><div class="type-icon">🔵</div><div><div class="type-name">Chronic Congestion</div><div class="type-hint">Naak band, heavy head, subah zyada</div></div></div>
+<div class="type-card t3"><div class="type-icon">🔥</div><div><div class="type-name">Deep Inflammation</div><div class="type-hint">Yellow mucus, burning, headache</div></div></div>
+<div class="type-card t4"><div class="type-icon">💊</div><div><div class="type-name">Spray Dependency</div><div class="type-hint">Spray ke bina naak nahi khulti</div></div></div>
+<div class="type-card t5"><div class="type-icon">🫁</div><div><div class="type-name">Drainage Blockage</div><div class="type-hint">Post-nasal drip, throat mein balgam</div></div></div>
+<div class="type-card t6"><div class="type-icon">🦴</div><div><div class="type-name">Structural Congestion</div><div class="type-hint">Deviated septum, one-sided block</div></div></div>
+</div>
+<div class="cta-section">
+<h2>Apna Sinus Type Jaano</h2>
+<p><span class="free-tag">FREE</span> — 2 minute mein pata chalega</p>
+<a href="https://wa.me/918595160713?text=SINUS" class="cta-btn wa-btn" id="wa-cta">WhatsApp Pe Jaano →</a>
+<a href="/widget" class="cta-btn chat-btn" id="chat-cta">Yahan Chat Karo →</a>
+<div class="trust">
+<div class="trust-item">🌿 100% Ayurvedic</div>
+<div class="trust-item">🤖 AI-Powered Assessment</div>
+<div class="trust-item">📱 WhatsApp Support</div>
+</div>
+</div>
+<div class="footer">Ayusomam Herbals — Ayurvedic Sinus Treatment Since 2023</div>
+<script>
+// Track video lead source
+(function(){
+  var src='${src}';
+  var ts=new Date().toISOString();
+  fetch('/video-lead',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({source:src,timestamp:ts,page:'sinus-landing',action:'page_view'})
+  }).catch(function(){});
+  document.getElementById('wa-cta').addEventListener('click',function(){
+    fetch('/video-lead',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({source:src,timestamp:ts,page:'sinus-landing',action:'whatsapp_click'})
+    }).catch(function(){});
+  });
+  document.getElementById('chat-cta').addEventListener('click',function(){
+    fetch('/video-lead',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({source:src,timestamp:ts,page:'sinus-landing',action:'chat_click'})
+    }).catch(function(){});
+  });
+})();
+</script>
+</body></html>`);
+});
+
+// ─── VIDEO LEAD TRACKING ENDPOINT ────────────────────────────
+app.post("/video-lead", async (req, res) => {
+  const { source, timestamp, page, action } = req.body || {};
+  const leadData = {
+    source: source || 'unknown',
+    timestamp: timestamp || new Date().toISOString(),
+    page: page || 'sinus-landing',
+    action: action || 'unknown',
+    ip: req.headers['x-forwarded-for'] || req.ip
+  };
+  console.log(`[VIDEO-LEAD] ${leadData.action} from ${leadData.source} at ${leadData.timestamp}`);
+
+  // Log to Google Sheets if configured
+  if (SHEET_URL) {
+    try {
+      const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
+      await fetch(SHEET_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'video_lead',
+          source: leadData.source,
+          event: leadData.action,
+          timestamp: leadData.timestamp,
+          page: leadData.page
+        })
+      });
+    } catch(e) { console.error('[VIDEO-LEAD] Sheet log error:', e.message); }
+  }
+
+  // Store in Firestore if available
+  if (db) {
+    try {
+      await db.collection('video_leads').add(leadData);
+    } catch(e) { console.error('[VIDEO-LEAD] Firestore error:', e.message); }
+  }
+  res.json({ ok: true });
+});
+
 // ─── HEALTH CHECK ─────────────────────────────────────────────
 app.get("/health", (req, res) => {
   res.json({
@@ -1893,6 +2028,117 @@ app.post('/widget-chat', async (req, res) => {
     res.status(500).json({ replies: ['Sorry, something went wrong. Please try again.'] });
   }
 });
+
+// ─── FIREBASE LEAD DASHBOARD ──────────────────────────────────────────────────
+app.get('/dashboard', async (req, res) => {
+  if (!db) return res.send('<h1 style="padding:40px;color:red">Firebase not connected.</h1>');
+  try {
+    const snap = await db.collection('users').get();
+    const leads = [];
+    snap.forEach(function(doc) { leads.push(Object.assign({ id: doc.id }, doc.data())); });
+    leads.sort(function(a, b) { return (b.lastMessageAt || 0) - (a.lastMessageAt || 0); });
+
+    function stateColor(s) {
+      var map = { new: '#3498db', probe: '#9b59b6', pitched: '#e67e22', close: '#e74c3c', enrolled: '#27ae60', closed: '#27ae60' };
+      return map[s] || '#95a5a6';
+    }
+    function fmtTime(ts) {
+      if (!ts) return '-';
+      var ms = (ts && ts._seconds) ? ts._seconds * 1000 : ts;
+      return new Date(ms).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    }
+    function esc(v) { return String(v || '-').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    var stats = { total: leads.length, enrolled: 0, pitched: 0, probe: 0 };
+    leads.forEach(function(u) {
+      var s = u.state || u.convPhase || '';
+      if (s === 'enrolled' || s === 'closed') stats.enrolled++;
+      else if (s === 'pitched' || s === 'close') stats.pitched++;
+      else if (s === 'probe') stats.probe++;
+    });
+
+    var histData = [];
+    var rows = leads.map(function(u, i) {
+      var hist = Array.isArray(u.history) ? u.history.slice(-3) : [];
+      histData.push(JSON.stringify(hist).replace(/</g,'&lt;').replace(/>/g,'&gt;'));
+      var sc = stateColor(u.state || u.convPhase);
+      return '<tr class="lr" data-idx="' + i + '" style="cursor:pointer;border-bottom:1px solid #f0f0f0">' +
+        '<td style="padding:10px 12px;font-weight:600">' + esc(u.name) + '</td>' +
+        '<td style="padding:10px 8px;font-size:12px;color:#666">' + esc(u.id).replace('whatsapp:','') + '</td>' +
+        '<td style="padding:10px 8px"><span style="padding:3px 8px;border-radius:12px;background:' + sc + ';color:#fff;font-size:11px;font-weight:600">' + esc(u.state || '-') + '</span></td>' +
+        '<td style="padding:10px 8px;font-size:12px">' + esc(u.convPhase) + '</td>' +
+        '<td style="padding:10px 8px;font-size:12px">' + esc(u.platform) + '</td>' +
+        '<td style="padding:10px 8px;font-size:12px;color:#6d28d9">' + esc(u.sinusType) + '</td>' +
+        '<td style="padding:10px 8px;font-size:12px">' + esc(u.duration) + '</td>' +
+        '<td style="padding:10px 8px;font-size:12px;max-width:160px">' + esc(u.symptoms) + '</td>' +
+        '<td style="padding:10px 8px;font-size:12px;color:' + (u.usedAllopathy ? '#dc2626' : '#059669') + '">' + (u.usedAllopathy ? 'Yes' : 'No') + '</td>' +
+        '<td style="padding:10px 8px;font-size:12px">' + esc(u.selectedPlan || (u.enrolledAt ? 'Enrolled' : '-')) + '</td>' +
+        '<td style="padding:10px 8px;font-size:12px;color:#888">' + fmtTime(u.lastMessageAt) + '</td>' +
+        '<td style="padding:10px 8px;font-size:12px">' + (Array.isArray(u.history) ? u.history.length : 0) + '</td>' +
+        '</tr>' +
+        '<tr class="hist-row" id="hist-' + i + '" style="display:none"><td colspan="12" style="padding:8px 16px;background:#fafafa;font-size:12px">Loading...</td></tr>';
+    }).join('');
+
+    var histJson = '<script>var HIST=' + JSON.stringify(histData) + ';' +
+      'document.addEventListener("click",function(e){' +
+      'var row=e.target.closest(".lr");' +
+      'if(!row)return;' +
+      'var idx=row.getAttribute("data-idx");' +
+      'var hrow=document.getElementById("hist-"+idx);' +
+      'if(hrow.style.display==="none"){' +
+      'var h=JSON.parse(HIST[idx]);' +
+      'var html=h.map(function(m){return"<div style=\"margin:2px 0;padding:4px 8px;border-radius:4px;background:"+(m.role==="user"?"#eef2ff":"#f0fdf4")+";\"><b>"+(m.role==="user"?"U":"Bot")+":</b> "+(m.content||"").substring(0,150)+"</div>";}).join("");' +
+      'hrow.querySelector("td").innerHTML=html||"No history";' +
+      'hrow.style.display="table-row";' +
+      '}else{hrow.style.display="none";}' +
+      '});' +
+      'setTimeout(function(){location.reload();},60000);' +
+      '</script>';
+
+    res.send('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ayusomam Dashboard</title>' +
+      '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f4f6fb}' +
+      '.hdr{background:linear-gradient(135deg,#2d6a4f,#40916c);color:#fff;padding:18px 28px;display:flex;justify-content:space-between;align-items:center}' +
+      '.hdr h1{font-size:20px;font-weight:700}.hdr small{opacity:.8;font-size:12px}' +
+      '.stats{display:flex;gap:14px;padding:18px 28px;flex-wrap:wrap}' +
+      '.stat{background:#fff;border-radius:10px;padding:14px 20px;flex:1;min-width:130px;box-shadow:0 1px 4px rgba(0,0,0,.08)}' +
+      '.stat .n{font-size:26px;font-weight:800;color:#2d6a4f}.stat .l{font-size:11px;color:#888;margin-top:2px}' +
+      '.tw{padding:0 28px 28px;overflow-x:auto}' +
+      'table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}' +
+      'th{background:#2d6a4f;color:#fff;padding:9px 10px;font-size:11px;font-weight:600;text-align:left;white-space:nowrap}' +
+      'tr.lr:hover{background:#f9f9f9}</style></head><body>' +
+      '<div class="hdr"><div><h1>🌿 Ayusomam Lead Dashboard</h1>' +
+      '<small>Auto-refresh 60s • ' + new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}) + ' IST • Click row = last 3 msgs</small></div>' +
+      '<a href="/dashboard" style="color:#fff;font-size:12px">Refresh</a></div>' +
+      '<div class="stats">' +
+      '<div class="stat"><div class="n">' + stats.total + '</div><div class="l">Total Leads</div></div>' +
+      '<div class="stat"><div class="n" style="color:#27ae60">' + stats.enrolled + '</div><div class="l">Enrolled</div></div>' +
+      '<div class="stat"><div class="n" style="color:#e67e22">' + stats.pitched + '</div><div class="l">In Pitch</div></div>' +
+      '<div class="stat"><div class="n" style="color:#9b59b6">' + stats.probe + '</div><div class="l">In Probe</div></div>' +
+      '</div>' +
+      '<div class="tw"><table><thead><tr>' +
+      '<th>Name</th><th>Phone/ID</th><th>State</th><th>Phase</th><th>Platform</th>' +
+      '<th>Sinus Type</th><th>Duration</th><th>Symptoms</th><th>Allopathy</th><th>Plan</th><th>Last Active</th><th>Msgs</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      histJson + '</body></html>');
+  } catch(err) {
+    res.status(500).send('<pre style="padding:40px">Dashboard error: ' + err.message + '</pre>');
+  }
+});
+// ──────────────────────────────────────────────────────────────────────────────
+
+app.get('/ig-relogin', async (req, res) => {
+  try {
+    console.log('[IG-PW] Manual relogin triggered via /ig-relogin');
+    await require('./instagram-pw').loginInstagramPW();
+    res.send('OK: Instagram re-login complete. Bot will resume polling in ~1 min.');
+  } catch (err) {
+    console.error('[IG-PW] Relogin error:', err.message);
+    res.status(500).send('Error: ' + err.message);
+  }
+});
+
+app.get('/', (req, res) => res.send('OK'));
+
 app.listen(PORT, () => {
   console.log(`SALESOM v5.0 running on port ${PORT}`);
   console.log(`  Sinus types: Reactive Sensitivity, Chronic Congestion, Deep Inflammation, Spray Dependency, Drainage Blockage, Structural Congestion`);
