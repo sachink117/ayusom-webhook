@@ -434,6 +434,12 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
       console.log('[IG-PW] Pool tab', i + 1, 'ready');
     }
 
+    // Auto-recover if Chromium crashes
+    igBrowser.on('disconnected', () => {
+      console.log('[IG-PW] Browser disconnected — reinitializing in 30s...');
+      igReady = false;
+      setTimeout(() => initPlaywrightIG(_igUsername, _igPassword), 30 * 1000);
+    });
     igReady = true;
     console.log('Instagram Playwright: ready, polling every 1 min');
     console.log('[IG-PW] Module loaded. Page pool:', POOL_SIZE, 'tabs. Auto-qualification: ON');
@@ -792,9 +798,14 @@ async function pollInstagramDMs() {
   } catch (e) {
     console.error('[IG-PW] Poll error:', e.message);
     igReady = false;
-        // Re-engage warm leads who went silent
-    await sendProactiveFollowups();
-    setTimeout(pollInstagramDMs, 5 * 60 * 1000);
+    if (e.message.includes('browser has been closed') || e.message.includes('context or browser')) {
+      // Full browser crash — reinitialize everything
+      console.log('[IG-PW] Browser crash in poll — reinitializing in 30s...');
+      setTimeout(() => initPlaywrightIG(_igUsername, _igPassword), 30 * 1000);
+    } else {
+      await sendProactiveFollowups();
+      setTimeout(pollInstagramDMs, 5 * 60 * 1000);
+    }
   }
 }
 
