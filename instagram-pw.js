@@ -755,8 +755,7 @@ async function sendInstagramMessagePW(senderId, text) {
 
 // ââ Module export âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 module.exports = {
-  async init({ db, handleMessage, sleep, INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD ,
-  loginInstagramPW}) {
+  async init({ db, handleMessage, sleep, INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD}) {
     _db = db;
     _handleMessage = handleMessage;
     _sleep = sleep;
@@ -764,3 +763,5 @@ module.exports = {
     return sendInstagramMessagePW;
   }
 };
+
+module.exports.loginInstagramPW = loginInstagramPW;
