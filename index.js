@@ -969,7 +969,7 @@ async function handleMessage(senderId, messageText, platform) {
     user.state = "asked_duration";
     user.durationMenuSent = true;
     const welcomeMsg =
-      "Namaste 🙏 Ayusomam Herbals mein swagat hai.\nSinus ki takleef mein specialized Ayurvedic guidance dete hain.\n\nAap jis bhasha mein comfortable hain, usi mein reply karein.\n\nYe problem kitne time se hai?\n\n1. Abhi abhi shuru hua (1 se 3 mahine)\n2. Thodi purani hai (3 se 6 mahine)\n3. 1 se 2 saal se\n4. 3 se 5 saal se\n5. 5 saal se zyada\n\nBas number reply karein 👇";
+      "Namaste 🙏 Ayusomam Herbals mein swagat hai\nSinus ki takleef mein specialized Ayurvedic guidance dete hain\n\nAap jis bhasha mein comfortable hain, usi mein reply karein\n\nYe problem kitne time se hai?\n\n1. Abhi abhi shuru hua (1 se 3 mahine)\n2. Thodi purani hai (3 se 6 mahine)\n3. 1 se 2 saal se\n4. 3 se 5 saal se\n5. 5 saal se zyada\n\nBas number reply karein 👇";
     await sendWithTyping(platform, senderId, welcomeMsg, 800);
     await logToSheet(senderId, platform, null, "welcome_sent", text, "welcome + duration menu");
     return;
