@@ -317,17 +317,17 @@ async function sendMessageOnPage(page, text) {
 
     if (!onThreadPage && domTid) {
       // igPage is at inbox — can't do DOM send here. Use pool page instead.
-      domPoolEntry = igPagePool.find(p => !p.busy);
-      if (domPoolEntry) {
-        domPoolEntry.busy = true;
-        domPage = domPoolEntry.page;
-        console.log('[IG-PW] Navigating pool page to thread', domTid, 'for DOM send');
+      // Create a fresh page for DOM send — closed immediately after, no heap accumulation
+      try {
+        domPage = await igContext.newPage();
+        domPoolEntry = { page: domPage, _isTemp: true }; // flag for cleanup in finally
+        console.log('[IG-PW] Created temp page for DOM send to thread', domTid);
         await domPage.goto('https://www.instagram.com/direct/t/' + domTid + '/', {
           waitUntil: 'domcontentloaded', timeout: 15000
         }).catch(e => { if (!e.message.includes('ERR_ABORTED')) console.warn('[IG-PW] DOM nav warn:', e.message); });
         await _sleep(2500);
-      } else {
-        console.error('[IG-PW] No pool page available for DOM fallback — all attempts failed');
+      } catch (pageErr) {
+        console.error('[IG-PW] Could not create temp page for DOM fallback:', pageErr.message);
         return;
       }
     }
@@ -378,7 +378,9 @@ async function sendMessageOnPage(page, text) {
       }
       console.error('[IG-PW] All send attempts failed for text:', text.substring(0, 40));
     } finally {
-      if (domPoolEntry) domPoolEntry.busy = false;
+      if (domPoolEntry?._isTemp) {
+        domPage.close().catch(() => {}); // close temp page — free memory immediately
+      }
     }
   } catch (e) {
     console.error('[IG-PW] sendMessageOnPage error:', e.message);
@@ -619,11 +621,27 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
         '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote',
         '--disable-blink-features=AutomationControlled',
         '--lang=en-US,en',
+        // Memory saving flags
+        '--single-process',              // run renderer in main process — saves ~200MB
+        '--disable-extensions',
+        '--disable-plugins',
+        '--disable-background-networking',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-sync',
+        '--disable-translate',
+        '--disable-default-apps',
+        '--no-first-run',
+        '--mute-audio',
+        '--hide-scrollbars',
+        '--disable-ipc-flooding-protection',
+        '--js-flags=--max-old-space-size=256', // cap JS heap per page at 256MB
       ]
     });
     igContext = await igBrowser.newContext({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-      viewport: { width: 1280, height: 800 },
+      viewport: { width: 800, height: 600 }, // smaller = less GPU memory
       locale: 'en-US',
       extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' },
     });
@@ -655,16 +673,10 @@ async function initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD) {
     // Load saved qualification states
     await loadQualStates();
 
-    // Initialize page pool for parallel DM processing
-    console.log('[IG-PW] Initializing page pool (' + POOL_SIZE + ' tabs)...');
+    // No persistent pool pages — DOM fallback creates a fresh page on demand and closes it.
+    // Persistent pool pages accumulate JS heap from repeated thread navigations.
     igPagePool.length = 0;
-    for (let i = 0; i < POOL_SIZE; i++) {
-      const poolPage = await igContext.newPage();
-      // Pre-warm each pool page by navigating to a blank Instagram page
-      await poolPage.goto('https://www.instagram.com/', { timeout: 20000 }).catch(() => {});
-      igPagePool.push({ page: poolPage, busy: false });
-      console.log('[IG-PW] Pool tab', i + 1, 'ready');
-    }
+    console.log('[IG-PW] Pool: on-demand mode (no persistent tabs)');
 
     igBrowser.on('disconnected', () => {
       console.log('[IG-PW] Browser disconnected — reinitializing in 30s...');
@@ -1065,23 +1077,36 @@ async function pollNewUserRequests() {
 }
 
 let _igPollRunning = false; // guard: prevent overlapping poll cycles
+let _igPollCount = 0;    // tracks cycle count for periodic maintenance
 async function pollInstagramDMs() {
   if (!igReady || !igPage || _igPollRunning) return;
   _igPollRunning = true;
   try {
-    await igPage.goto('https://www.instagram.com/direct/inbox/', { waitUntil: 'domcontentloaded', timeout: 30000 })
-      .catch(e => { if (!e.message.includes('ERR_ABORTED')) throw e; });
-    await _sleep(3000);
-    console.log('[IG-PW] Poll URL:', igPage.url());
-
-    if (igPage.url().includes('login')) {
-      console.log('[IG-PW] Session expired â re-logging in...');
-      await loginInstagramPW();
-      console.log('[IG-PW] Post-relogin URL:', igPage.url());
+    // ── Periodic session check (every 20 cycles ~6min) — avoids loading inbox SPA each poll ──
+    // The inbox SPA is a heavy React app that accumulates heap if loaded repeatedly.
+    // Instead, we only navigate for session keep-alive, and use API calls for all data.
+    _igPollCount = (_igPollCount || 0) + 1;
+    if (_igPollCount % 20 === 1) {
+      await igPage.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 20000 })
+        .catch(e => { if (!e.message.includes('ERR_ABORTED')) throw e; });
+      await _sleep(1500);
       if (igPage.url().includes('login')) {
-        console.log('[IG-PW] Still on login after re-login â aborting poll');
-        return;
+        console.log('[IG-PW] Session expired — re-logging in...');
+        await loginInstagramPW();
+        if (igPage.url().includes('login')) { console.log('[IG-PW] Re-login failed — aborting poll'); return; }
       }
+      console.log('[IG-PW] Session OK — poll cycle', _igPollCount);
+    }
+
+    // ── Memory cleanup every 30 cycles (~10min) ──
+    if (_igPollCount % 30 === 0) {
+      if (igSeenMessages.size > 500) {
+        const keep = [...igSeenMessages].slice(-300);
+        igSeenMessages.clear(); keep.forEach(id => igSeenMessages.add(id));
+      }
+      if (igThreadUrls.size > 300)   { const k=[...igThreadUrls.entries()].slice(-200);   igThreadUrls.clear();   k.forEach(([a,b])=>igThreadUrls.set(a,b)); }
+      if (igLastUserReply.size > 300) { const k=[...igLastUserReply.entries()].slice(-200); igLastUserReply.clear(); k.forEach(([a,b])=>igLastUserReply.set(a,b)); }
+      console.log('[IG-PW] Cleanup done. seen=' + igSeenMessages.size + ' threads=' + igThreadUrls.size);
     }
 
     // Collect all thread hrefs from inbox (no clicking â just read hrefs)
@@ -1176,20 +1201,19 @@ async function sendInstagramMessagePW(senderId, text) {
         _currentProcessingThreadId = prevThreadId;
       }
     }
-    // Fallback: navigate pool page if no threadId available
-    const poolEntry = igPagePool.find(p => !p.busy);
-    const page = poolEntry ? poolEntry.page : igPage;
-    if (poolEntry) poolEntry.busy = true;
+    // DOM fallback: create fresh page, navigate, send, close — no heap leak
+    let tempPage = null;
     try {
+      tempPage = await igContext.newPage();
       if (threadUrl) {
-        await page.goto(threadUrl, { waitUntil: 'domcontentloaded', timeout: 15000 })
+        await tempPage.goto(threadUrl, { waitUntil: 'domcontentloaded', timeout: 15000 })
           .catch(e => { if (!e.message.includes('ERR_ABORTED')) throw e; });
         await _sleep(2000);
       }
-      await sendMessageOnPage(page, text);
+      await sendMessageOnPage(tempPage, text);
       console.log('[IG-PW] Reply sent to', senderId, '(DOM fallback)');
     } finally {
-      if (poolEntry) poolEntry.busy = false;
+      if (tempPage) tempPage.close().catch(() => {}); // always close — free memory
     }
   } catch (e) {
     console.error('[IG-PW] Send error:', e.message);
