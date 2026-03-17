@@ -407,6 +407,11 @@ async function logToSheet(userId, platform, sinusType, state, msg, botReply) {
   if (!SHEET_URL) return;
   const user = userData[userId] || {};
   try {
+    // Single HTTP call — merged log_message + update_lead into one request.
+    // Google Sheet Apps Script handles both actions from this payload.
+    // Lead-level fields (duration, symptoms, plan etc.) are already persisted
+    // in Firestore users/ collection — Sheet only needs the conversation log
+    // plus a few key lead fields for the dashboard view.
     await fetch(SHEET_URL, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
@@ -416,37 +421,14 @@ async function logToSheet(userId, platform, sinusType, state, msg, botReply) {
         userId:    userId.replace(/^whatsapp:/i, ''),
         name:      user.name || '',
         platform,
+        language:  user.lang || "hin",
         sinusType: sinusType || user.sinusType || "unknown",
         state:     state     || user.state     || "new",
         phase:     user.convPhase || "probe",
+        duration:  user.duration || "",
+        selectedPlan: user.selectedPlan || "",
         userMsg:   (msg      || "").substring(0, 300),
         botReply:  cleanText(botReply || "").substring(0, 300),
-      }),
-    });
-
-    await fetch(SHEET_URL, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({
-        action:          "update_lead",
-        timestamp:       new Date().toISOString(),
-        userId, platform,
-        name:            user.name          || "",
-        language:        user.lang          || "hin",
-        sinusType:       user.sinusType     || sinusType || "unknown",
-        duration:        user.duration      || "",
-        symptoms:        (user.symptomNums  || []).join(","),
-        usedAllopathy:   user.usedAllopathy === true ? "Yes" : user.usedAllopathy === false ? "No" : "Not asked",
-        convPhase:       user.convPhase     || "probe",
-        state:           user.state         || state || "new",
-        selectedPlan:    user.selectedPlan  || "",
-        enrolledAt:      user.enrolledAt    ? new Date(user.enrolledAt).toISOString() : "",
-        ghostAttempts:   user.ghostAttempts || 0,
-        milestonesSent:  (user.milestonesSent || []).join(","),
-        lastMessageAt:   user.lastMessageAt ? new Date(user.lastMessageAt).toISOString() : "",
-        totalMessages:   Math.floor((user.history || []).length / 2),
-        lastUserMsg:     (msg      || "").substring(0, 200),
-        lastBotReply:    (botReply || "").substring(0, 200),
       }),
     });
   } catch (e) {
@@ -1917,12 +1899,8 @@ app.post("/video-lead", async (req, res) => {
     } catch(e) { console.error('[VIDEO-LEAD] Sheet log error:', e.message); }
   }
 
-  // Store in Firestore if available
-  if (db) {
-    try {
-      await db.collection('video_leads').add(leadData);
-    } catch(e) { console.error('[VIDEO-LEAD] Firestore error:', e.message); }
-  }
+  // Video leads tracked in Google Sheets only — no need to duplicate in Firestore.
+  // Firestore users/ collection is the source of truth for user state.
   res.json({ ok: true });
 });
 

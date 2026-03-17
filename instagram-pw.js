@@ -79,24 +79,11 @@ function saveIgCookies(cookies) {
 
 // ââ Qualification State (Firestore persistence) ââââââââââââââââââââââââââââââ
 async function loadQualStates() {
-  if (!_db) return;
-  try {
-    const doc = await _db.collection('config').doc('ig_qual_states').get();
-    if (doc.exists && doc.data().states) {
-      for (const [k, v] of Object.entries(doc.data().states)) {
-        igQualStates.set(k, v);
-      }
-      console.log('[IG-PW] Loaded', igQualStates.size, 'qualification states');
-    }
-  } catch (e) {}
+  // No-op: state now managed by SALESOM handleMessage via Firestore users/ collection
+  console.log('[IG-PW] Qual states: using SALESOM userData (Firestore users/)');
 }
 function saveQualStates() {
-  if (!_db) return;
-  const obj = {};
-  igQualStates.forEach((v, k) => { obj[k] = v; });
-  _db.collection('config').doc('ig_qual_states')
-    .set({ states: obj, savedAt: Date.now() })
-    .catch(e => console.error('[IG-PW] QualState save error:', e.message));
+  // No-op: no longer writing to ig_qual_states
 }
 
 // ââ Qualification Engine âââââââââââââââââââââââââââââââââââââââââââââââââââââ
