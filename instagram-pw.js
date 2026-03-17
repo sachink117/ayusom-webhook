@@ -260,11 +260,59 @@ function getSymptomInsightMsg(symptoms) {
   return MSG_SYMPTOM[1];
 }
 
+// Per-page send lock — prevents concurrent keyboard events interleaving characters
+// (WeakMap so pages get GC'd normally when closed)
+const _pageSendLocks = new WeakMap();
+
 // Send a single message on a specific Playwright page (already on the thread)
-// Strategy: DOM click → JS execCommand → API fallback (all use real browser session)
+// Strategy: Instagram API first (no typing = no interleaving) → execCommand paste → JS DOM
+// IMPORTANT: keyboard.type() with delay:15 is intentionally NOT used as a primary method
+// because slow character-by-character typing causes garbled messages when concurrent
+// sendMessageOnPage calls race on the same page.
 async function sendMessageOnPage(page, text) {
+  // ── Acquire per-page lock: serialize sends so two messages never type simultaneously ──
+  const prevLock = _pageSendLocks.get(page) || Promise.resolve();
+  let releaseLock;
+  const thisLock = new Promise(r => { releaseLock = r; });
+  _pageSendLocks.set(page, thisLock);
+  await prevLock; // wait for any in-progress send on this page to finish
+
   try {
-    // Instagram uses Meta's Lexical editor — try multiple selectors in priority order
+    // ── Attempt 1: Instagram internal fetch API (PRIMARY — no DOM typing, no interleaving) ──
+    // This is the most reliable method: uses the authenticated browser session's cookies
+    // to POST directly to Instagram's internal message endpoint.
+    const tid = page.url().match(/\/direct\/t\/(\d+)/)?.[1];
+    if (tid) {
+      const res = await page.evaluate(async ([threadId, msg]) => {
+        try {
+          const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+          const body = 'text=' + encodeURIComponent(msg) + '&mutation_token=' + Date.now();
+          const r = await fetch('/api/v1/direct_v2/threads/' + threadId + '/broadcast/text/', {
+            method: 'POST', credentials: 'include',
+            headers: {
+              'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459',
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body
+          });
+          if (!r.ok) { const t = await r.text().catch(() => ''); return { ok: false, status: r.status, body: t.slice(0, 200) }; }
+          return { ok: true };
+        } catch (e) { return { ok: false, err: e.message }; }
+      }, [tid, text]).catch(e => ({ ok: false, err: e.message }));
+
+      if (res?.ok) {
+        console.log('[IG-PW] API send OK for thread', tid);
+        await _sleep(400);
+        return;
+      }
+      console.log('[IG-PW] API send failed (thread ' + tid + '):', JSON.stringify(res), '— trying DOM');
+    } else {
+      console.log('[IG-PW] No thread ID in URL:', page.url(), '— skipping API, trying DOM');
+    }
+
+    // ── Attempt 2: execCommand insertText (atomic paste — no character delay, no interleaving) ──
+    // Uses document.execCommand which inserts the full text in one operation, then sends
+    // an Enter keypress. Unlike keyboard.type(), this is instant and cannot be interleaved.
     const SELECTORS = [
       'div[role="textbox"][contenteditable="true"]',
       'div[contenteditable="true"][aria-label]',
@@ -274,7 +322,6 @@ async function sendMessageOnPage(page, text) {
       'p[contenteditable="true"]',
     ];
 
-    // ── Attempt 1: standard Playwright click + keyboard ──────────────────────
     let domSent = false;
     for (const sel of SELECTORS) {
       const el = await page.waitForSelector(sel, { timeout: 5000 }).catch(() => null);
@@ -282,21 +329,27 @@ async function sendMessageOnPage(page, text) {
       try {
         await el.scrollIntoViewIfNeeded();
         await el.click({ timeout: 3000 });
-        await _sleep(300);
-        await page.keyboard.type(text, { delay: 15 });
+        await _sleep(200);
+        // execCommand('insertText') inserts the full string atomically — no char-by-char delay
+        await page.evaluate((msg) => {
+          const box = document.querySelector(
+            'div[role="textbox"][contenteditable="true"], div[contenteditable="true"][aria-label], div[contenteditable="true"]'
+          );
+          if (box) { box.focus(); document.execCommand('insertText', false, msg); }
+        }, text);
         await _sleep(300);
         await page.keyboard.press('Enter');
         await _sleep(800);
-        console.log('[IG-PW] DOM send OK (selector:', sel, ')');
+        console.log('[IG-PW] execCommand send OK (selector:', sel, ')');
         domSent = true;
         break;
       } catch (clickErr) {
-        // try next selector
+        console.log('[IG-PW] Selector', sel, 'failed:', clickErr.message);
       }
     }
     if (domSent) return;
 
-    // ── Attempt 2: JS execCommand inside the page (still DOM, no API) ────────
+    // ── Attempt 3: Pure JS DOM fallback ──────────────────────────────────────
     const jsResult = await page.evaluate(async (msg) => {
       const inputs = Array.from(document.querySelectorAll('[contenteditable="true"], [role="textbox"]'));
       for (const el of inputs) {
@@ -315,36 +368,11 @@ async function sendMessageOnPage(page, text) {
       await _sleep(800);
       return;
     }
-    console.log('[IG-PW] JS DOM found', jsResult?.count ?? 0, 'inputs but none worked');
-
-    // ── Attempt 3: Instagram internal fetch API (still authenticated browser session) ──
-    const tid = page.url().match(/\/direct\/t\/(\d+)/)?.[1];
-    if (tid) {
-      console.log('[IG-PW] Falling back to API send for thread', tid);
-      const res = await page.evaluate(async ([threadId, msg]) => {
-        try {
-          const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
-          const body = 'text=' + encodeURIComponent(msg) + '&mutation_token=' + Date.now();
-          const r = await fetch('/api/v1/direct_v2/threads/' + threadId + '/broadcast/text/', {
-            method: 'POST', credentials: 'include',
-            headers: {
-              'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459',
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body
-          });
-          if (!r.ok) { const t = await r.text().catch(() => ''); return { ok: false, status: r.status, body: t.slice(0, 200) }; }
-          return { ok: true };
-        } catch (e) { return { ok: false, err: e.message }; }
-      }, [tid, text]).catch(e => ({ ok: false, err: e.message }));
-
-      if (res?.ok) console.log('[IG-PW] API send succeeded for thread', tid);
-      else console.error('[IG-PW] API send failed for thread', tid, JSON.stringify(res));
-    } else {
-      console.error('[IG-PW] Cannot send — no thread ID in URL:', page.url());
-    }
+    console.error('[IG-PW] All send methods failed. URL:', page.url(), '| text:', text.substring(0, 60));
   } catch (e) {
     console.error('[IG-PW] sendMessageOnPage error:', e.message);
+  } finally {
+    releaseLock(); // always release lock so next queued send can proceed
   }
 }
 
