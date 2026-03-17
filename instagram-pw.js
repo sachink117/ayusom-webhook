@@ -668,48 +668,28 @@ async function pollInstagramDMs() {
     // Wait for thread list to render (Instagram SPA needs time)
     await igPage.waitForSelector('a[href*="/direct/t/"]', { timeout: 12000 }).catch(() => null);
 
-    // Use Instagram's internal API to get thread IDs (more reliable than DOM scraping)
+    // Use Instagram internal API to get DM thread IDs (DOM scan doesn't work in headless mode)
     let threadHrefs = [];
-    try {
-      const inboxData = await igPage.evaluate(async () => {
-        try {
-          const csrfToken = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
-          const resp = await fetch('/api/v1/direct_v2/inbox/?thread_message_limit=1&persistentBadging=true&limit=20', {
-            credentials: 'include',
-            headers: {
-              'X-CSRFToken': csrfToken,
-              'X-IG-App-ID': '936619743392459',
-              'X-ASBD-ID': '129477',
-              'Accept': '*/*',
-            }
-          });
-          if (!resp.ok) return { error: 'HTTP ' + resp.status };
-          const data = await resp.json();
-          return data;
-        } catch(e) { return { error: e.message }; }
-      });
+    const _inboxApi = await igPage.evaluate(async () => {
+      try {
+        const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+        const r = await fetch('/api/v1/direct_v2/inbox/?limit=20', {
+          credentials: 'include',
+          headers: { 'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459' }
+        });
+        if (!r.ok) return { err: r.status };
+        return await r.json();
+      } catch(e) { return { err: e.message }; }
+    }).catch(() => null);
 
-      if (inboxData?.inbox?.threads?.length > 0) {
-        threadHrefs = inboxData.inbox.threads.map(t => '/direct/t/' + t.thread_id + '/');
-        console.log('[IG-PW] API: got ' + threadHrefs.length + ' threads');
-      } else if (inboxData?.error) {
-        console.log('[IG-PW] API error:', inboxData.error, '- falling back to DOM scan');
-        // Fallback: DOM scan
-        threadHrefs = await igPage.evaluate(() => {
-          const seen = new Set(); const hrefs = [];
-          document.querySelectorAll('a').forEach(a => {
-            try { const p = new URL(a.href).pathname;
-              if (p.includes('/direct/t/') && !seen.has(p)) { seen.add(p); hrefs.push(p); }
-            } catch(e) {}
-          });
-          return hrefs;
-        }).catch(() => []);
-        console.log('[IG-PW] DOM scan fallback found ' + threadHrefs.length + ' threads');
-      } else {
-        console.log('[IG-PW] API returned no threads - inbox empty or response format changed. Keys:', Object.keys(inboxData || {}).join(','));
-      }
-    } catch(apiErr) {
-      console.log('[IG-PW] API fetch exception:', apiErr.message);
+    if (_inboxApi?.inbox?.threads?.length) {
+      threadHrefs = _inboxApi.inbox.threads.map(t => '/direct/t/' + t.thread_id + '/');
+      console.log('[IG-PW] API: got ' + threadHrefs.length + ' threads');
+    } else {
+      console.log('[IG-PW] API no threads. Response keys:', Object.keys(_inboxApi || {}).join(','));
+    }
+
+    console.log('[IG-PW] Found ' + threadHrefs.length + ' DM threads');
     }
     try {
       const hasLoginForm = await page.evaluate(() =>
