@@ -399,17 +399,21 @@ async function sendQualificationSequence(senderId, page, duration, symptoms) {
   // Step 4: Engaging question
   messages.push(typeData.question);
 
+  // Save state as 'qualified' BEFORE sending messages.
+  // If we save AFTER (old behaviour), a crash or restart mid-sequence leaves
+  // state as 'awaiting_qual' and the bot re-runs the whole sequence on the
+  // next message — causing Kinju-style "asked for details again" bugs.
+  igQualStates.set(senderId, { stage: 'qualified', duration, symptoms, sinusType, lastUpdated: Date.now() });
+  saveQualStates();
+
   for (const msg of messages) {
     await sendMessageOnPage(page, msg);
     await _sleep(2800); // Pause between messages to feel natural
   }
-
-  igQualStates.set(senderId, { stage: 'qualified', duration, symptoms, sinusType });
-  saveQualStates();
 }
 
 // Returns true if this message was handled as a qualification reply
-async function handleQualificationReply(senderId, page, msgText) {
+async function handleQualificationReply(senderId, page, msgText, recentContext) {
   const state = igQualStates.get(senderId);
 
   // Already qualified â do not re-run the sequence
@@ -773,7 +777,7 @@ async function processThread(poolEntry, href) {
     const threadData = await page.evaluate(async (tid) => {
       try {
         const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
-        const r = await fetch('/api/v1/direct_v2/threads/' + tid + '/?limit=1', {
+        const r = await fetch('/api/v1/direct_v2/threads/' + tid + '/?limit=20', {
           credentials: 'include',
           headers: { 'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459' }
         });
@@ -784,17 +788,45 @@ async function processThread(poolEntry, href) {
 
     if (!threadData?.thread?.items?.length) return;
 
-    const lastItem = threadData.thread.items[0]; // items are newest-first
+    const lastItem = threadData.thread.items[0]; // items are newest-first (newest = index 0)
     // Skip if the last message is our own reply (avoid infinite reply loop)
     if (String(lastItem.user_id) === String(threadData.thread.viewer_id)) return;
 
     const msgText = (lastItem.text || lastItem.item_type || '').trim();
     if (!msgText || msgText.length < 2) return;
 
+    // Build conversation context from last 5 messages (oldest first, skip bot messages for context)
+    const viewerId = String(threadData.thread.viewer_id);
+    const recentItems = [...threadData.thread.items].reverse(); // reverse so oldest is first
+    const recentContext = recentItems
+      .map(item => {
+        const isBot = String(item.user_id) === viewerId;
+        const txt = (item.text || '').trim();
+        if (!txt) return null;
+        return (isBot ? 'Bot: ' : 'User: ') + txt;
+      })
+      .filter(Boolean)
+      .join('\n');
+    console.log('[IG-PW] Context (' + recentItems.length + ' msgs):', recentContext.substring(0, 200));
+
     const msgId = lastItem.item_id || (threadId + '::' + msgText.substring(0, 60));
     if (igSeenMessages.has(msgId)) return;
+    // Also check persisted lastMsgId — igSeenMessages resets on every restart,
+    // so without this check the bot re-processes already-handled messages after
+    // a crash/redeploy and re-runs the qualification sequence on the same message.
+    const _stateForDedup = igQualStates.get(senderId);
+    if (_stateForDedup?.lastMsgId === msgId) {
+      igSeenMessages.add(msgId); // keep in-memory set in sync
+      return;
+    }
     igSeenMessages.add(msgId);
     igThreadUrls.set(senderId, threadUrl);
+    // Persist that we've seen this message — survives bot restarts
+    if (_stateForDedup) {
+      _stateForDedup.lastMsgId = msgId;
+      igQualStates.set(senderId, _stateForDedup);
+      saveQualStates();
+    }
 
     console.log('[IG-PW] DM (' + threadId + '): "' + msgText.substring(0, 80) + '"');
 
@@ -811,7 +843,7 @@ async function processThread(poolEntry, href) {
           .catch(e => console.error('[IG-PW] handleMessage error:', e.message));
         igActivePages.delete(senderId);
         // Mark as awaiting_qual so future messages are handled by qual engine
-        igQualStates.set(senderId, { stage: 'awaiting_qual', lastUpdated: Date.now() });
+        igQualStates.set(senderId, { stage: 'awaiting_qual', lastMsgId: msgId, lastUpdated: Date.now() });
         saveQualStates();
       } else if (existingState.stage === 'qualified' || existingState.stage === 'pitched') {
         // Existing user in post-qualification stage — continue the sales conversation
