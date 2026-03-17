@@ -859,27 +859,21 @@ async function processThread(poolEntry, href) {
       .join('\n');
     console.log('[IG-PW] Context (' + recentItems.length + ' msgs):', recentContext.substring(0, 200));
 
-    // Persist key details from context into Firestore state (duration, symptoms, lastMsgId).
+    // Persist key details from context into Firestore state (duration, symptoms).
     // This survives bot restarts so we never ask users for info they already gave us.
     const msgId = lastItem.item_id || (threadId + '::' + msgText.substring(0, 60));
     const _stateForDedup = igQualStates.get(senderId);
     if (igSeenMessages.has(msgId)) return;
-    // Also check persisted lastMsgId — igSeenMessages resets on every restart
-    if (_stateForDedup?.lastMsgId === msgId) {
-      igSeenMessages.add(msgId);
-      return;
-    }
     igSeenMessages.add(msgId);
     igThreadUrls.set(senderId, threadUrl);
     // Track when this user last sent a message — used for priority queue (active chats first)
     igLastUserReply.set(senderId, Date.now());
-    // Save lastMsgId + any newly parsed details to Firestore
+    // Persist any newly parsed context details (duration, symptoms) to Firestore
     if (_stateForDedup) {
       const ctxDur = parseDuration(recentContext);
       const ctxSym = parseSymptoms(recentContext);
       if (ctxDur && !_stateForDedup.duration) _stateForDedup.duration = ctxDur;
       if (ctxSym.length > 0 && !(_stateForDedup.symptoms?.length > 0)) _stateForDedup.symptoms = ctxSym;
-      _stateForDedup.lastMsgId = msgId;
       igQualStates.set(senderId, _stateForDedup);
       saveQualStates();
     }
@@ -899,7 +893,7 @@ async function processThread(poolEntry, href) {
           .catch(e => console.error('[IG-PW] handleMessage error:', e.message));
         igActivePages.delete(senderId);
         // Mark as awaiting_qual so future messages are handled by qual engine
-        igQualStates.set(senderId, { stage: 'awaiting_qual', lastMsgId: msgId, lastUpdated: Date.now() });
+        igQualStates.set(senderId, { stage: 'awaiting_qual', lastUpdated: Date.now() });
         saveQualStates();
       } else if (existingState.stage === 'qualified' || existingState.stage === 'pitched') {
         // Existing user in post-qualification stage — continue the sales conversation
