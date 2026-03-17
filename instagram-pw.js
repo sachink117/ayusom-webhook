@@ -268,7 +268,39 @@ async function sendMessageOnPage(page, text) {
       '[contenteditable="true"][role="textbox"], div[aria-label*="message" i][contenteditable="true"]',
       { timeout: 20000 }
     ).catch(() => null);
-    if (!inputEl) { console.error('[IG-PW] Message input not found on', page.url()); return; }
+
+    if (!inputEl) {
+      // DOM input not found — fall back to Instagram internal send API
+      const pageUrl = page.url();
+      const tidMatch = pageUrl.match(/\/direct\/t\/(\d+)/);
+      if (tidMatch) {
+        const tid = tidMatch[1];
+        console.log('[IG-PW] DOM input missing, trying API send for thread', tid);
+        const res = await page.evaluate(async (threadId, msg) => {
+          try {
+            const tok = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+            const body = 'text=' + encodeURIComponent(msg) + '&mutation_token=' + Date.now();
+            const r = await fetch('/api/v1/direct_v2/threads/' + threadId + '/broadcast/text/', {
+              method: 'POST', credentials: 'include',
+              headers: {
+                'X-CSRFToken': tok, 'X-IG-App-ID': '936619743392459',
+                'Content-Type': 'application/x-www-form-urlencoded'
+              },
+              body
+            });
+            if (!r.ok) { const t = await r.text().catch(() => ''); return { ok: false, status: r.status, body: t.slice(0, 200) }; }
+            return { ok: true };
+          } catch (e) { return { ok: false, err: e.message }; }
+        }, tid, text).catch(e => ({ ok: false, err: e.message }));
+
+        if (res && res.ok) { console.log('[IG-PW] API send succeeded for thread', tid); }
+        else { console.error('[IG-PW] API send failed for thread', tid, JSON.stringify(res)); }
+      } else {
+        console.error('[IG-PW] Message input not found and no thread ID in URL:', pageUrl);
+      }
+      return;
+    }
+
     await inputEl.click();
     await _sleep(500);
     await page.keyboard.type(text, { delay: 30 });
