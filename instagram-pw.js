@@ -262,17 +262,23 @@ function getSymptomInsightMsg(symptoms) {
 // Send a single message on a specific Playwright page (already on the thread)
 async function sendMessageOnPage(page, text) {
   try {
+    // Instagram's message input: contenteditable div with role=textbox
+    // Try clicking the lower half of the page first to trigger focus
     const inputEl = await page.waitForSelector(
-      '[contenteditable="true"][role="textbox"], div[contenteditable="true"][data-testid], textarea[placeholder*="essage"]',
-      { timeout: 8000 }
+      '[contenteditable="true"][role="textbox"]',
+      { timeout: 10000 }
     ).catch(() => null);
-    if (!inputEl) { console.error('[IG-PW] Message input not found'); return; }
+    if (!inputEl) {
+      console.error('[IG-PW] Message input not found on', page.url());
+      return;
+    }
     await inputEl.click();
-    await _sleep(400);
-    await inputEl.fill(text);
-    await _sleep(400);
+    await _sleep(500);
+    // Use type() for contenteditable divs — more reliable than fill()
+    await page.keyboard.type(text, { delay: 30 });
+    await _sleep(500);
     await page.keyboard.press('Enter');
-    await _sleep(600);
+    await _sleep(800);
   } catch (e) {
     console.error('[IG-PW] sendMessageOnPage error:', e.message);
   }
@@ -790,10 +796,13 @@ async function sendInstagramMessagePW(senderId, text) {
 
     try {
       if (threadUrl) {
+        // Always navigate to ensure we're on the right thread page
+        // (the split/pop check was broken – URL ends in '/' so pop() returns '')
+        const threadIdPart = threadUrl.split('/').filter(Boolean).pop() || '';
         const currentUrl = page.url();
-        if (!currentUrl.includes(threadUrl.split('/').pop())) {
+        if (!threadIdPart || !currentUrl.includes(threadIdPart)) {
           await page.goto(threadUrl, { timeout: 15000 });
-          await _sleep(2000);
+          await _sleep(3000);
         }
       }
       await sendMessageOnPage(page, text);
