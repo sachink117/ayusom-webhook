@@ -6,7 +6,12 @@ const {terms}=require("./prompts/glossary");
 const app=express(), claude=new Anthropic({apiKey:process.env.ANTHROPIC_API_KEY});
 app.use(express.json());
 
-app.get("/health",(req,res)=>res.json({status:"ok",version:"2.0",time:new Date().toISOString()}));
+// QR code helper — generates scannable PNG from any URL via qrserver.com
+function getQRUrl(link){ return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(link)}`; }
+const QR_499  = ()=>getQRUrl(process.env.PAYMENT_499_LINK);
+const QR_1299 = ()=>getQRUrl(process.env.PAYMENT_1299_LINK);
+
+app.get("/health",(req,res)=>res.json({status:"ok",version:"2.1",time:new Date().toISOString()}));
 
 app.get("/webhook",(req,res)=>{
   if(req.query["hub.mode"]==="subscribe"&&req.query["hub.verify_token"]===process.env.WEBHOOK_VERIFY_TOKEN)
@@ -51,8 +56,18 @@ async function processMessage({userId,text,source,platform,name=""}) {
     const reply=await getAIReply(lead,history);
     await firebase.saveMessage(userId,"assistant",reply);
     await firebase.updateLead(userId,{lastMessage:text,name:lead.name||name});
-    if(platform==="instagram") await sendIGReply(userId,reply);
-    else if(platform==="whatsapp") await sendWAReply(userId,reply);
+
+    if(platform==="instagram") {
+      await sendIGReply(userId,reply);
+    } else if(platform==="whatsapp") {
+      await sendWAReply(userId,reply);
+      // Auto-send QR image when a payment link appears in the reply
+      if(process.env.PAYMENT_499_LINK && reply.includes(process.env.PAYMENT_499_LINK)) {
+        await sendWAImage(userId, QR_499(), "📲 Scan karke pay karo — 7-Day Sinus Reset Plan (Rs.499)");
+      } else if(process.env.PAYMENT_1299_LINK && reply.includes(process.env.PAYMENT_1299_LINK)) {
+        await sendWAImage(userId, QR_1299(), "📲 Scan karke pay karo — 14-Day Deep Relief Plan (Rs.1299)");
+      }
+    }
   } catch(e){ console.error("[ProcessMessage]",e.message); }
 }
 
@@ -73,6 +88,12 @@ async function sendWAReply(phone,text) {
   try {
     await fetch(`https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,{method:"POST",headers:{Authorization:`Bearer ${process.env.WHATSAPP_TOKEN}`,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:phone,type:"text",text:{body:text}})});
   } catch(e){ console.error("[WA Reply]",e.message); }
+}
+
+async function sendWAImage(phone,imageUrl,caption) {
+  try {
+    await fetch(`https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,{method:"POST",headers:{Authorization:`Bearer ${process.env.WHATSAPP_TOKEN}`,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:phone,type:"image",image:{link:imageUrl,caption}})});
+  } catch(e){ console.error("[WA Image]",e.message); }
 }
 
 app.post("/payment/webhook",express.raw({type:"application/json"}),async(req,res)=>{
@@ -117,4 +138,4 @@ app.get("/admin/lead/:uid/history",adminAuth,async(req,res)=>res.json(await fire
 app.use("/public",express.static(path.join(__dirname,"public")));
 
 const PORT=process.env.PORT||3000;
-app.listen(PORT,()=>console.log(`[Ayusomam v2] Running on port ${PORT}`));
+app.listen(PORT,()=>console.log(`[Ayusomam v2.1] Running on port ${PORT}`));
