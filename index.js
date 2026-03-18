@@ -137,5 +137,10 @@ app.get("/admin/data",adminAuth,async(req,res)=>{
 app.get("/admin/lead/:uid/history",adminAuth,async(req,res)=>res.json(await firebase.getHistory(req.params.uid,100)));
 app.use("/public",express.static(path.join(__dirname,"public")));
 
+
+// Keep-alive: prevent Render from sleeping
+setInterval(() => {
+  fetch('https://bot.ayusomamherbals.com/health').catch(() => {});
+}, 10 * 60 * 1000); // every 10 minutes
 const PORT=process.env.PORT||3000;
 app.listen(PORT,()=>console.log(`[Ayusomam v2.1] Running on port ${PORT}`));
