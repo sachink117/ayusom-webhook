@@ -65,13 +65,13 @@ async function getAIReply(lead,history) {
 
 async function sendIGReply(userId,text) {
   try {
-    await fetch(`https://graph.facebook.com/v18.0/me/messages?access_token=${process.env.IG_ACCESS_TOKEN}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({recipient:{id:userId},message:{text}})});
+    await fetch(`https://graph.facebook.com/v18.0/me/messages?access_token=${process.env.INSTAGRAM_TOKEN}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({recipient:{id:userId},message:{text}})});
   } catch(e){ console.error("[IG Reply]",e.message); }
 }
 
 async function sendWAReply(phone,text) {
   try {
-    await fetch(`https://graph.facebook.com/v18.0/${process.env.WA_PHONE_NUMBER_ID}/messages`,{method:"POST",headers:{Authorization:`Bearer ${process.env.WA_ACCESS_TOKEN}`,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:phone,type:"text",text:{body:text}})});
+    await fetch(`https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,{method:"POST",headers:{Authorization:`Bearer ${process.env.WHATSAPP_TOKEN}`,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:phone,type:"text",text:{body:text}})});
   } catch(e){ console.error("[WA Reply]",e.message); }
 }
 
