@@ -38,6 +38,7 @@ const ALERT_EMAIL    = 'deamonslayer117@gmail.com';
 
 // ─── FIREBASE INIT ────────────────────────────────────────────────────────────
 let db;
+let fbError = null;
 try {
   // Supports FIREBASE_SERVICE_ACCOUNT (single JSON string) or individual vars
   const fbCred = process.env.FIREBASE_SERVICE_ACCOUNT
@@ -54,6 +55,7 @@ try {
   db = admin.firestore();
   console.log('[Firebase] Connected');
 } catch (e) {
+  fbError = e.message;
   console.warn('[Firebase] Init failed:', e.message);
 }
 
@@ -523,7 +525,7 @@ app.post('/widget-chat', async (req, res) => {
 });
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', version: '2.0', firebase: !!db, ig: !!sendInstagramMessagePW, time: new Date().toISOString() });
+  res.json({ status: 'ok', version: '2.0', firebase: !!db, fbError: fbError || undefined, ig: !!sendInstagramMessagePW, time: new Date().toISOString() });
 });
 
 // ─── INSTAGRAM POLLING (Playwright) ──────────────────────────────────────────
