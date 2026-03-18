@@ -300,7 +300,7 @@ async function sendTwilioMessage(to, body) {
 }
 
 async function sendFBMessage(recipientId, text) {
-  const url = `https://graph.facebook.com/v18.0/17841445309536661/messages?access_token=${PAGE_ACCESS_TOKEN}`;
+  const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`;
   const res = await fetch(url, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
@@ -371,6 +371,7 @@ async function sendMessage(platform, userId, text) {
     if      (platform === "twilio")    await sendTwilioMessage(userId, chunk);
     else if (platform === "instagram") await sendInstagramMessage(userId, chunk);
     else if (platform === "instagram_playwright" && sendInstagramMessagePW) await sendInstagramMessagePW(userId, chunk);
+    else if (platform === "facebook")  await sendFBMessage(userId, chunk);
     else if (platform === "whatsapp")  await sendWhatsAppMessage(userId, chunk);
     else if (platform === "website")   { if (widgetPending[userId]) widgetPending[userId].push(chunk); }
     else                               await sendFBMessage(userId, chunk);
