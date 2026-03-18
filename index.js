@@ -80,8 +80,13 @@ async function getAIReply(lead,history) {
 
 async function sendIGReply(userId,text) {
   try {
-    await fetch(`https://graph.facebook.com/v18.0/me/messages?access_token=${process.env.INSTAGRAM_TOKEN}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({recipient:{id:userId},message:{text}})});
-  } catch(e){ console.error("[IG Reply]",e.message); }
+    const token=process.env.PAGE_ACCESS_TOKEN||process.env.INSTAGRAM_TOKEN;
+    console.log("[IG] Sending reply to",userId,"token starts:",token?.substring(0,10));
+    const r=await fetch(`https://graph.facebook.com/v22.0/me/messages?access_token=${token}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({recipient:{id:userId},message:{text}})});
+    const data=await r.json();
+    if(data.error) console.error("[IG Reply Error]",JSON.stringify(data.error));
+    else console.log("[IG Reply OK]",userId,data.message_id||"sent");
+  } catch(e){ console.error("[IG Reply Fail]",e.message); }
 }
 
 async function sendWAReply(phone,text) {
