@@ -1489,6 +1489,14 @@ app.get('/admin/followup-status',(req,res)=>{
   }
   res.json({globalFollowupEnabled,statuses:out});
 });
+// === LEAD DASHBOARD ===
+app.get('/dashboard', (req, res) => {
+  if (req.query.secret !== 'ayusomam_admin_2024') {
+    return res.status(401).send('Unauthorized');
+  }
+  res.setHeader('Content-Type', 'text/html');
+  res.send($dashHtml);
+});
 app.get("/admin", (req, res) => {
   if (req.query.secret !== VERIFY_TOKEN) {
     return res.send(`<!DOCTYPE html><html><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f5f5f5">
