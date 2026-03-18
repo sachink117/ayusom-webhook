@@ -1333,6 +1333,9 @@ app.get("/admin/data", async (req, res) => {
   if (req.query.secret !== VERIFY_TOKEN) return res.status(401).json({ error: "Unauthorized" });
   const all = Object.entries(userData).map(([id, u]) => ({
     id,
+    name:              u.name || null,
+    username:          u.username || null,
+    phone:             u.phone || null,
     platform:          u.platform || "unknown",
     state:             u.state    || "new",
     sinusType:         u.sinusType || null,
@@ -1490,15 +1493,7 @@ app.get('/admin/followup-status',(req,res)=>{
   }
   res.json({globalFollowupEnabled,statuses:out});
 });
-// === LEAD DASHBOARD ===
-app.get('/dashboard', (req, res) => {
-  if (req.query.secret !== 'ayusomam_admin_2024') {
-    return res.status(401).send('Unauthorized');
-  }
-  res.setHeader('Content-Type', 'text/html');
-  res.send($dashHtml);
-});
-app.get("/admin", (req, res) => {
+// === LEAD DASHBOARD ===app.get("/admin", (req, res) => {
   if (req.query.secret !== VERIFY_TOKEN) {
     return res.send(`<!DOCTYPE html><html><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f5f5f5">
       <form method="GET" action="/admin" style="background:#fff;padding:32px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.1);text-align:center">
@@ -2074,7 +2069,7 @@ app.get('/dashboard', async (req, res) => {
 
     var histData = [];
     var rows = leads.map(function(u, i) {
-      var hist = Array.isArray(u.history) ? u.history.slice(-3) : [];
+      var hist = Array.isArray(u.history) ? u.history.slice(-80) : [];
       histData.push(JSON.stringify(hist).replace(/</g,'&lt;').replace(/>/g,'&gt;'));
       var sc = stateColor(u.state || u.convPhase);
       return '<tr class="lr" data-idx="' + i + '" style="cursor:pointer;border-bottom:1px solid #f0f0f0">' +
@@ -2102,7 +2097,7 @@ app.get('/dashboard', async (req, res) => {
       'var hrow=document.getElementById("hist-"+idx);' +
       'if(hrow.style.display==="none"){' +
       'var h=JSON.parse(HIST[idx]);' +
-      'var html=h.map(function(m){return"<div style=\"margin:2px 0;padding:4px 8px;border-radius:4px;background:"+(m.role==="user"?"#eef2ff":"#f0fdf4")+";\"><b>"+(m.role==="user"?"U":"Bot")+":</b> "+(m.content||"").substring(0,150)+"</div>";}).join("");' +
+      'var html=h.map(function(m){return"<div style=\"margin:2px 0;padding:4px 8px;border-radius:4px;background:"+(m.role==="user"?"#eef2ff":"#f0fdf4")+";\"><b>"+(m.role==="user"?"U":"Bot")+":</b> "+(m.content||"")+"</div>";}).join("");' +
       'hrow.querySelector("td").innerHTML=html||"No history";' +
       'hrow.style.display="table-row";' +
       '}else{hrow.style.display="none";}' +
@@ -2122,7 +2117,7 @@ app.get('/dashboard', async (req, res) => {
       'th{background:#2d6a4f;color:#fff;padding:9px 10px;font-size:11px;font-weight:600;text-align:left;white-space:nowrap}' +
       'tr.lr:hover{background:#f9f9f9}</style></head><body>' +
       '<div class="hdr"><div><h1>🌿 Ayusomam Lead Dashboard</h1>' +
-      '<small>Auto-refresh 60s • ' + new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}) + ' IST • Click row = last 3 msgs</small></div>' +
+      '<small>Auto-refresh 60s • ' + new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}) + ' IST • Click row = full conversation</small></div>' +
       '<a href="/dashboard" style="color:#fff;font-size:12px">Refresh</a></div>' +
       '<div class="stats">' +
       '<div class="stat"><div class="n">' + stats.total + '</div><div class="l">Total Leads</div></div>' +
