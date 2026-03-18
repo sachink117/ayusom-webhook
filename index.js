@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 const express=require("express"),crypto=require("crypto"),fetch=require("node-fetch"),Anthropic=require("@anthropic-ai/sdk"),path=require("path");
 const firebase=require("./firebase"),notifications=require("./notifications");
 const {persona,language,style,conversion}=require("./prompts/system");
