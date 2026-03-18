@@ -26,7 +26,7 @@ const igLastUserReply = new Map(); // senderId → timestamp of last user messag
 const igPagePool = [];
 const POOL_SIZE = 1; // reduced: API-first means pool only needed for DOM fallback
 
-let _db, _handleMessage, _sleep;
+let _db, _handleMessage, _sleep, _userData, _persistUser;
 let _currentProcessingThreadId = null; // set by processThread so sendMessageOnPage knows thread without URL
 let _igUsername, _igPassword;
 
@@ -840,6 +840,15 @@ async function processThread(poolEntry, href) {
     igThreadUrls.set(senderId, threadUrl);
     // Track when this user last sent a message — used for priority queue (active chats first)
     igLastUserReply.set(senderId, Date.now());
+    // Store Instagram username from thread participants
+    if (_userData && threadData?.thread?.users?.length) {
+      const otherUser = threadData.thread.users.find(u => String(u.pk) !== String(threadData.thread.viewer_id));
+      if (otherUser && _userData[senderId] && !_userData[senderId].name) {
+        _userData[senderId].name = otherUser.full_name || otherUser.username || null;
+        _userData[senderId].username = otherUser.username || null;
+        if (_persistUser) _persistUser(senderId);
+      }
+    }
     console.log('[IG-PW] DM (' + threadId + '): "' + msgText.substring(0, 80) + '"');
 
     // ── Relevance filter: only respond to sinus/health-related DMs ──
@@ -1202,8 +1211,8 @@ async function sendInstagramMessagePW(senderId, text) {
 
 // ââ Module export âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 module.exports = {
-  async init({ db, handleMessage, sleep, INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD}) {
-    _db = db;
+  async init({ db, handleMessage, sleep, INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD, userData, persistUser }) {
+    _db = db; _userData = userData; _persistUser = persistUser;
     _handleMessage = handleMessage;
     _sleep = sleep;
     await initPlaywrightIG(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD);
