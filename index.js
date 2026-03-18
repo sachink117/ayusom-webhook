@@ -2157,7 +2157,7 @@ app.listen(PORT, () => {
   if (INSTAGRAM_USERNAME) setTimeout(async () => {
     try {
       const igMod = require('./instagram-pw');
-      sendInstagramMessagePW = await igMod.init({ db, handleMessage, sleep, INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD });
+      sendInstagramMessagePW = await igMod.init({ db, handleMessage, sleep, INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD, userData, persistUser: persistUserToFirestore });
       console.log('[IG-PW] Module loaded and ready');
     } catch(e) { console.error('[IG-PW] Module load error:', e.message); }
   }, 8000);
