@@ -6,7 +6,7 @@ const {terms}=require("./prompts/glossary");
 const app=express(), claude=new Anthropic({apiKey:process.env.ANTHROPIC_API_KEY});
 app.use(express.json());
 
-// QR code helper — generates scannable PNG from any URL via qrserver.com
+// QR code helper â€” generates scannable PNG from any URL via qrserver.com
 function getQRUrl(link){ return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(link)}`; }
 const QR_499  = ()=>getQRUrl(process.env.PAYMENT_499_LINK);
 const QR_1299 = ()=>getQRUrl(process.env.PAYMENT_1299_LINK);
@@ -63,9 +63,9 @@ async function processMessage({userId,text,source,platform,name=""}) {
       await sendWAReply(userId,reply);
       // Auto-send QR image when a payment link appears in the reply
       if(process.env.PAYMENT_499_LINK && reply.includes(process.env.PAYMENT_499_LINK)) {
-        await sendWAImage(userId, QR_499(), "📲 Scan karke pay karo — 7-Day Sinus Reset Plan (Rs.499)");
+        await sendWAImage(userId, QR_499(), "ðŸ“² Scan karke pay karo â€” 7-Day Sinus Reset Plan (Rs.499)");
       } else if(process.env.PAYMENT_1299_LINK && reply.includes(process.env.PAYMENT_1299_LINK)) {
-        await sendWAImage(userId, QR_1299(), "📲 Scan karke pay karo — 14-Day Deep Relief Plan (Rs.1299)");
+        await sendWAImage(userId, QR_1299(), "ðŸ“² Scan karke pay karo â€” 14-Day Deep Relief Plan (Rs.1299)");
       }
     }
   } catch(e){ console.error("[ProcessMessage]",e.message); }
@@ -140,6 +140,18 @@ app.get("/admin/data",adminAuth,async(req,res)=>{
   res.json({leads,members,payments});
 });
 app.get("/admin/lead/:uid/history",adminAuth,async(req,res)=>res.json(await firebase.getHistory(req.params.uid,100)));
+
+app.post("/admin/reply",async(req,res)=>{
+  const{secret,userId,platform,message}=req.body;
+  if(secret!=="ayusomam_admin_2024") return res.status(401).json({ok:false,error:"Unauthorized"});
+  try{
+    if(platform==="instagram") await sendIGReply(userId,message);
+    else if(platform==="whatsapp") await sendWAReply(userId,message);
+    else return res.json({ok:false,error:"Unknown platform: "+platform});
+    await firebase.saveMessage(userId,"assistant",message);
+    res.json({ok:true});
+  }catch(e){ res.json({ok:false,error:e.message}); }
+});
 app.use("/public",express.static(path.join(__dirname,"public")));
 
 
