@@ -16,6 +16,14 @@ function isDuplicate(mid) {
     return false;
 }
 
+// Fix "Invalid Date" in admin dashboard - convert Firestore Timestamps to ISO strings
+function serializeTimestamps(obj) {
+      if(!obj || typeof obj !== 'object') return obj;
+      if(obj._seconds !== undefined) return new Date(obj._seconds * 1000).toISOString();
+      if(obj.seconds !== undefined) return new Date(obj.seconds * 1000).toISOString();
+      if(Array.isArray(obj)) return obj.map(serializeTimestamps);
+      return Object.fromEntries(Object.entries(obj).map(([k,v]) => [k, serializeTimestamps(v)]));
+}
 // QR code helper - generates scannable PNG from any URL via qrserver.com
 function getQRUrl(link){ return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(link)}`; }
 const QR_499 = ()=>getQRUrl(process.env.PAYMENT_499_LINK);
