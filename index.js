@@ -43,9 +43,9 @@ async function handleWA(value) {
   const contact=value.contacts?.[0]||{};
   for(const msg of value.messages||[]) {
     if(msg.type!=="text") continue;
-    const resetKw=['start over','reset','shuru se','naya shuru','restart','start again','fresh start','redo'];
-    if(msg.text.body && resetKw.some(k=>msg.text.body.toLowerCase().includes(k))){
-      await sendWAReply(msg.from,'Bilkul! Shuru karte hain naye sire se.
+    if(msg.text.body && msg.text.body.trim()==='#repeat'){
+      await firebase.clearHistory(msg.from);
+      await sendWAReply(msg.from,'Starting fresh!
 
 Mujhe batayein — aapko kitne time se sinus ki problem hai? Aur sabse zyada kya hota hai — naak band, sneezing, ya sar mein bhaari pan?');
       continue;
