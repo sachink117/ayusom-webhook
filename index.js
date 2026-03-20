@@ -43,6 +43,14 @@ async function handleWA(value) {
   const contact=value.contacts?.[0]||{};
   for(const msg of value.messages||[]) {
     if(msg.type!=="text") continue;
+    const resetKw=['start over','reset','shuru se','naya shuru','restart','start again','fresh start'];
+    if(msg.text.body && resetKw.some(k=>msg.text.body.toLowerCase().includes(k))){
+      await firebase.clearHistory(msg.from);
+      await sendWAReply(msg.from,'Bilkul! Shuru karte hain naye sire se.
+
+Mujhe batayein — aapko kitne time se sinus ki problem hai? Aur sabse zyada kya hota hai — naak band, sneezing, ya sar mein bhaari pan?');
+      continue;
+    }
     await processMessage({userId:msg.from,text:msg.text.body,source:"whatsapp",platform:"whatsapp",name:contact.profile?.name||""});
   }
 }
