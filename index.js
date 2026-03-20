@@ -43,7 +43,7 @@ async function handleWA(value) {
   const contact=value.contacts?.[0]||{};
   for(const msg of value.messages||[]) {
     if(msg.type!=="text") continue;
-    const resetKw=['start over','reset','shuru se','naya shuru','restart','start again','fresh start','dubara','dobara','wapas','repeat','phir se','again','redo'];
+    const resetKw=['start over','reset','shuru se','naya shuru','restart','start again','fresh start','redo'];
     if(msg.text.body && resetKw.some(k=>msg.text.body.toLowerCase().includes(k))){
       await sendWAReply(msg.from,'Bilkul! Shuru karte hain naye sire se.
 
