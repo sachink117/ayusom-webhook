@@ -45,9 +45,7 @@ async function handleWA(value) {
     if(msg.type!=="text") continue;
     if(msg.text.body && msg.text.body.trim()==='#repeat'){
       await firebase.clearHistory(msg.from);
-      await sendWAReply(msg.from,'Starting fresh!
-
-Mujhe batayein — aapko kitne time se sinus ki problem hai? Aur sabse zyada kya hota hai — naak band, sneezing, ya sar mein bhaari pan?');
+      await sendWAReply(msg.from,'Starting fresh!\n\nMujhe batayein \u2014 aapko kitne time se sinus ki problem hai? Aur sabse zyada kya hota hai \u2014 naak band, sneezing, ya sar mein bhaari pan?');
       continue;
     }
     await processMessage({userId:msg.from,text:msg.text.body,source:"whatsapp",platform:"whatsapp",name:contact.profile?.name||""});
