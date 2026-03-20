@@ -6,12 +6,51 @@ const {terms}=require("./prompts/glossary");
 const app=express(), claude=new Anthropic({apiKey:process.env.ANTHROPIC_API_KEY});
 app.use(express.json());
 
+// Deduplication: prevent processing same message twice (WhatsApp can send duplicate webhooks)
+const recentMessages = new Map();
+function isDuplicate(msgId) {
+  if (!msgId) return false;
+  if (recentMessages.has(msgId)) return true;
+  recentMessages.set(msgId, Date.now());
+  // Clean up entries older than 5 minutes
+  if (recentMessages.size > 500) {
+    const cutoff = Date.now() - 5 * 60 * 1000;
+    for (const [k, v] of recentMessages) { if (v < cutoff) recentMessages.delete(k); }
+  }
+  return false;
+}
+
+// Admin commands
+const ADMIN_COMMANDS = new Set(["#reset", "#restart", "#clear", "#status"]);
+function isAdminCommand(text) { return ADMIN_COMMANDS.has(text?.trim().toLowerCase()); }
+
+async function handleAdminCommand(userId, text, platform) {
+  const cmd = text.trim().toLowerCase();
+  if (cmd === "#reset" || cmd === "#restart" || cmd === "#clear") {
+    // Clear conversation history
+    const msgsRef = require("firebase-admin").firestore().collection("leads").doc(userId).collection("messages");
+    const batch = require("firebase-admin").firestore().batch();
+    const msgs = await msgsRef.get();
+    msgs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+    await firebase.updateLead(userId, { status: "new" });
+    const reply = "Conversation reset ho gayi hai. Fresh start! Namaste, kya aapko sinus ya naak se related koi takleef hai?";
+    await firebase.saveMessage(userId, "assistant", reply);
+    return reply;
+  }
+  if (cmd === "#status") {
+    const lead = await firebase.getLead(userId);
+    return `Status: ${lead?.status || "unknown"}\nPlatform: ${platform}\nVersion: v5.0`;
+  }
+  return null;
+}
+
 // QR code helper — generates scannable PNG from any URL via qrserver.com
 function getQRUrl(link){ return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(link)}`; }
 const QR_499  = ()=>getQRUrl(process.env.PAYMENT_499_LINK);
 const QR_1299 = ()=>getQRUrl(process.env.PAYMENT_1299_LINK);
 
-app.get("/health",(req,res)=>res.json({status:"ok",version:"2.1",time:new Date().toISOString()}));
+app.get("/health",(req,res)=>res.json({status:"ok",version:"5.0",time:new Date().toISOString()}));
 
 app.get("/webhook",(req,res)=>{
   if(req.query["hub.mode"]==="subscribe"&&req.query["hub.verify_token"]===process.env.WEBHOOK_VERIFY_TOKEN)
@@ -34,8 +73,8 @@ app.post("/webhook",async(req,res)=>{
 });
 
 async function handleIG(event) {
-  const userId=event.sender.id, text=event.message?.text;
-  if(!text) return;
+  const userId=event.sender.id, text=event.message?.text, msgId=event.message?.mid;
+  if(!text || isDuplicate(msgId)) return;
   await processMessage({userId,text,source:"instagram",platform:"instagram"});
 }
 
@@ -43,6 +82,7 @@ async function handleWA(value) {
   const contact=value.contacts?.[0]||{};
   for(const msg of value.messages||[]) {
     if(msg.type!=="text") continue;
+    if(isDuplicate(msg.id)) continue;
     await processMessage({userId:msg.from,text:msg.text.body,source:"whatsapp",platform:"whatsapp",name:contact.profile?.name||""});
   }
 }
@@ -51,12 +91,23 @@ async function processMessage({userId,text,source,platform,name=""}) {
   try {
     let lead=await firebase.getLead(userId);
     if(!lead){ await firebase.createLead(userId,{name,source,platform}); lead={id:userId,name,source,platform,status:"new"}; }
-    await firebase.saveMessage(userId,"user",text);
-    const history=await firebase.getHistory(userId,20);
-    const reply=await getAIReply(lead,history);
-    await firebase.saveMessage(userId,"assistant",reply);
-    await firebase.updateLead(userId,{lastMessage:text,name:lead.name||name});
 
+    let reply;
+
+    // Handle admin commands (#reset, #restart, #clear, #status)
+    if(isAdminCommand(text)) {
+      reply = await handleAdminCommand(userId, text, platform);
+      if(!reply) return;
+    } else {
+      // Normal AI conversation
+      await firebase.saveMessage(userId,"user",text);
+      const history=await firebase.getHistory(userId,20);
+      reply=await getAIReply(lead,history);
+      await firebase.saveMessage(userId,"assistant",reply);
+      await firebase.updateLead(userId,{lastMessage:text,name:lead.name||name});
+    }
+
+    // Send reply to the right platform
     if(platform==="instagram") {
       await sendIGReply(userId,reply);
     } else if(platform==="whatsapp") {
@@ -91,13 +142,13 @@ async function sendIGReply(userId,text) {
 
 async function sendWAReply(phone,text) {
   try {
-    await fetch(`https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,{method:"POST",headers:{Authorization:`Bearer ${process.env.WHATSAPP_TOKEN}`,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:phone,type:"text",text:{body:text}})});
+    await fetch(`https://graph.facebook.com/v21.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,{method:"POST",headers:{Authorization:`Bearer ${process.env.WHATSAPP_TOKEN}`,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:phone,type:"text",text:{body:text}})});
   } catch(e){ console.error("[WA Reply]",e.message); }
 }
 
 async function sendWAImage(phone,imageUrl,caption) {
   try {
-    await fetch(`https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,{method:"POST",headers:{Authorization:`Bearer ${process.env.WHATSAPP_TOKEN}`,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:phone,type:"image",image:{link:imageUrl,caption}})});
+    await fetch(`https://graph.facebook.com/v21.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,{method:"POST",headers:{Authorization:`Bearer ${process.env.WHATSAPP_TOKEN}`,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:phone,type:"image",image:{link:imageUrl,caption}})});
   } catch(e){ console.error("[WA Image]",e.message); }
 }
 
@@ -148,4 +199,4 @@ setInterval(() => {
   fetch('https://bot.ayusomamherbals.com/health').catch(() => {});
 }, 10 * 60 * 1000); // every 10 minutes
 const PORT=process.env.PORT||3000;
-app.listen(PORT,()=>console.log(`[Ayusomam v2.1] Running on port ${PORT}`));
+app.listen(PORT,()=>console.log(`[Ayusomam v5.0] Running on port ${PORT}`));
