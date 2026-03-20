@@ -26,4 +26,12 @@ async function getAllLeads(limit=100) { const s = await db.collection("leads").o
 async function getAllMembers() { const s = await db.collection("members").where("status","==","active").get(); return s.docs.map(d=>({id:d.id,...d.data()})); }
 async function getAllPayments() { const s = await db.collection("payments").orderBy("createdAt","desc").limit(100).get(); return s.docs.map(d=>({id:d.id,...d.data()})); }
 
-module.exports = { getLead,createLead,updateLead,getHistory,saveMessage,createMember,getMemberByUserId,updateMemberDay,logProgress,savePayment,getAllLeads,getAllMembers,getAllPayments };
+async function clearHistory(userId) {
+  const snapshot = await db.collection("leads").doc(userId).collection("messages").get();
+  const batch = db.batch();
+  snapshot.docs.forEach(doc => batch.delete(doc.ref));
+  await batch.commit();
+  await db.collection("leads").doc(userId).update({ status: "new", lastActiveAt: ts() });
+}
+
+module.exports = { getLead, createLead, updateLead, getHistory, saveMessage, clearHistory, createMember, getMemberByUserId, updateMemberDay, logProgress, savePayment, getAllLeads, getAllMembers, getAllPayments };
