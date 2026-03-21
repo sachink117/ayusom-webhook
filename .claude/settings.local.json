@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep:*)",
+      "Bash(node:*)",
+      "Bash(npx:*)",
+      "Bash(clip:*)",
+      "WebFetch(domain:bot.ayusomamherbals.com)"
+    ]
+  }
+}

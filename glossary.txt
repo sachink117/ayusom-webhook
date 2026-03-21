@@ -1,0 +1,31 @@
+﻿module.exports = {
+  terms: {
+    "saindhav namak": "saindha namak (sendha namak / rock salt)",
+    "saindhava lavana": "saindha namak",
+    "trikatu": "adrak, kali mirch aur pipli ka mix",
+    "triphala": "triphala (amla, harad, baheda)",
+    "pippali": "pipli",
+    "haritaki": "harad",
+    "amalaki": "amla",
+    "bibhitaki": "baheda",
+    "guduchi": "giloy",
+    "tulasi": "tulsi",
+    "shunthi": "sonth (sukha adrak)",
+    "marich": "kali mirch",
+    "yashtimadhu": "mulethi",
+    "pratishyay": "naak ki samasya / sinus problem",
+    "shirahshool": "sar dard / headache",
+    "kasa": "khansi",
+    "shwas": "saans lene mein takleef",
+    "shotha": "sujan",
+    "jwara": "bukhar",
+    "pratiraksha shakti": "immunity / body ki resistance",
+    "ama": "toxins / body ke gande padarth",
+    "agni": "pachan shakti / digestion",
+    "vata dosha": "vata imbalance",
+    "pitta dosha": "pitta / acidity / heat",
+    "kapha dosha": "kapha / mucus / balgam",
+    "buhari": "bimari / takleef",
+    "aushadhi": "herbal dawa / medicine"
+  }
+};

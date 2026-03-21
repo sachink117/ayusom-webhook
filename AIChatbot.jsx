@@ -68,8 +68,8 @@ Type: Allergic Rhinosinusitis | Dosha: Vata + Kapha
 
 Aaj ke 2 steps subah try karein - ek doosre ke complementary hain:
 
-1. *Tulsi-Ginger Steam* - Subah uthte hi, khaana khaane se pehle
-Ek bhagona paani mein 4-5 fresh tulsi patte + adha inch kuch adrak daalen. Ubaal lein, phir towel sar pe odh ke 8-10 min steam lein. Muh band, sirf naak se saans lein.
+1. *Pre-Steam Facial Massage (Marma) + Steam* - Uthte hi
+Pehle 2 min warm til (sesame) tel se naak aur gaal pe massage karein. Phir 4-5 tulsi patte + adrak ubaal ke 8-10 min steam lein. Massage se block kapha melt hota hai, steam use clear karti hai.
 
 ⏱ 15-20 min baad -
 
@@ -84,8 +84,8 @@ Type: Congestive Sinusitis | Dosha: Kapha dominant
 
 Aaj ke 2 steps subah try karein:
 
-1. *Adrak-Saunth Steam* - khaali pet, uthte hi
-Paani mein 1 inch kuchi adrak + 1/2 tsp saunth (dry ginger powder) daalen. Ubaal ke 10 min steam lein, towel sar pe. Balgam loose hoga andar se.
+1. *Warm Oil Cheek Massage + Adrak Steam* - uthte hi
+2 boond garm sarson tel se pehle nose/cheecks par 2 min massage karein. Phir paani mein 1 inch kuchi adrak + 1/2 tsp saunth daal ke 10 min steam lein. Tel block kapha ko ukhaadta hai.
 
 ⏱ 20-25 min baad -
 
@@ -100,12 +100,12 @@ Type: Inflammatory Sinusitis | Dosha: Pitta aggravation
 Aaj ke 2 steps subah try karein:
 
 1. *Dhaniya-Saunf Infusion* - khaali pet, subah uthke
-1 tsp dhaniya (coriander seeds) + 1 tsp saunf ko raat bhar paani mein bhigo ke rakhein. Subah chhan ke thanda hi peeyein. Pitta ko andar se shant karta hai.
+1 tsp dhaniya + 1 tsp saunf ko raat bhar paani mein bhigo ke rakhein. Subah chhan ke thanda hi peeyein. Naak ki heat (Pitta) ko andar se shant karta hai.
 
-⏱ 30-40 min baad khaana khaane ke baad -
+⏱ 30-40 min baad -
 
-2. *Ghee Nasya* (medicated nasal application)
-Dono naak mein 1-1 boond pure desi ghee (garm nahi - room temp). 5 min bilkul still baith ke rakhein. Burning sensation aur inflammation mein seedha kaam karta hai.
+2. *Cooling Nasal Rinse (Room Temp)*
+Room temperature (thanda nahi, garm bhi nahi) paani mein 1 tsp Gulab Jal (Rose water) aur thoda sa sendha namak milayein. Ise naak se rinse karein. Garm paani Pitta ko bhadkata hai, isliye rose water soothing effect dega.
 
 ⚠ Yeh andar ki pitta vitiation ka root address nahi karti - sirf aaj ke liye relief hai. Shaam ko zaroor batana 🙏`,
 
@@ -114,13 +114,13 @@ Type: Chronic Rebound Sinusitis | Dosha: Vata + Srotas blockage
 
 Aaj ke 2 steps subah try karein:
 
-1. *Pre-Spray Steam Replacement*
-Spray use karne se pehle 10 min steam karein - plain paani, koi additive nahi. Agar naak khul jaaye toh spray ki zaroorat na padhe. Agar padhe toh sirf ek naak mein - doosri naak open rahe.
+1. *Pre-Spray Facial Massage + Steam*
+Spray use karne se pehle 2 min coconut oil se poore chehre ki halki massage karein, phir 10 min steam lein (plain paani). Agar naak khul jaaye toh spray avoid karein.
 
-⏱ Dono ke beech minimum 30 min ka gap -
+⏱ 30 min baad -
 
-2. *Anu Taila / Desi Ghee Nasya*
-Steam ke 30 min baad, dono naak mein 1-1 boond desi ghee ya anu taila (Ayurvedic nasal drops - easily available). Naak ki lining ko nourish karta hai - spray ki harshness se healing shuru hoti hai.
+2. *Soothing Cow's Ghee Nasya (Poshana)*
+Dono naak mein 1-1 boond pure Desi Ghee. (Warning: Spray addict naak damaged hoti hai, isliye koi sharp Ayurvedic drops jaise Anu Taila abhi bilkul use NA karein). Ghee lining ko nourish karke healing shuru karta hai.
 
 ⚠ Spray ne jo mucosal damage kiya hai - yeh ghee se thodi healing karta hai, lekin dependency todne ke liye structured protocol chahiye. Shaam ko zaroor batana 🙏`
   },
@@ -198,67 +198,31 @@ ${typeLabel}
 
 ${insight}
 
-Aapke liye 2 protocols hain 👇
+Is root cause ko permanently theek karne ke liye, Sachin Ji ne ek *14-Day Deep Healing Protocol* design kiya hai 👇
 
----------------------
+🔥 *14-Day Deep Sinus Protocol - Rs.1,299*
+✔ 14 din ka subah + raat personalized routine
+✔ Root dosha imbalance pe point-by-point attack
+✔ Aapke sinus type ke liye specific Herbal + Diet adjustments
+✔ Sachin Ji se direct WhatsApp access
 
-⚡ *PROTOCOL 1 - Rs.499*
-7-Day Sinus Stabilization
+⚠ *URGENCY NOTE:* Kyunki Sachin Ji har patient ko mentally track aur guide karte hain, hum ek din mein *sirf 15 naye patients* lete hain. Aaj ke slots lagbhag full hain.
 
-✔ Naya problem hai (6 months-1 saal)
-✔ Pehli baar structured try karna hai
-✔ Sirf 15-20 min daily
+💰 Monthly ENT aur spray karcha = Rs.1,500-3,000 (jo temporary hai)
+Yahan Rs.1,299 mein root cause pe seedha kaam.
 
-📅 7 din - roz clear steps
-📲 Sachin Ji WhatsApp pe personally guide karenge
-🌿 Ghar ke cheezein + herbal support
-
-💰 Ek ENT visit = Rs.500-800 sirf consultation
-Yahan Rs.499 mein 7 din ka poora protocol + daily guidance
-
----------------------
-
-🔥 *PROTOCOL 2 - Rs.1,299*
-14-Day Deep Sinus Protocol
-⭐ Sabse zyada log yahi lete hain
-
-✔ Purani problem - 1+ saal
-✔ Spray/medicine pe depend hain
-✔ Pehle try kiya - temporary hi raha
-✔ Root cause se permanently theek karna hai
-
-📅 14 din - subah + raat personalized routine
-📊 Daily tracking - aapke progress ke saath adjust hota hai
-🌿 Herbal support included + personalized
-🩺 Dosha ke hisaab se diet guidance
-📲 Sachin Ji se direct WhatsApp access
-
-💰 Monthly medicines = Rs.1,500-3,000 - phir bhi wapas aata hai
-Yahan Rs.1,299 mein root cause pe seedha kaam
-
----------------------
-         Rs.499      |  Rs.1,299
----------------------
-Din      7          |  14
-Routine  1x/day     |  2x/day
-Tracking Basic      |  Full
-Herbal   Optional   |  Included
-Diet     ✗          |  ✓
----------------------
-
-🕐 Aaj reply karein - kal subah Day 1 aapke WhatsApp pe`;
+Kya aap is permanent healing journey ko shuru karne ke liye ready hain?`;
 }
 
 // ── SURFACE MESSAGE ──
-const SURFACE_MSG = `☝ Yeh steps temporary relief ke liye hain - root cause pe kaam nahi karte.
+const SURFACE_MSG = `☝ Yeh dono steps aaj ke liye surface relief denge.
 
-Agar sinus baar baar aata hai ya months se chal raha hai - toh andar ka dosha imbalance address karna padega. Warna yeh cycle chalti rahegi 🔄
+Lekin agar sinus purana hai ya baar-baar aata hai - toh iski jadd (root cause dosha imbalance) ko nikalna padega. Warna yeh medicine/spray ka vicious cycle chalta rahega 🔄
 
-Aap batayein:`;
+Kya aap Sachin Ji ka structured Ayurvedic Protocol dekhna chahenge jo root cause theek karta hai?`;
 
 const SURFACE_OPTIONS = [
-  "Haan, structured protocol dekhna hai",
-  "Pehle steps try karti/karta hun, baad mein bataungi/bataunga"
+  "Haan, Protocol dikhayein 🙏"
 ];
 
 // ── SEND LEAD TO BACKEND ──
@@ -607,75 +571,43 @@ export default function AIChatbot() {
 
     // ── AFTER STEPS ──
     if (stage === 'after_steps') {
-      const wantsTry = t === '2' || t.match(/pehle|try|baad|steps|karti|karta/);
-
-      if (wantsTry) {
-        setStage('try_first');
-        sendLead({ stage: 'try_first', sinusType: answers.symptom || '', name: answers.name || '', phone: answers.phone || '' });
-        await addBotMessage(
-          "Bilkul 🙏 Steps try karein - subah aur raat dono.\n\nKuch bhi sawaal ho - yahan type karein ya seedha WhatsApp karein:",
-          [`WhatsApp: ${WHATSAPP_NUM}`]
-        );
-        return;
-      }
-
-      // Wants to see protocol
       setStage('pitched');
       const sinusType = answers.symptom || 'congestive';
-      sendLead({ stage: 'plans_shown', sinusType, name: answers.name || '', phone: answers.phone || '' });
+      sendLead({ stage: 'plans_shown', sinusType, name: answers.name || '', phone: '' });
       await addBotMessage(buildPlanMsg(sinusType), [
-        "Rs.499 - 7-Day Protocol",
-        "Rs.1,299 - 14-Day Protocol",
-        "Fark samjhna hai",
-        "Sachin Ji se baat"
+        "Yes, 14-Day Protocol (Rs.1,299) Start Karein ✅",
+        "Kuch aur sasta/chota plan hai? (Rs.499)",
+        "Sachin Ji se baat karni hai"
       ]);
       return;
     }
 
     // ── PITCHED / PLAN SELECTION ──
     if (stage === 'pitched') {
-      // Protocol 1
-      if (t === '1' || t.match(/\b499\b|protocol 1|plan 1|7.day/i)) {
-        setAnswers(prev => ({ ...prev, selectedPlan: '499' }));
-        sendLead({ stage: 'protocol_1_selected', sinusType: answers.symptom || '', name: answers.name || '', phone: answers.phone || '' });
-        setStage('plan_selected');
-        const paymentLink = PAYMENT_499;
-        await addBotMessage(
-          `Bahut achha decision ${answers.name} Ji 🙏✅\n\nProtocol 1 (Rs.499 - 7-Day) ke liye payment link:\n${paymentLink}\n\nPayment ke baad screenshot WhatsApp pe bhejein.\n\n📱 ${WHATSAPP_NUM}\n\nSachin Ji kal subah aapko Day 1 routine personally bhejenge 🌿`,
-          [`WhatsApp pe message karein`]
-        );
-        return;
-      }
-
-      // Protocol 2
-      if (t === '2' || t.match(/\b1299\b|protocol 2|plan 2|14.day/i)) {
+      // Protocol 2 (Primary High-Ticket Close)
+      if (t.includes('14') || t.includes('1299') || t.includes('yes') || t.includes('start') || t.includes('1')) {
         setAnswers(prev => ({ ...prev, selectedPlan: '1299' }));
-        sendLead({ stage: 'protocol_2_selected', sinusType: answers.symptom || '', name: answers.name || '', phone: answers.phone || '' });
-        setStage('plan_selected');
-        const paymentLink = PAYMENT_1299;
+        setStage('ask_phone_payment');
         await addBotMessage(
-          `Bahut achha decision ${answers.name} Ji 🙏✅\n\nProtocol 2 (Rs.1,299 - 14-Day) ke liye payment link:\n${paymentLink}\n\nPayment ke baad screenshot WhatsApp pe bhejein.\n\n📱 ${WHATSAPP_NUM}\n\nSachin Ji kal subah aapko Day 1 routine personally bhejenge 🌿`,
-          [`WhatsApp pe message karein`]
+          `Bahut badhiya decision ${answers.name} Ji 🙏✅\n\nProtocol 2 (Rs.1,299 - 14-Day) aapki bimari ki jadd pe kaam karega.\n\nSachin Ji WhatsApp pe properly account link kar sakein, uske liye please apna 10-digit WhatsApp number type karein:`
         );
         return;
       }
 
-      // Difference
-      if (t === '3' || t.match(/fark|difference|confused|dono mein|samajh|kaun sa/)) {
+      // Protocol 1 (Downsell)
+      if (t.includes('chota') || t.includes('sasta') || t.includes('499') || t.includes('small') || t.includes('2')) {
+        setAnswers(prev => ({ ...prev, selectedPlan: '499' }));
+        setStage('ask_phone_payment');
         await addBotMessage(
-          "Seedhi baat 👇\n\nProtocol 1 (Rs.499) - 7 din, 1x daily. Naya problem hai toh yeh sahi hai. Body ko stabilize karta hai.\n\nProtocol 2 (Rs.1,299) - 14 din, 2x daily. Purana ya chronic problem, spray dependency. Root dosha imbalance pe kaam karta hai.\n\nDono fundamentally alag hain - ek ka extension nahi.\n\nBatayein - 1 ya 2?",
-          [
-            "Rs.499 - 7-Day Protocol",
-            "Rs.1,299 - 14-Day Protocol"
-          ]
+          `Bilkul ${answers.name} Ji. Ek 7-Day Stabilization Protocol (Rs. 499) bhi available hai jo body ko initial relief aur healing deta hai.\n\nSachin Ji WhatsApp pe properly account link kar sakein, uske liye please apna 10-digit WhatsApp number type karein:`
         );
         return;
       }
 
       // Specialist / Sachin Ji
-      if (t === '4' || t.match(/specialist|sachin|baat|call/)) {
+      if (t.includes('specialist') || t.includes('baat') || t.includes('sachin') || t.includes('3')) {
         setStage('human_takeover');
-        sendLead({ stage: 'requested_specialist', sinusType: answers.symptom || '', name: answers.name || '', phone: answers.phone || '' });
+        sendLead({ stage: 'requested_specialist', sinusType: answers.symptom || '', name: answers.name || '', phone: '' });
         await addBotMessage(
           `Bilkul 🙏 Sachin Ji personally baat karenge.\n\n📱 ${WHATSAPP_NUM}\n\nAyusomam Herbals 🌿`,
           [`WhatsApp pe message karein`]
@@ -685,12 +617,11 @@ export default function AIChatbot() {
 
       // Fallback
       await addBotMessage(
-        "Reply karein:\n1 - Protocol 1 (Rs.499)\n2 - Protocol 2 (Rs.1,299)\n3 - Dono mein kya fark hai?\n4 - Specialist se baat 🙏",
+        "Reply karein:\n1 - 14-Day Protocol Start Karein (Rs.1,299)\n2 - Chota 7-Day Plan (Rs.499)\n3 - Sachin Ji se baat 🙏",
         [
-          "Rs.499 - 7-Day Protocol",
-          "Rs.1,299 - 14-Day Protocol",
-          "Fark samjhna hai",
-          "Sachin Ji se baat"
+          "Yes, 14-Day Protocol (Rs.1,299) Start Karein ✅",
+          "Kuch aur sasta/chota plan hai? (Rs.499)",
+          "Sachin Ji se baat karni hai"
         ]
       );
       return;
@@ -701,32 +632,9 @@ export default function AIChatbot() {
       const name = text.trim();
       const newAnswers = { ...answers, name };
       setAnswers(newAnswers);
-      setStage('ask_phone');
-      await addBotMessage(
-        `${name} Ji 🙏 Aapka WhatsApp number bata dijiye - FREE assessment result wahan bhej denge.`
-      );
-      return;
-    }
-
-    // ── ASK PHONE (then continue assessment) ──
-    if (stage === 'ask_phone') {
-      let phone = text.replace(/\D/g, '');
-      // Strip country code
-      if (phone.startsWith('91') && phone.length === 12) phone = phone.slice(2);
-      if (phone.startsWith('091') && phone.length === 13) phone = phone.slice(3);
-      if (phone.startsWith('0') && phone.length === 11) phone = phone.slice(1);
-      if (phone.length !== 10) {
-        await addBotMessage('Sirf 10 digit ka WhatsApp number daalein 🙏\n\nJaise: 9876543210');
-        return;
-      }
-      const newAnswers = { ...answers, phone };
-      setAnswers(newAnswers);
-
-      sendLead({ stage: 'contact_collected', sinusType: answers.symptom || '', name: answers.name || '', phone });
-
       setStage('q3_tried');
       await addBotMessage(
-        `Shukriya ${answers.name} Ji ✅ Assessment result aapke WhatsApp pe bhi bhejenge.\n\nBas 2 aur chhote sawaal hain.\n\nIske liye pehle kuch try kiya?`,
+        `Shukriya ${name} Ji ✅\n\nBas 2 aur chhote sawaal hain aapki report ready karne se pehle.\n\nIs sinus problem ke liye aapne pehle kya try kiya hai?`,
         [
           "Nahi, kuch nahi kiya abhi tak",
           "Allopathy / antibiotic li",
