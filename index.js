@@ -8,8 +8,8 @@ app.use(express.json());
 
 // QR code helper â generates scannable PNG from any URL via qrserver.com
 function getQRUrl(link){ return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(link)}`; }
-const QR_499  = ()=>getQRUrl(process.env.PAYMENT_499_LINK);
-const QR_1299 = ()=>getQRUrl(process.env.PAYMENT_1299_LINK);
+const QR_499  = ()=>getQRUrl(process.env.PAYMENT_LINK_499);
+const QR_1299 = ()=>getQRUrl(process.env.PAYMENT_LINK_1299);
 
 app.get("/health",(req,res)=>res.json({status:"ok",version:"2.1",time:new Date().toISOString()}));
 
@@ -67,9 +67,9 @@ async function processMessage({userId,text,source,platform,name=""}) {
     } else if(platform==="whatsapp") {
       await sendWAReply(userId,reply);
       // Auto-send QR image when a payment link appears in the reply
-      if(process.env.PAYMENT_499_LINK && reply.includes(process.env.PAYMENT_499_LINK)) {
+      if(process.env.PAYMENT_LINK_499 && reply.includes(process.env.PAYMENT_LINK_499)) {
         await sendWAImage(userId, QR_499(), "ð² Scan karke pay karo â 7-Day Sinus Reset Plan (Rs.499)");
-      } else if(process.env.PAYMENT_1299_LINK && reply.includes(process.env.PAYMENT_1299_LINK)) {
+      } else if(process.env.PAYMENT_LINK_1299 && reply.includes(process.env.PAYMENT_LINK_1299)) {
         await sendWAImage(userId, QR_1299(), "ð² Scan karke pay karo â 14-Day Deep Relief Plan (Rs.1299)");
       }
     }
@@ -78,7 +78,7 @@ async function processMessage({userId,text,source,platform,name=""}) {
 
 async function getAIReply(lead,history) {
   const glossary=Object.entries(terms).map(([w,r])=>`- Never say "${w}" - say "${r}"`).join("\n");
-  const system=`${persona}\n${language}\n${style}\n${conversion}\n\nGLOSSARY:\n${glossary}\n\nLEAD: Name=${lead.name||"Unknown"}, Source=${lead.source}, Status=${lead.status}\nPLANS: Basic Rs.499 = ${process.env.PAYMENT_499_LINK} | Complete Rs.1299 = ${process.env.PAYMENT_1299_LINK}`;
+  const system=`${persona}\n${language}\n${style}\n${conversion}\n\nGLOSSARY:\n${glossary}\n\nLEAD: Name=${lead.name||"Unknown"}, Source=${lead.source}, Status=${lead.status}\nPLANS: Basic Rs.499 = ${process.env.PAYMENT_LINK_499} | Complete Rs.1299 = ${process.env.PAYMENT_LINK_1299}`;
   const response=await claude.messages.create({model:"claude-sonnet-4-6",max_tokens:500,system,messages:history.map(m=>({role:m.role,content:m.content}))});
   return response.content[0].text;
 }
