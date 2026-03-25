@@ -6,12 +6,12 @@ const {terms}=require("./prompts/glossary");
 const app=express(), claude=new Anthropic({apiKey:process.env.ANTHROPIC_API_KEY});
 app.use(express.json());
 
-// QR code helper â generates scannable PNG from any URL via qrserver.com
+// QR code helper — generates scannable PNG from any URL via qrserver.com
 function getQRUrl(link){ return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(link)}`; }
-const QR_499  = ()=>getQRUrl(process.env.PAYMENT_LINK_499);
-const QR_1299 = ()=>getQRUrl(process.env.PAYMENT_LINK_1299);
+const QR_499  = ()=>getQRUrl(process.env.PAYMENT_499_LINK);
+const QR_1299 = ()=>getQRUrl(process.env.PAYMENT_1299_LINK);
 
-app.get("/health",(req,res)=>res.json({status:"ok",version:"2.1",time:new Date().toISOString()}));
+app.get("/health",(req,res)=>res.json({status:"ok",version:"2.2",time:new Date().toISOString()}));
 
 app.get("/webhook",(req,res)=>{
   if(req.query["hub.mode"]==="subscribe"&&req.query["hub.verify_token"]===process.env.WEBHOOK_VERIFY_TOKEN)
@@ -45,7 +45,7 @@ async function handleWA(value) {
     if(msg.type!=="text") continue;
     if(msg.text.body && msg.text.body.trim()==='#repeat'){
       await firebase.clearHistory(msg.from);
-      await sendWAReply(msg.from,'Starting fresh!\n\nMujhe batayein \u2014 aapko kitne time se sinus ki problem hai? Aur sabse zyada kya hota hai \u2014 naak band, sneezing, ya sar mein bhaari pan?');
+      await sendWAReply(msg.from,'Starting fresh!\n\nMujhe batayein — aapko kitne time se sinus ki problem hai? Aur sabse zyada kya hota hai — naak band, sneezing, ya sar mein bhaari pan?');
       continue;
     }
     await processMessage({userId:msg.from,text:msg.text.body,source:"whatsapp",platform:"whatsapp",name:contact.profile?.name||""});
@@ -67,10 +67,10 @@ async function processMessage({userId,text,source,platform,name=""}) {
     } else if(platform==="whatsapp") {
       await sendWAReply(userId,reply);
       // Auto-send QR image when a payment link appears in the reply
-      if(process.env.PAYMENT_LINK_499 && reply.includes(process.env.PAYMENT_LINK_499)) {
-        await sendWAImage(userId, QR_499(), "ð² Scan karke pay karo â 7-Day Sinus Reset Plan (Rs.499)");
-      } else if(process.env.PAYMENT_LINK_1299 && reply.includes(process.env.PAYMENT_LINK_1299)) {
-        await sendWAImage(userId, QR_1299(), "ð² Scan karke pay karo â 14-Day Deep Relief Plan (Rs.1299)");
+      if(process.env.PAYMENT_499_LINK && reply.includes(process.env.PAYMENT_499_LINK)) {
+        await sendWAImage(userId, QR_499(), "💰 Scan karke pay karo – 7-Day Sinus Reset Plan (Rs.499)");
+      } else if(process.env.PAYMENT_1299_LINK && reply.includes(process.env.PAYMENT_1299_LINK)) {
+        await sendWAImage(userId, QR_1299(), "💰 Scan karke pay karo – 14-Day Deep Relief Plan (Rs.1299)");
       }
     }
   } catch(e){ console.error("[ProcessMessage]",e.message); }
@@ -78,7 +78,7 @@ async function processMessage({userId,text,source,platform,name=""}) {
 
 async function getAIReply(lead,history) {
   const glossary=Object.entries(terms).map(([w,r])=>`- Never say "${w}" - say "${r}"`).join("\n");
-  const system=`${persona}\n${language}\n${style}\n${conversion}\n\nGLOSSARY:\n${glossary}\n\nLEAD: Name=${lead.name||"Unknown"}, Source=${lead.source}, Status=${lead.status}\nPLANS: Basic Rs.499 = ${process.env.PAYMENT_LINK_499} | Complete Rs.1299 = ${process.env.PAYMENT_LINK_1299}`;
+  const system=`${persona}\n${language}\n${style}\n${conversion}\n\nGLOSSARY:\n${glossary}\n\nLEAD: Name=${lead.name||"Unknown"}, Source=${lead.source}, Status=${lead.status}\nPLANS: Basic Rs.499 = ${process.env.PAYMENT_499_LINK} | Complete Rs.1299 = ${process.env.PAYMENT_1299_LINK}`;
   const response=await claude.messages.create({model:"claude-sonnet-4-6",max_tokens:500,system,messages:history.map(m=>({role:m.role,content:m.content}))});
   return response.content[0].text;
 }
@@ -96,13 +96,18 @@ async function sendIGReply(userId,text) {
 
 async function sendWAReply(phone,text) {
   try {
-    await fetch(`https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,{method:"POST",headers:{Authorization:`Bearer ${process.env.WHATSAPP_TOKEN}`,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:phone,type:"text",text:{body:text}})});
+    const r=await fetch(`https://graph.facebook.com/v22.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,{method:"POST",headers:{Authorization:`Bearer ${process.env.WHATSAPP_TOKEN}`,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:phone,type:"text",text:{body:text}})});
+    const data=await r.json();
+    if(data.error) console.error("[WA Reply Error]",JSON.stringify(data.error));
+    else console.log("[WA Reply OK]",phone);
   } catch(e){ console.error("[WA Reply]",e.message); }
 }
 
 async function sendWAImage(phone,imageUrl,caption) {
   try {
-    await fetch(`https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,{method:"POST",headers:{Authorization:`Bearer ${process.env.WHATSAPP_TOKEN}`,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:phone,type:"image",image:{link:imageUrl,caption}})});
+    const r=await fetch(`https://graph.facebook.com/v22.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,{method:"POST",headers:{Authorization:`Bearer ${process.env.WHATSAPP_TOKEN}`,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:phone,type:"image",image:{link:imageUrl,caption}})});
+    const data=await r.json();
+    if(data.error) console.error("[WA Image Error]",JSON.stringify(data.error));
   } catch(e){ console.error("[WA Image]",e.message); }
 }
 
@@ -163,6 +168,4 @@ setInterval(() => {
   fetch('https://bot.ayusomamherbals.com/health').catch(() => {});
 }, 10 * 60 * 1000); // every 10 minutes
 const PORT=process.env.PORT||3000;
-app.listen(PORT,()=>console.log(`[Ayusomam v2.1] Running on port ${PORT}`));
-
-
+app.listen(PORT,()=>console.log(`[Ayusomam v2.2] Running on port ${PORT}`));
