@@ -34,16 +34,18 @@ app.post("/webhook",async(req,res)=>{
   res.sendStatus(200);
   try {
     const body=req.body;
+    console.log("[Webhook] Received event, object:",body.object);
     if(!body.object) return;
     for(const entry of body.entry||[]) {
       for(const msg of entry.messaging||[]) {
+        console.log("[Webhook] messaging event from",msg.sender?.id,"keys:",Object.keys(msg).join(","));
         if(msg.message&&!msg.message.is_echo) await handleIG(msg);
         else if(msg.postback) await handleIGPostback(msg);
       }
       for(const change of entry.changes||[])
         if(change.field==="messages") await handleWA(change.value);
     }
-  } catch(e){ console.error("[Webhook]",e.message); }
+  } catch(e){ console.error("[Webhook]",e.message,e.stack); }
 });
 
 async function handleIG(event) {
@@ -112,7 +114,8 @@ async function getAIReply(lead,history) {
 async function sendIGReply(userId,text) {
   try {
     const token=process.env.PAGE_ACCESS_TOKEN||process.env.INSTAGRAM_TOKEN;
-    console.log("[IG] Sending reply to",userId,"token starts:",token?.substring(0,10));
+    if(!token) { console.error("[IG] No PAGE_ACCESS_TOKEN or INSTAGRAM_TOKEN set!"); return; }
+    console.log("[IG] Sending reply to",userId,"token starts:",token?.substring(0,10),"length:",token?.length);
     const r=await fetch(`https://graph.facebook.com/v22.0/me/messages?access_token=${token}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({recipient:{id:userId},message:{text}})});
     const data=await r.json();
     if(data.error) console.error("[IG Reply Error]",JSON.stringify(data.error));
