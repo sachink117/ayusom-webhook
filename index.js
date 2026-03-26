@@ -6,12 +6,23 @@ const {terms}=require("./prompts/glossary");
 const app=express(), claude=new Anthropic({apiKey:process.env.ANTHROPIC_API_KEY});
 app.use(express.json());
 
+// In-memory dedup for WA message IDs — prevents duplicate replies on webhook retries or batched events
+const _seenMsgIds = new Map();
+function _isDupMsg(id) {
+  if (!id) return false;
+  const now = Date.now();
+  if (_seenMsgIds.has(id)) return true;
+  _seenMsgIds.set(id, now);
+  for (const [k, ts] of _seenMsgIds) if (now - ts > 300000) _seenMsgIds.delete(k);
+  return false;
+}
+
 // QR code helper — generates scannable PNG from any URL via qrserver.com
 function getQRUrl(link){ return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(link)}`; }
 const QR_499  = ()=>getQRUrl(process.env.PAYMENT_499_LINK);
 const QR_1299 = ()=>getQRUrl(process.env.PAYMENT_1299_LINK);
 
-app.get("/health",(req,res)=>res.json({status:"ok",version:"2.2",time:new Date().toISOString()}));
+app.get("/health",(req,res)=>res.json({status:"ok",version:"2.3",time:new Date().toISOString()}));
 
 app.get("/webhook",(req,res)=>{
   if(req.query["hub.mode"]==="subscribe"&&req.query["hub.verify_token"]===process.env.WEBHOOK_VERIFY_TOKEN)
@@ -43,6 +54,8 @@ async function handleWA(value) {
   const contact=value.contacts?.[0]||{};
   for(const msg of value.messages||[]) {
     if(msg.type!=="text") continue;
+    // Skip duplicate message IDs (webhook retries / batched re-delivery)
+    if(_isDupMsg(msg.id)){ console.log("[WA] Duplicate skipped:",msg.id); continue; }
     if(msg.text.body && msg.text.body.trim()==='#repeat'){
       await firebase.clearHistory(msg.from);
       await sendWAReply(msg.from,'Starting fresh!\n\nMujhe batayein — aapko kitne time se sinus ki problem hai? Aur sabse zyada kya hota hai — naak band, sneezing, ya sar mein bhaari pan?');
@@ -79,7 +92,11 @@ async function processMessage({userId,text,source,platform,name=""}) {
 async function getAIReply(lead,history) {
   const glossary=Object.entries(terms).map(([w,r])=>`- Never say "${w}" - say "${r}"`).join("\n");
   const system=`${persona}\n${language}\n${style}\n${conversion}\n\nGLOSSARY:\n${glossary}\n\nLEAD: Name=${lead.name||"Unknown"}, Source=${lead.source}, Status=${lead.status}\nPLANS: Basic Rs.499 = ${process.env.PAYMENT_499_LINK} | Complete Rs.1299 = ${process.env.PAYMENT_1299_LINK}`;
-  const response=await claude.messages.create({model:"claude-sonnet-4-6",max_tokens:500,system,messages:history.map(m=>({role:m.role,content:m.content}))});
+  // Sanitize history: Claude API requires first message to be 'user' role
+  let msgs=(history||[]).map(m=>({role:m.role,content:m.content}));
+  while(msgs.length>0 && msgs[0].role!=='user') msgs.shift();
+  if(msgs.length===0) return "Namaste! Mujhe batayein aapko sinus ki problem hai? Kitne time se hai aur kya symptoms hain?";
+  const response=await claude.messages.create({model:"claude-sonnet-4-6",max_tokens:220,system,messages:msgs});
   return response.content[0].text;
 }
 
