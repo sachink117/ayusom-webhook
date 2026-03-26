@@ -36,8 +36,10 @@ app.post("/webhook",async(req,res)=>{
     const body=req.body;
     if(!body.object) return;
     for(const entry of body.entry||[]) {
-      for(const msg of entry.messaging||[])
+      for(const msg of entry.messaging||[]) {
         if(msg.message&&!msg.message.is_echo) await handleIG(msg);
+        else if(msg.postback) await handleIGPostback(msg);
+      }
       for(const change of entry.changes||[])
         if(change.field==="messages") await handleWA(change.value);
     }
@@ -47,6 +49,13 @@ app.post("/webhook",async(req,res)=>{
 async function handleIG(event) {
   const userId=event.sender.id, text=event.message?.text;
   if(!text) return;
+  await processMessage({userId,text,source:"instagram",platform:"instagram"});
+}
+
+async function handleIGPostback(event) {
+  const userId=event.sender.id, text=event.postback?.title||event.postback?.payload;
+  if(!text) return;
+  console.log("[Messenger Postback]",userId,text);
   await processMessage({userId,text,source:"instagram",platform:"instagram"});
 }
 
