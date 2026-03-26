@@ -20,7 +20,9 @@ async function saveMessage(id, role, content) { await db.collection("leads").doc
 async function createMember(data) { const r = await db.collection("members").add({...data,currentDay:1,status:"active",startDate:ts(),createdAt:ts()}); return r.id; }
 async function getMemberByUserId(uid) { const s = await db.collection("members").where("userId","==",uid).where("status","==","active").limit(1).get(); if(s.empty) return null; const d=s.docs[0]; return {id:d.id,...d.data()}; }
 async function updateMemberDay(id) { await db.collection("members").doc(id).update({currentDay:inc(1),lastUpdated:ts()}); }
-async function logProgress(id, data) { const today=new Date().toISOString().split("T")[0]; await db.collection("members").doc(id).collection("progress").doc(today).set({...data,timestamp:ts()}); }
+async function logProgress(id, data) { const today=new Date().toISOString().split("T")[0]; await db.collection("members").doc(id).collection("progress").doc(today).set({...data,timestamp:ts()},{merge:true}); }
+async function getProgress(id) { const s = await db.collection("members").doc(id).collection("progress").orderBy("timestamp","desc").limit(30).get(); return s.docs.map(d=>({date:d.id,...d.data()})); }
+async function getMemberByPhone(phone) { const s = await db.collection("members").where("phone","==",phone).where("status","==","active").limit(1).get(); if(s.empty) return null; const d=s.docs[0]; return {id:d.id,...d.data()}; }
 async function savePayment(data) { await db.collection("payments").add({...data,createdAt:ts()}); }
 async function getAllLeads(limit=100) { const s = await db.collection("leads").orderBy("lastActiveAt","desc").limit(limit).get(); return s.docs.map(d=>({id:d.id,...d.data()})); }
 async function getAllMembers() { const s = await db.collection("members").where("status","==","active").get(); return s.docs.map(d=>({id:d.id,...d.data()})); }
@@ -34,4 +36,4 @@ async function clearHistory(userId) {
   await db.collection("leads").doc(userId).update({ status: "new", lastActiveAt: ts() });
 }
 
-module.exports = { getLead, createLead, updateLead, getHistory, saveMessage, clearHistory, createMember, getMemberByUserId, updateMemberDay, logProgress, savePayment, getAllLeads, getAllMembers, getAllPayments };
+module.exports = { getLead, createLead, updateLead, getHistory, saveMessage, clearHistory, createMember, getMemberByUserId, getMemberByPhone, updateMemberDay, logProgress, getProgress, savePayment, getAllLeads, getAllMembers, getAllPayments };

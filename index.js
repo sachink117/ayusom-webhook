@@ -157,6 +157,41 @@ app.post("/api/lead",async(req,res)=>{
 });
 
 
+// --- Member Symptom/Progress Tracking API ---
+
+app.post("/api/member/progress",async(req,res)=>{
+  try {
+    const{phone,name,day,timeOfDay,symptoms,notes}=req.body;
+    if(!phone&&!name) return res.status(400).json({error:"Phone or name required"});
+    // Find member by phone or name
+    let member=null;
+    if(phone) member=await firebase.getMemberByPhone(phone);
+    if(!member&&name) {
+      const members=await firebase.getAllMembers();
+      member=members.find(m=>m.name&&m.name.toLowerCase()===name.toLowerCase());
+    }
+    // If no member found, create a tracking entry under a generated ID
+    const entry={day:day||null,timeOfDay:timeOfDay||"general",symptoms:symptoms||[],notes:notes||"",loggedAt:new Date().toISOString()};
+    if(member) {
+      const progressKey=timeOfDay?`${timeOfDay}`:"general";
+      await firebase.logProgress(member.id,{[progressKey]:entry});
+      res.json({ok:true,memberId:member.id,entry});
+    } else {
+      // Store under leads collection as progress note
+      const uid=phone?`web_${phone}`:`name_${name.toLowerCase().replace(/\s+/g,"_")}`;
+      await firebase.saveMessage(uid,"system",`[Day ${day||"?"} ${timeOfDay||""}] Symptoms: ${(symptoms||[]).join(", ")}. ${notes||""}`);
+      res.json({ok:true,userId:uid,entry,note:"Member not found, logged as message"});
+    }
+  } catch(e){ console.error("[Progress API]",e.message); res.status(500).json({error:e.message}); }
+});
+
+app.get("/api/member/:id/progress",async(req,res)=>{
+  try {
+    const progress=await firebase.getProgress(req.params.id);
+    res.json(progress);
+  } catch(e){ res.status(500).json({error:e.message}); }
+});
+
 // Fix "Invalid Date" in admin dashboard - convert Firestore Timestamps to ISO strings
 function serializeTimestamps(obj) {
   if(!obj || typeof obj !== 'object') return obj;
