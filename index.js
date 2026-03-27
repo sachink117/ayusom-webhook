@@ -73,7 +73,7 @@ async function processMessage({userId,text,source,platform,name=""}) {
     const history=await firebase.getHistory(userId,20);
     const reply=await getAIReply(lead,history);
     await firebase.saveMessage(userId,"assistant",reply);
-    await firebase.updateLead(userId,{lastMessage:text,name:lead.name||name});
+    await firebase.updateLead(userId,{lastMessage:text,name:lead.name||name,followUpsSent:0});
 
     if(platform==="instagram") {
       await sendIGReply(userId,reply);
@@ -179,6 +179,50 @@ app.get("/admin/data",adminAuth,async(req,res)=>{
 app.get("/admin/lead/:uid/history",adminAuth,async(req,res)=>res.json(await firebase.getHistory(req.params.uid,100)));
 app.use("/public",express.static(path.join(__dirname,"public")));
 
+
+
+// ─────────────────────────────────────────────────
+// AUTOMATED FOLLOW-UP SYSTEM
+// Sends gentle follow-ups to leads who went quiet
+// ─────────────────────────────────────────────────
+const FOLLOW_UP_MSGS=[null,
+  "Sab theek hai? Kal hum baat kar rahe the sinus ke baare mein. Koi sawaal ho toh main yahan hun.",
+  "Ek observation share karna tha. Chronic sinus mein jo log early protocol shuru karte hain, unka recovery time bahut kam hota hai. Aapka case kitne time ka hai?",
+  "Last baar poochh raha hun. Agar try karna hai toh 7-Day Reset se shuru kar sakte hain. Rs. 499. 7 din mein khud judge karein. Interested hain?"
+];
+function _tsMs(ts){if(!ts)return 0;if(typeof ts==='string')return new Date(ts).getTime();if(ts._seconds!==undefined)return ts._seconds*1000;if(ts.seconds!==undefined)return ts.seconds*1000;return 0;}
+async function sendFollowUp(lead,num){
+  try{
+    const msg=FOLLOW_UP_MSGS[num]; if(!msg)return;
+    const plat=lead.platform||lead.source;
+    if(plat==='whatsapp')await sendWAReply(lead.id,msg);
+    else if(plat==='instagram')await sendIGReply(lead.id,msg);
+    else return;
+    await firebase.saveMessage(lead.id,'assistant',msg);
+    await firebase.updateLead(lead.id,{followUpsSent:(lead.followUpsSent||0)+1});
+    console.log('[FollowUp '+num+'] Sent to',lead.id,'('+plat+')');
+  }catch(e){console.error('[FollowUp Send]',e.message);}
+}
+async function checkFollowUps(){
+  try{
+    const leads=await firebase.getAllLeads();
+    const now=Date.now(); let sent=0;
+    for(const lead of leads){
+      if(['member','paid','converted'].includes(lead.status))continue;
+      const plat=lead.platform||lead.source;
+      if(!plat||plat==='website')continue;
+      const lastActive=_tsMs(lead.lastActiveAt); if(!lastActive)continue;
+      const hrs=(now-lastActive)/(1000*60*60);
+      const n=lead.followUpsSent||0;
+      if(hrs>=72&&hrs<168&&n<3){await sendFollowUp(lead,3);sent++;}
+      else if(hrs>=48&&hrs<72&&n<2){await sendFollowUp(lead,2);sent++;}
+      else if(hrs>=24&&hrs<48&&n<1){await sendFollowUp(lead,1);sent++;}
+    }
+    if(sent>0)console.log('[FollowUps] Sent',sent,'follow-up(s)');
+  }catch(e){console.error('[FollowUp Check]',e.message);}
+}
+setInterval(checkFollowUps,2*60*60*1000); // every 2 hours
+setTimeout(checkFollowUps,3*60*1000);     // 3 min after boot
 
 // Keep-alive: prevent Render from sleeping
 setInterval(() => {
